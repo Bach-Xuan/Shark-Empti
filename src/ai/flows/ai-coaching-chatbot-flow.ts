@@ -91,7 +91,7 @@ const aiCoachingChatbotFlow = ai.defineFlow(
 
       const { output } = await tempAi.generate({
         system: SYSTEM_PROMPT,
-        history,
+        messages: history,
         prompt: `User Message: "${input.userMessage}"
 Language: ${input.preferredLanguage === 'vi' ? 'Vietnamese' : 'English'}
 Summary: Concept Mastery ${input.quizSummary.cognitiveMetrics.conceptMastery}%`,

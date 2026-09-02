@@ -128,7 +128,7 @@ export default function Navigation({ view, setView, lang, changeLang, theme, onT
         <div className="flex flex-col">
           <div className="flex items-baseline gap-1 md:gap-2">
             <span className="font-headline font-black text-xs md:text-2xl leading-none text-primary tracking-tight uppercase group-hover:tracking-normal transition-all duration-500">SHARK EMPTI</span>
-            <span className="hidden sm:inline text-[7px] md:text-[10px] font-black text-muted-foreground/50 tracking-widest uppercase ml-0.5 opacity-60">v1.15.0</span>
+            <span className="hidden sm:inline text-[7px] md:text-[10px] font-black text-muted-foreground/50 tracking-widest uppercase ml-0.5 opacity-60">v1.15.1</span>
           </div>
           <span className="hidden md:block text-[9px] font-black text-muted-foreground uppercase tracking-[0.15em] leading-tight whitespace-normal break-words max-w-[120px] md:max-w-none">
             {t.appTagline}

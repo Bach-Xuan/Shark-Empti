@@ -2,13 +2,25 @@ import { genkit } from 'genkit';
 import { openAICompatible } from '@genkit-ai/compat-oai';
 import { AI_MODEL } from './config/model';
 
+function getOpenRouterApiKey(): string {
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim();
+
+  if (!apiKey) {
+    throw new Error(
+      'OPENROUTER_API_KEY is missing. Add it to .env and restart the server.'
+    );
+  }
+
+  return apiKey;
+}
+
 /**
  * Cấu hình OpenRouter qua OpenAI Compatibility API.
  * Thiết lập name là 'openai' để khớp với tiền tố trong AI_MODEL (openai/...).
  */
 const OPENROUTER_CONFIG = {
   name: 'openai',
-  apiKey: process.env.OPENROUTER_API_KEY!,
+  apiKey: getOpenRouterApiKey(),
   baseURL: 'https://openrouter.ai/api/v1',
 };
 
@@ -25,11 +37,13 @@ export const ai = genkit({
  * Hàm khởi tạo AI với API Key động (hỗ trợ Key Rotation/Fallback).
  */
 export function getAiWithKey(apiKey?: string) {
+  const resolvedApiKey = apiKey?.trim() || getOpenRouterApiKey();
+
   return genkit({
     plugins: [
       openAICompatible({
         ...OPENROUTER_CONFIG,
-        apiKey: apiKey || OPENROUTER_CONFIG.apiKey,
+        apiKey: resolvedApiKey,
       }),
     ],
     model: AI_MODEL,

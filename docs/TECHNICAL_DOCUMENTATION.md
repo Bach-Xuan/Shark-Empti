@@ -1,4 +1,4 @@
-# Shark Empti - Technical Documentation (v1.15.0)
+# Shark Empti - Technical Documentation (v1.15.1)
 
 ## 1. Tổng Quan Dự Án (Project Overview)
 **Shark Empti** là một nền tảng học tập thông minh tích hợp AI (Cognitive Learning Platform), lấy cảm hứng từ phong cách thiết kế của Duolingo (Neo-brutalism). Ứng dụng không chỉ dừng lại ở việc tạo câu hỏi mà còn tập trung vào việc **phân tích tư duy**, **giám sát sự tập trung** và **cá nhân hóa lộ trình ôn tập** dựa trên dữ liệu lịch sử của người dùng.
@@ -22,7 +22,7 @@
 *   **Frontend**: Next.js 15 (App Router), React 19, Tailwind CSS.
 *   **UI Components**: ShadCN UI (Radix Primitives) được tinh chỉnh theo style "Duo" (border dày, shadow cứng).
 *   **Backend as a Service**: Firebase (Authentication, Firestore).
-*   **Generative AI**: Firebase Genkit v1.x phối hợp với OpenRouter (Model chủ đạo: Gemma 4).
+*   **Generative AI**: Firebase Genkit v1.37 phối hợp với OpenRouter. Model được chọn bằng `OPENROUTER_MODEL` (mặc định: `nvidia/nemotron-3.5-content-safety:free`).
 *   **On-device AI**: TensorFlow.js (xử lý Focus Tracking trực tiếp trên trình duyệt để bảo mật và tiết kiệm tài nguyên server).
 *   **Math Rendering**: KaTeX (hiển thị công thức Toán/Hóa chuyên nghiệp).
 
@@ -38,15 +38,15 @@
 
 ### 3.1. Hệ thống AI (Genkit & OpenRouter)
 Dự án sử dụng một cơ chế đặc biệt để vượt qua giới hạn của môi trường đám mây:
-*   **Fallback Mechanism (`src/ai/lib/fallback.ts`)**: Tự động xoay vòng danh sách API Keys nếu một key bị rate limit hoặc lỗi.
-*   **Cấu hình Plugin (`src/ai/genkit.ts`)**: Sử dụng `openAICompatible` để kết nối với OpenRouter. Định danh plugin được đặt là `openai` để khớp với tiền tố mô hình `openai/google/gemma-4-31b-it`.
+*   **Fallback Mechanism (`src/ai/lib/fallback.ts`)**: Hiện xác thực và cung cấp một API key. Cơ chế xoay vòng nhiều key chưa được triển khai.
+*   **Cấu hình Plugin (`src/ai/genkit.ts`)**: Sử dụng `openAICompatible` để kết nối với OpenRouter. Định danh plugin là `openai`, khớp với model ref `openai/<OPENROUTER_MODEL>`.
 *   **Prompt Engineering**: Sử dụng Handlebars để chèn ngữ cảnh học tập (khối lớp, độ khó) vào System Prompt của Shark Guru.
 
 ### 3.2. Lá Chắn Tập Trung (Focus Shield)
 *   **Mô hình**: Sử dụng mô hình MobileNet/Face-Landmark đã được convert sang định dạng `model.json` của TensorFlow.js.
 *   **Cơ chế**: Thử nạp `LayersModel` trước, nếu thất bại (do định dạng graph) sẽ tự động chuyển sang `loadGraphModel`. 
 *   **Hiệu năng**: Chạy `requestAnimationFrame` với chu kỳ xử lý 800ms/frame để không làm nóng máy người dùng.
-*   **Ổn định (v1.15.0)**: Khắc phục lỗi ngắt vòng lặp khi thu nhỏ widget và đảm bảo webcam hiển thị mượt mà.
+*   **Ổn định (v1.15.1)**: Khắc phục lỗi ngắt vòng lặp khi thu nhỏ widget và đảm bảo webcam hiển thị mượt mà.
 
 ### 3.3. Schema Dữ liệu (Firestore)
 *   `/users/{userId}`: Thông tin profile, Shark Coins.
@@ -74,7 +74,7 @@ Dự án sử dụng một cơ chế đặc biệt để vượt qua giới hạ
 *   [x] Hệ thống Quiz đa ngôn ngữ (Vi/En).
 *   [x] Phân tích hiệu suất bằng AI.
 *   [x] Diễn đàn thảo luận hỗ trợ LaTeX.
-*   [x] Focus Shield ổn định (v1.15.0).
+*   [x] Focus Shield ổn định (v1.15.1).
 *   [x] Playground (Flashcards 3D & Luyện lỗi sai).
 *   [x] Cấu hình Genkit v1.x ổn định với OpenRouter.
 
@@ -91,7 +91,7 @@ Dự án sử dụng một cơ chế đặc biệt để vượt qua giới hạ
 ## 6. Hướng dẫn cho Developer mới (Onboarding)
 
 ### 6.1. Biến môi trường
-Cần cấu hình `OPENROUTER_API_KEY` trong `.env`. Hệ thống sử dụng mô hình được định nghĩa trong `src/ai/config/model.ts`.
+Cần cấu hình `OPENROUTER_API_KEY` và sáu biến `NEXT_PUBLIC_FIREBASE_*` trong `.env`. `OPENROUTER_MODEL` là tùy chọn. Xem hướng dẫn đầy đủ tại [CONFIGURATION.md](CONFIGURATION.md).
 
 ### 6.2. Cấu trúc thư mục
 *   `src/ai/flows`: Nơi định nghĩa logic của AI (Input/Output schemas).

@@ -15,7 +15,7 @@ export default function BrandBadges() {
       </div>
       <div className="bg-card/90 backdrop-blur-md px-4 md:px-6 py-2 md:py-2.5 rounded-full border-2 border-border shadow-duo w-fit">
         <span className="text-[10px] md:text-xs font-black uppercase tracking-[0.15em] text-primary">
-          SHARK EMPTI v1.15.0
+          SHARK EMPTI v1.15.1
         </span>
       </div>
     </div>

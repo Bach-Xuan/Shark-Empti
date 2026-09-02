@@ -160,7 +160,7 @@ export default function RegisterPage() {
             <div className="flex flex-col">
               <div className="flex items-baseline gap-1 md:gap-2">
                 <span className="font-headline font-black text-lg md:text-2xl leading-none text-primary tracking-tight uppercase">SHARK EMPTI</span>
-                <span className="text-[8px] md:text-[10px] font-black text-muted-foreground/50 tracking-widest uppercase ml-1">v1.15.0</span>
+                <span className="text-[8px] md:text-[10px] font-black text-muted-foreground/50 tracking-widest uppercase ml-1">v1.15.1</span>
               </div>
               <span className="text-[7px] md:text-[9px] font-black text-muted-foreground uppercase tracking-[0.15em] leading-tight whitespace-normal break-words">
                 {t.appTagline}

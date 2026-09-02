@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * @fileOverview Tính năng Lá Chắn Tập Trung (Focus Shield) - v1.15.0
+ * @fileOverview Tính năng Lá Chắn Tập Trung (Focus Shield) - v1.15.1
  * 
- * FIX v1.15.0 (khôi phục vòng lặp AI sau khi minimize):
+ * FIX v1.15.1 (khôi phục vòng lặp AI sau khi minimize):
  *   Bổ sung isOpen và isMinimized vào danh sách dependency của useEffect
  *   chạy startDetection. Điều này đảm bảo khi người dùng mở rộng widget 
  *   (thẻ video được mount lại), logic nhận diện sẽ tự động khởi động lại

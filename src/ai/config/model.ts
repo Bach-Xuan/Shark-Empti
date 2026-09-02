@@ -1,6 +1,8 @@
+export const DEFAULT_OPENROUTER_MODEL =
+  'nvidia/nemotron-3.5-content-safety:free';
+
 export const AI_MODEL_NAME =
-  process.env.OPENROUTER_MODEL ??
-  "nvidia/nemotron-3.5-content-safety:free";
+  process.env.OPENROUTER_MODEL?.trim() || DEFAULT_OPENROUTER_MODEL;
 
 /**
  * Định danh mô hình đầy đủ cho Genkit (bao gồm tiền tố provider).
