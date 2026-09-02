@@ -25,7 +25,7 @@ Sao chép `.env.example` thành `.env`. Không commit `.env`.
 | `OPENROUTER_MODEL` | Tùy chọn; model OpenRouter không gồm tiền tố `openai/`. |
 | `NEXT_PUBLIC_FIREBASE_*` | Cấu hình Web App Firebase dùng ở trình duyệt. |
 
-`OPENROUTER_MODEL` mặc định là `nvidia/nemotron-3.5-content-safety:free`. Cấu hình Firebase Web App không phải secret, nhưng quyền truy cập dữ liệu phải được bảo vệ bằng Firebase Authentication và Security Rules.
+`OPENROUTER_MODEL` mặc định là `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`. Cấu hình Firebase Web App không phải secret, nhưng quyền truy cập dữ liệu phải được bảo vệ bằng Firebase Authentication và Security Rules.
 
 ## Lệnh hữu ích
 
@@ -33,6 +33,7 @@ Sao chép `.env.example` thành `.env`. Không commit `.env`.
 npm run dev          # Chạy Next.js ở cổng 9002
 npm run genkit:dev   # Chạy Genkit Developer UI
 npm run ai:health    # Kiểm tra API key, kết nối và model OpenRouter
+npm run ai:smoke     # Kiểm tra structured output qua Genkit/OpenRouter
 npm run typecheck    # Kiểm tra kiểu TypeScript
 npm run build        # Build production (works on Windows, macOS and Linux)
 ```

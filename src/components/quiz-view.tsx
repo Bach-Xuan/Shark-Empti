@@ -13,6 +13,7 @@ import { QuizConfig } from '@/lib/types';
 import { TranslationSet } from '@/lib/translations';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
+import { getAiErrorMessage } from '@/lib/ai-error-message';
 
 interface QuizViewProps {
   t: TranslationSet;
@@ -67,7 +68,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
         setQuestionStartTime(Date.now());
       } catch (err) {
         console.error("Failed to generate questions", err);
-        setError(lang === 'vi' ? 'KHÔNG THỂ TẠO CÂU HỎI. VUI LÒNG THỬ LẠI.' : 'FAILED TO GENERATE QUESTIONS. PLEASE TRY AGAIN.');
+        setError(getAiErrorMessage(err, lang as 'en' | 'vi'));
       } finally {
         setIsLoading(false);
       }

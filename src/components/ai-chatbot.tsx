@@ -9,6 +9,7 @@ import { aiCoachingChatbotForQuizReview } from '@/ai/flows/ai-coaching-chatbot-f
 import { LatexText } from '@/components/latex-text';
 import { TranslationSet } from '@/lib/translations';
 import { cn } from '@/lib/utils';
+import { getAiErrorMessage } from '@/lib/ai-error-message';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -108,7 +109,10 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
       setMessages(prev => [...prev, { role: 'model', message: cleanResponse }]);
     } catch (e) {
       console.error("Chatbot error:", e);
-      setMessages(prev => [...prev, { role: 'model', message: t.botError }]);
+      setMessages(prev => [...prev, {
+        role: 'model',
+        message: getAiErrorMessage(e, lang as 'en' | 'vi')
+      }]);
     } finally {
       setIsTyping(false);
     }

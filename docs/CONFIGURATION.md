@@ -24,15 +24,24 @@ Firebase Web API key xuất hiện ở client là thiết kế bình thường; 
 
 ## 3. OpenRouter và Genkit
 
-Tạo key tại OpenRouter, đặt vào `OPENROUTER_API_KEY`, sau đó khởi động lại Next.js/Genkit. Tầng AI dùng adapter `@genkit-ai/compat-oai` với endpoint `https://openrouter.ai/api/v1` và model ref `openai/<OPENROUTER_MODEL>`.
+Tạo key tại OpenRouter, đặt vào `OPENROUTER_API_KEY`, sau đó khởi động lại Next.js/Genkit. Tầng AI dùng adapter `@genkit-ai/compat-oai` với endpoint `https://openrouter.ai/api/v1` và model ref `openai/<OPENROUTER_MODEL>`. Mặc định là `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`, hỗ trợ structured output cần cho các AI flow.
+
+### Transport và retry
+
+Adapter truyền `fetch: globalThis.fetch` để buộc OpenAI-compatible client sử dụng native `fetch` của Node. Trong môi trường này, native fetch đọc response stream của OpenRouter ổn định hơn transport mặc định và tránh lỗi `Premature close`.
+
+- **Timeout 60 giây**: một request bị hủy nếu OpenRouter không phản hồi trong thời gian này, tránh request treo vô hạn.
+- **Retry tối đa 2 lần**: chỉ giúp phục hồi các lỗi transport tạm thời như connection reset hoặc response stream bị đóng sớm; mỗi lần thử lại vẫn dùng cùng model và API key.
+- Retry không sửa được HTTP 401/403, API key sai, model không khả dụng hoặc JSON/schema không hợp lệ. Những trường hợp đó cần sửa cấu hình hoặc chọn model khác.
 
 Chạy:
 
 ```bash
 npm run ai:health
+npm run ai:smoke
 ```
 
-Lệnh chỉ gọi danh sách model: nó xác nhận API key, kết nối OpenRouter và model được chọn mà không in API key hoặc tạo nội dung AI.
+`ai:health` chỉ gọi danh sách model: nó xác nhận API key, kết nối OpenRouter và model được chọn mà không in API key hoặc tạo nội dung AI. `ai:smoke` gửi một prompt JSON tối thiểu qua chính adapter Genkit để kiểm tra structured output và lỗi transport.
 
 ## 4. Xử lý lỗi thường gặp
 

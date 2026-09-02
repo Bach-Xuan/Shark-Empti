@@ -5,7 +5,7 @@ config();
 const apiKey = process.env.OPENROUTER_API_KEY?.trim();
 const model =
   process.env.OPENROUTER_MODEL?.trim() ||
-  'nvidia/nemotron-3.5-content-safety:free';
+  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free';
 
 if (!apiKey) {
   throw new Error(

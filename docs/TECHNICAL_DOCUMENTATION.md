@@ -22,7 +22,7 @@
 *   **Frontend**: Next.js 15 (App Router), React 19, Tailwind CSS.
 *   **UI Components**: ShadCN UI (Radix Primitives) được tinh chỉnh theo style "Duo" (border dày, shadow cứng).
 *   **Backend as a Service**: Firebase (Authentication, Firestore).
-*   **Generative AI**: Firebase Genkit v1.37 phối hợp với OpenRouter. Model được chọn bằng `OPENROUTER_MODEL` (mặc định: `nvidia/nemotron-3.5-content-safety:free`).
+*   **Generative AI**: Firebase Genkit v1.37 phối hợp với OpenRouter. Model được chọn bằng `OPENROUTER_MODEL` (mặc định: `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`).
 *   **On-device AI**: TensorFlow.js (xử lý Focus Tracking trực tiếp trên trình duyệt để bảo mật và tiết kiệm tài nguyên server).
 *   **Math Rendering**: KaTeX (hiển thị công thức Toán/Hóa chuyên nghiệp).
 
@@ -40,6 +40,7 @@
 Dự án sử dụng một cơ chế đặc biệt để vượt qua giới hạn của môi trường đám mây:
 *   **Fallback Mechanism (`src/ai/lib/fallback.ts`)**: Hiện xác thực và cung cấp một API key. Cơ chế xoay vòng nhiều key chưa được triển khai.
 *   **Cấu hình Plugin (`src/ai/genkit.ts`)**: Sử dụng `openAICompatible` để kết nối với OpenRouter. Định danh plugin là `openai`, khớp với model ref `openai/<OPENROUTER_MODEL>`.
+*   **Ổn định kết nối**: Adapter được cấu hình dùng `globalThis.fetch` (native `fetch` của Node) thay cho HTTP transport mặc định từng gây lỗi `Premature close` khi đọc response từ OpenRouter. Mỗi request có timeout 60 giây; nếu request bị lỗi transport tạm thời, OpenAI-compatible client tự thử lại tối đa 2 lần. Retry không che giấu lỗi API key, model không tồn tại hoặc response sai schema; các lỗi đó vẫn được trả về để UI báo đúng nguyên nhân.
 *   **Prompt Engineering**: Sử dụng Handlebars để chèn ngữ cảnh học tập (khối lớp, độ khó) vào System Prompt của Shark Guru.
 
 ### 3.2. Lá Chắn Tập Trung (Focus Shield)

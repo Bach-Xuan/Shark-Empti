@@ -22,6 +22,9 @@ const OPENROUTER_CONFIG = {
   name: 'openai',
   apiKey: getOpenRouterApiKey(),
   baseURL: 'https://openrouter.ai/api/v1',
+  fetch: globalThis.fetch,
+  maxRetries: 2,
+  timeout: 60_000,
 };
 
 /**
