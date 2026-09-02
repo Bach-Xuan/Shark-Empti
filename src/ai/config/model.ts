@@ -1,6 +1,6 @@
 export const AI_MODEL_NAME =
   process.env.OPENROUTER_MODEL ??
-  "google/gemma-4-31b-it";
+  "nvidia/nemotron-3.5-content-safety:free";
 
 /**
  * Định danh mô hình đầy đủ cho Genkit (bao gồm tiền tố provider).
