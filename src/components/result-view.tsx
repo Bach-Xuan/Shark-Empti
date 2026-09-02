@@ -11,6 +11,7 @@ import { TranslationSet } from '@/lib/translations';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Language } from '@/lib/types';
+import { showErrorToast, showUnexpectedErrorToast } from '@/lib/error-toast';
 
 interface ResultViewProps {
   t: TranslationSet;
@@ -37,9 +38,15 @@ export default function ResultView({ t, lang, results, onViewDashboard, onRetake
         quizResults: results.quizResults,
         originalTopic: results.config.topic
       });
-      setAnalysisData(data);
+      if (!data.ok) {
+        showErrorToast(data.error, lang);
+        setError(true);
+        return;
+      }
+      setAnalysisData(data.data);
     } catch (e) {
       console.error("AI Performance Analysis failed", e);
+      showUnexpectedErrorToast('AI-REQUEST-FAILED', 'The performance analysis could not be generated.', {}, lang);
       setError(true);
     } finally {
       setIsAnalyzing(false);

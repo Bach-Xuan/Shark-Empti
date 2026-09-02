@@ -32,6 +32,7 @@ import { validateAcademicTopic } from '@/ai/flows/academic-validation-flow';
 import { QuizConfig, BaseViewProps } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import FeatureHelp from './feature-help';
+import { showErrorToast, showUnexpectedErrorToast } from '@/lib/error-toast';
 
 interface SetupViewProps extends BaseViewProps {
   onStart: (config: QuizConfig) => void;
@@ -129,18 +130,24 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
         grade: config.grade === 'none' ? undefined : config.grade,
         language: lang as 'en' | 'vi'
       });
+      if (!result.ok) {
+        showErrorToast(result.error, lang as 'en' | 'vi');
+        return;
+      }
       
-      if (!result.isValid) {
+      if (!result.data.isValid) {
         toast({
           variant: "destructive",
           title: t.invalidTopic.toUpperCase(),
-          description: result.reason || t.notAcademic.toUpperCase(),
+          description: result.data.reason || t.notAcademic.toUpperCase(),
         });
         setIsValidating(false);
         return;
       }
     } catch (err) {
       console.error("Validation error:", err);
+      showUnexpectedErrorToast('AI-REQUEST-FAILED', 'The topic could not be validated.', {}, lang as 'en' | 'vi');
+      return;
     } finally {
       setIsValidating(false);
     }

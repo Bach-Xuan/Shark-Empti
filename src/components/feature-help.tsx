@@ -26,7 +26,7 @@ import { cn } from '@/lib/utils';
 
 interface FeatureHelpProps {
   title: string;
-  items: string[];
+  items: readonly string[];
   helpTitle: string;
   storageKey: string;
 }

@@ -5,7 +5,7 @@ config();
 const apiKey = process.env.OPENROUTER_API_KEY?.trim();
 const model =
   process.env.OPENROUTER_MODEL?.trim() ||
-  'nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free';
+  'liquid/lfm-2.5-2.6b:free';
 
 if (!apiKey) {
   throw new Error(
@@ -14,7 +14,7 @@ if (!apiKey) {
 }
 
 type OpenRouterModelList = {
-  data?: Array<{ id?: string }>;
+  data?: Array<{ id?: string; supported_parameters?: string[] }>;
 };
 
 async function main() {
@@ -31,15 +31,21 @@ async function main() {
   }
 
   const payload = (await response.json()) as OpenRouterModelList;
-  const modelAvailable = payload.data?.some(({ id }) => id === model) ?? false;
+  const configuredModel = payload.data?.find(({ id }) => id === model);
 
-  if (!modelAvailable) {
+  if (!configuredModel) {
     throw new Error(
       `OpenRouter is reachable, but the configured model "${model}" is unavailable. Set OPENROUTER_MODEL to an available model.`
     );
   }
 
-  console.log(`OpenRouter is reachable and the configured model is available: ${model}`);
+  if (!configuredModel.supported_parameters?.includes('response_format')) {
+    throw new Error(
+      `The configured model "${model}" does not advertise response_format support. Choose a model that supports structured output.`
+    );
+  }
+
+  console.log(`OpenRouter is reachable and the configured model supports structured output: ${model}`);
 }
 
 main().catch((error: unknown) => {

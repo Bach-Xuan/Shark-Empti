@@ -1,3 +1,5 @@
+> English below.
+
 # Cấu hình và chẩn đoán
 
 ## 1. Thiết lập `.env`
@@ -24,7 +26,7 @@ Firebase Web API key xuất hiện ở client là thiết kế bình thường; 
 
 ## 3. OpenRouter và Genkit
 
-Tạo key tại OpenRouter, đặt vào `OPENROUTER_API_KEY`, sau đó khởi động lại Next.js/Genkit. Tầng AI dùng adapter `@genkit-ai/compat-oai` với endpoint `https://openrouter.ai/api/v1` và model ref `openai/<OPENROUTER_MODEL>`. Mặc định là `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`, hỗ trợ structured output cần cho các AI flow.
+Tạo key tại OpenRouter, đặt vào `OPENROUTER_API_KEY`, sau đó khởi động lại Next.js/Genkit. Tầng AI dùng adapter `@genkit-ai/compat-oai` với endpoint `https://openrouter.ai/api/v1` và model ref `openai/<OPENROUTER_MODEL>`. Mặc định là `liquid/lfm-2.5-2.6b:free`, hỗ trợ structured output cần cho các AI flow; ứng dụng không tự động chuyển model.
 
 ### Transport và retry
 
@@ -52,6 +54,54 @@ npm run ai:smoke
 | Model unavailable | Đặt `OPENROUTER_MODEL` thành một model hiện có trong OpenRouter. |
 | Firebase khởi tạo rỗng hoặc lỗi domain/project | Kiểm tra đủ sáu biến `NEXT_PUBLIC_FIREBASE_*`, sau đó restart Next.js. |
 | Firestore permission error | Sửa Firebase Security Rules; không giải quyết bằng cách sửa API key client. |
+
+## 6. Mã lỗi AI và kiểm thử
+
+Các lỗi AI được chuẩn hóa và hiển thị trong toast với mã và giá trị an toàn:
+
+| Code | Meaning |
+| --- | --- |
+| `AI-CONFIG-MISSING` | `OPENROUTER_API_KEY` is missing. |
+| `AI-UPSTREAM-502` | The configured provider is overloaded or unavailable. |
+| `AI-RATE-LIMIT-429` | The provider rate limit was reached. |
+| `AI-TRANSPORT` / `AI-TIMEOUT` | The request connection failed or timed out. |
+| `AI-INVALID-RESPONSE` | The model did not satisfy the required schema. |
+
+The toast may include HTTP status, provider code/name, model ID, retry-after seconds, or a Firebase path/operation. It never includes API keys, prompts, or raw provider payloads.
+
+Run `npm test` for unit/component coverage and `npm run test:rules` for the local Firestore Emulator policy. The policy permits signed-in users to read public profiles, forum posts, and Arena exams; learning history, notes, activity, Flashcard sessions, and practice sessions remain owner-only.
+
+The Emulator CLI requires Java 11 or newer on `PATH`.
+
+---
+
+# English version
+
+## 1. `.env` setup
+
+Copy `.env.example` to `.env` and fill every value. Next.js and the Genkit Developer UI load `.env`; this project does not use `.env.local`.
+
+Required groups are `OPENROUTER_API_KEY` and the six `NEXT_PUBLIC_FIREBASE_*` Web App values. `OPENROUTER_MODEL` is optional and must be a valid OpenRouter model ID without the `openai/` prefix. The default is `liquid/lfm-2.5-2.6b:free`; there is no automatic model failover.
+
+## 2. Firebase
+
+Copy the Firebase Console Web App SDK configuration into the six public environment variables. Enable Authentication and Firestore and deploy rules from `firestore.rules` when using production. Browser Firebase API keys are public by design; Authentication and Security Rules protect data.
+
+## 3. OpenRouter and Genkit
+
+The AI layer uses `@genkit-ai/compat-oai` at `https://openrouter.ai/api/v1`, with the model reference `openai/<OPENROUTER_MODEL>`. Native Node fetch is used to avoid premature stream closure, with a 60-second timeout and two transport retries. A 2xx response containing a provider `error` is converted to a safe application error before Genkit parses it.
+
+`npm run ai:health` checks the key, model availability, and `response_format` support without generating content. `npm run ai:smoke` verifies realistic quiz and chatbot structured output.
+
+## 4. Common failures
+
+`AI-CONFIG-MISSING` means the key is absent; `AI-UPSTREAM-502` means the configured provider is overloaded; `AI-RATE-LIMIT-429` means a rate limit; `AI-TRANSPORT` or `AI-TIMEOUT` means a network failure; `AI-INVALID-RESPONSE` means the schema was not satisfied. Toasts expose only safe values such as status, provider, model, retry-after, Firebase path, or operation.
+
+## 5. Emulator and tests
+
+Run `npm test` for unit/component tests and `npm run test:rules` for Firestore Emulator rules tests. Signed-in users may read public profiles, forum posts, and Arena exams. Histories, notes, activity, Flashcard sessions, and practice sessions are owner-only.
+
+The Emulator CLI requires Java 11 or newer on `PATH`.
 
 ## 5. Tình trạng kiểm tra TypeScript
 

@@ -1,9 +1,18 @@
+import { AppError, getAiAppError } from '@/lib/app-error';
+
 type SupportedLanguage = 'en' | 'vi';
+
+export function getAiError(error: unknown): AppError {
+  return getAiAppError(error);
+}
 
 export function getAiErrorMessage(
   error: unknown,
   language: SupportedLanguage
 ): string {
+  if (typeof error === 'object' && error && 'code' in error && 'message' in error) {
+    return (error as AppError).message;
+  }
   const message = error instanceof Error ? error.message : String(error);
   const normalized = message.toLowerCase();
 

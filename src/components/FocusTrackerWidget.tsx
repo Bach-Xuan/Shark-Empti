@@ -48,6 +48,7 @@ import {
   TranslationSet,
 } from "@/lib/translations";
 import { Language } from "@/lib/types";
+import { showUnexpectedErrorToast } from "@/lib/error-toast";
 
 const MODEL_URL = "/models/focus-model/model.json";
 const MODEL_INPUT_SIZE = 224;
@@ -165,6 +166,12 @@ export default function FocusTrackerWidget() {
       return model;
     } catch (error: any) {
       console.error("Focus model error:", error);
+      showUnexpectedErrorToast(
+        "FOCUS-MODEL-LOAD-FAILED",
+        "The focus model could not be loaded.",
+        { model: MODEL_URL },
+        lang
+      );
       setModelError(lang === "vi" 
         ? "Lỗi mô hình AI (model.json). Vui lòng kiểm tra file." 
         : "AI model error (model.json). Please check files.");

@@ -83,6 +83,47 @@ export interface ArenaExam {
   authorPhoto: string;
   createdAt: any;
   totalAttempts: number;
+  questions: QuizResultItem[];
+}
+
+export interface Flashcard {
+  front: string;
+  back: string;
+}
+
+export interface PracticeQuestion {
+  question: string;
+  type: 'Multiple Choice' | 'Short Answer';
+  options?: string[];
+  correct: string;
+  explanation: string;
+}
+
+export interface ForumPost {
+  id: string;
+  title: string;
+  content: string;
+  subject: string;
+  authorId: string;
+  authorName: string;
+  authorPhoto: string;
+  createdAt: any;
+  updatedAt?: any;
+  likesCount: number;
+  commentsCount: number;
+  likedBy?: string[];
+}
+
+export interface ForumComment {
+  id: string;
+  content: string;
+  authorId: string;
+  authorName: string;
+  authorPhoto: string;
+  createdAt: any;
+  updatedAt?: any;
+  likesCount: number;
+  likedBy?: string[];
 }
 
 export interface ArenaAttempt {

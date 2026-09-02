@@ -8,6 +8,7 @@
 import { ai, getAiWithKey } from '@/ai/genkit';
 import { z } from 'genkit';
 import { executeWithFallback } from '@/ai/lib/fallback';
+import { AppResult, asAiResult } from '@/lib/app-error';
 import {
   DEFAULT_GENERATION_CONFIG
 }
@@ -71,8 +72,8 @@ PRIMARY TASKS:
 - Always use LaTeX ($...$) for academic expressions.
 - Always be friendly and encouraging (using 🦈, ✨, ✅).`;
 
-export async function aiCoachingChatbotForQuizReview(input: AiCoachingChatbotInput): Promise<AiCoachingChatbotOutput> {
-  return aiCoachingChatbotFlow(input);
+export async function aiCoachingChatbotForQuizReview(input: AiCoachingChatbotInput): Promise<AppResult<AiCoachingChatbotOutput>> {
+  return asAiResult(() => aiCoachingChatbotFlow(input));
 }
 
 const aiCoachingChatbotFlow = ai.defineFlow(

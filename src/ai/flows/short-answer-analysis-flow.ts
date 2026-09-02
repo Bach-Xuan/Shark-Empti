@@ -7,6 +7,7 @@
 import { ai, getAiWithKey } from '@/ai/genkit';
 import { z } from 'genkit';
 import { executeWithFallback } from '@/ai/lib/fallback';
+import { AppResult, asAiResult } from '@/lib/app-error';
 import {
   DEFAULT_GENERATION_CONFIG
 }
@@ -29,8 +30,8 @@ export type ShortAnswerAnalysisOutput = z.infer<typeof ShortAnswerAnalysisOutput
 
 const SYSTEM_PROMPT = `You are Shark Guru evaluating a student's answer. Be flexible with phrasing but ensure conceptual correctness. Return feedback in the requested language.`;
 
-export async function shortAnswerAnalysis(input: ShortAnswerAnalysisInput): Promise<ShortAnswerAnalysisOutput> {
-  return shortAnswerAnalysisFlow(input);
+export async function shortAnswerAnalysis(input: ShortAnswerAnalysisInput): Promise<AppResult<ShortAnswerAnalysisOutput>> {
+  return asAiResult(() => shortAnswerAnalysisFlow(input));
 }
 
 const shortAnswerAnalysisFlow = ai.defineFlow(

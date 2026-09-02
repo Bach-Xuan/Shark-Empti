@@ -1,3 +1,5 @@
+> English below.
+
 # Shark Empti - Technical Documentation (v1.15.1)
 
 ## 1. Tổng Quan Dự Án (Project Overview)
@@ -22,7 +24,7 @@
 *   **Frontend**: Next.js 15 (App Router), React 19, Tailwind CSS.
 *   **UI Components**: ShadCN UI (Radix Primitives) được tinh chỉnh theo style "Duo" (border dày, shadow cứng).
 *   **Backend as a Service**: Firebase (Authentication, Firestore).
-*   **Generative AI**: Firebase Genkit v1.37 phối hợp với OpenRouter. Model được chọn bằng `OPENROUTER_MODEL` (mặc định: `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free`).
+*   **Generative AI**: Firebase Genkit v1.37 phối hợp với OpenRouter. Model được chọn bằng `OPENROUTER_MODEL` (mặc định: `liquid/lfm-2.5-2.6b:free`), không tự động failover.
 *   **On-device AI**: TensorFlow.js (xử lý Focus Tracking trực tiếp trên trình duyệt để bảo mật và tiết kiệm tài nguyên server).
 *   **Math Rendering**: KaTeX (hiển thị công thức Toán/Hóa chuyên nghiệp).
 
@@ -102,3 +104,29 @@ Cần cấu hình `OPENROUTER_API_KEY` và sáu biến `NEXT_PUBLIC_FIREBASE_*` 
 ### 6.3. Chiến lược Kiểm thử (Test Strategy)
 *   **Manual**: Test các trường hợp nhập Topic không hợp lệ (Ví dụ: "Ăn gì hôm nay") để kiểm tra `academic-validation-flow`.
 *   **Edge Case**: Tắt mạng khi đang làm bài để kiểm tra tính năng lưu tạm (Optimistic UI).
+
+---
+
+# Shark Empti - Technical Documentation (English)
+
+## 1. Project overview
+
+Shark Empti is a Duolingo-inspired cognitive learning platform. It creates quizzes, classifies mistakes, tracks focus, and personalizes revision through history-based Flashcards and practice.
+
+## 2. Architecture
+
+The stack is Next.js 15 App Router, React 19, Tailwind/ShadCN UI, Firebase Authentication/Firestore, Genkit 1.37 with OpenRouter, TensorFlow.js Focus Shield, and KaTeX. The client sends quiz configuration to server AI flows; results are stored under `users/{uid}/history` and rendered by the dashboard.
+
+## 3. AI layer
+
+The default model is `liquid/lfm-2.5-2.6b:free`; `OPENROUTER_MODEL` can override it, and the application intentionally uses one configured model without automatic failover. The OpenAI-compatible adapter uses native fetch, a 60-second timeout, and two transport retries. A provider response with HTTP 200 but an embedded `error` is detected before Genkit accesses `choices`, preventing the previous `undefined.length` crash.
+
+Every AI flow returns a serializable success/error result. Safe error codes include `AI-CONFIG-MISSING`, `AI-UPSTREAM-502`, `AI-RATE-LIMIT-429`, `AI-TRANSPORT`, `AI-TIMEOUT`, and `AI-INVALID-RESPONSE`. Toasts expose only safe diagnostic values.
+
+## 4. Data and security
+
+User profiles are readable by signed-in users for profile search. Histories, notes, activity, Flashcard sessions, and practice sessions are owner-only. Forum posts/comments and Arena exams are publicly readable; authenticated authors may create and edit only their own content. These rules are represented in `firestore.rules` and tested with the Firebase Emulator.
+
+## 5. Testing and onboarding
+
+Use `npm test` for unit/component tests, `npm run test:rules` for emulator rules, `npm run typecheck` for TypeScript, `npm run build` for production compilation, `npm run ai:health` for model capability, and `npm run ai:smoke` for quiz/chat structured-output contracts. The test suite covers authentication/profile, setup, every quiz mode, scoring/results, chatbot, dashboard, notes/activity, Flashcards, practice, Arena, forum, and Focus Shield failure paths.

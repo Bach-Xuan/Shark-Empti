@@ -8,6 +8,7 @@
 import { ai, getAiWithKey } from '@/ai/genkit';
 import { z } from 'genkit';
 import { executeWithFallback } from '@/ai/lib/fallback';
+import { AppResult, asAiResult } from '@/lib/app-error';
 import {
   DEFAULT_GENERATION_CONFIG
 }
@@ -97,8 +98,8 @@ Label as Improvement ONLY if systematic error exists:
 
 Output must be a valid JSON object matching the defined schema. Use LaTeX for math/science.`;
 
-export async function personalizedQuizPerformanceFeedback(input: PersonalizedQuizFeedbackInput): Promise<PersonalizedQuizFeedbackOutput> {
-  return personalizedQuizFeedbackFlow(input);
+export async function personalizedQuizPerformanceFeedback(input: PersonalizedQuizFeedbackInput): Promise<AppResult<PersonalizedQuizFeedbackOutput>> {
+  return asAiResult(() => personalizedQuizFeedbackFlow(input));
 }
 
 const personalizedQuizFeedbackFlow = ai.defineFlow(

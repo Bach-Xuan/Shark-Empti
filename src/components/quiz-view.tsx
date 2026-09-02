@@ -14,6 +14,7 @@ import { TranslationSet } from '@/lib/translations';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { getAiErrorMessage } from '@/lib/ai-error-message';
+import { showErrorToast, showUnexpectedErrorToast } from '@/lib/error-toast';
 
 interface QuizViewProps {
   t: TranslationSet;
@@ -64,10 +65,16 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
           numQuestions: Math.min(parseInt(config.numQuestions) || 5, 50),
           language: lang as 'en' | 'vi',
         });
-        setQuestions(result.questions);
+        if (!result.ok) {
+          showErrorToast(result.error, lang as 'en' | 'vi');
+          setError(result.error.message);
+          return;
+        }
+        setQuestions(result.data.questions);
         setQuestionStartTime(Date.now());
       } catch (err) {
         console.error("Failed to generate questions", err);
+        showUnexpectedErrorToast('AI-REQUEST-FAILED', 'Questions could not be generated.', {}, lang as 'en' | 'vi');
         setError(getAiErrorMessage(err, lang as 'en' | 'vi'));
       } finally {
         setIsLoading(false);
@@ -97,15 +104,19 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
     }
 
     try {
-      const analysis = await personalizedQuizPerformanceFeedback({ 
+      const analysis = await personalizedQuizPerformanceFeedback({
         quizResults: finalAnswers,
         originalTopic: config.topic
       });
+      if (!analysis.ok) {
+        showErrorToast(analysis.error, lang as 'en' | 'vi');
+        throw new Error(analysis.error.code);
+      }
       
       const bilingualConfig = {
         ...config,
-        topicEn: analysis.topicEn,
-        topicVi: analysis.topicVi
+        topicEn: analysis.data.topicEn,
+        topicVi: analysis.data.topicVi
       };
 
       onFinish({
@@ -158,8 +169,12 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
           correctAnswer: currentQ.correct,
           language: lang as 'en' | 'vi'
         });
-        isCorrect = result.isCorrect;
-        aiFeedback = result.feedback;
+        if (!result.ok) {
+          showErrorToast(result.error, lang as 'en' | 'vi');
+        } else {
+          isCorrect = result.data.isCorrect;
+          aiFeedback = result.data.feedback;
+        }
       } catch (e) {
         isCorrect = userAnswer.toLowerCase().trim() === currentQ.correct.toLowerCase().trim();
       } finally {
@@ -195,15 +210,19 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
     } else {
       setIsFinishing(true);
       try {
-        const analysis = await personalizedQuizPerformanceFeedback({ 
+      const analysis = await personalizedQuizPerformanceFeedback({
           quizResults: updatedAnswers,
           originalTopic: config.topic
-        });
+      });
+        if (!analysis.ok) {
+          showErrorToast(analysis.error, lang as 'en' | 'vi');
+          throw new Error(analysis.error.code);
+        }
 
         const bilingualConfig = {
           ...config,
-          topicEn: analysis.topicEn,
-          topicVi: analysis.topicVi
+          topicEn: analysis.data.topicEn,
+          topicVi: analysis.data.topicVi
         };
 
         onFinish({

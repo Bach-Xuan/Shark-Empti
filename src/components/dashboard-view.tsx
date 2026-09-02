@@ -940,7 +940,7 @@ function DashboardInsightList({ title, icon, data, type, t, onCopy, isCopied, on
           <div className="space-y-6 md:space-y-16 pb-4 md:pb-10">
             {data.map((group, idx) => {
               const topicChecks = (roadmapStatus && roadmapStatus[group.topic]) || {};
-              const isTopicDone = type === 'feedback' && group.recommendations.length > 0 && group.recommendations.every((_, i) => !!topicChecks[i]);
+              const isTopicDone = type === 'feedback' && group.recommendations.length > 0 && group.recommendations.every((_: string, i: number) => !!topicChecks[i]);
 
               return (
                 <div key={idx} className="space-y-4 md:space-y-10 animate-in fade-in slide-in-from-left-4 duration-500" style={{ animationDelay: `${idx * 100}ms` }}>

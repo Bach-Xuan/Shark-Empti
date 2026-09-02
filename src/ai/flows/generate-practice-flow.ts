@@ -7,6 +7,7 @@
 import { ai, getAiWithKey } from '@/ai/genkit';
 import { z } from 'genkit';
 import { executeWithFallback } from '@/ai/lib/fallback';
+import { AppResult, asAiResult } from '@/lib/app-error';
 import {
   DEFAULT_GENERATION_CONFIG
 }
@@ -41,8 +42,8 @@ Rules:
 4. LaTeX: Use LaTeX for ALL academic expressions.
 5. NO TRIVIA: Test application and comprehension skills.`;
 
-export async function generatePractice(input: GeneratePracticeInput): Promise<GeneratePracticeOutput> {
-  return generatePracticeFlow(input);
+export async function generatePractice(input: GeneratePracticeInput): Promise<AppResult<GeneratePracticeOutput>> {
+  return asAiResult(() => generatePracticeFlow(input));
 }
 
 const generatePracticeFlow = ai.defineFlow(

@@ -518,4 +518,8 @@ export const translations = {
   }
 } as const;
 
-export type TranslationSet = typeof translations.en;
+export type TranslationSet = {
+  [Key in keyof typeof translations.en]: (typeof translations.en)[Key] extends readonly string[]
+    ? readonly string[]
+    : string;
+};

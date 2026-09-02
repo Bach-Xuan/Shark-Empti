@@ -7,6 +7,7 @@
 import { ai, getAiWithKey } from '@/ai/genkit';
 import { z } from 'genkit';
 import { executeWithFallback } from '@/ai/lib/fallback';
+import { AppResult, asAiResult } from '@/lib/app-error';
 import {
   DEFAULT_GENERATION_CONFIG
 }
@@ -36,8 +37,8 @@ Validation Rules:
 
 Return a JSON object with "isValid" (boolean) and "reason" (string, explain in the requested language).`;
 
-export async function validateAcademicTopic(input: AcademicValidationInput): Promise<AcademicValidationOutput> {
-  return academicValidationFlow(input);
+export async function validateAcademicTopic(input: AcademicValidationInput): Promise<AppResult<AcademicValidationOutput>> {
+  return asAiResult(() => academicValidationFlow(input));
 }
 
 const academicValidationFlow = ai.defineFlow(

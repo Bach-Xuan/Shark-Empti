@@ -7,6 +7,7 @@
 import { ai, getAiWithKey } from '@/ai/genkit';
 import { z } from 'genkit';
 import { executeWithFallback } from '@/ai/lib/fallback';
+import { AppResult, asAiResult } from '@/lib/app-error';
 import {
   DEFAULT_GENERATION_CONFIG
 }
@@ -53,8 +54,8 @@ Mandatory Rules:
 9. Exclusions: STRICTLY DO NOT generate questions related to any concepts or sub-topics mentioned in the "Exclude" list.
 10. Sections: For every question, identify the specific sub-topic or section it belongs to within the main topic. Be concise (max 3-4 words).`;
 
-export async function generateQuestions(input: GenerateQuestionsInput): Promise<GenerateQuestionsOutput> {
-  return generateQuestionsFlow(input);
+export async function generateQuestions(input: GenerateQuestionsInput): Promise<AppResult<GenerateQuestionsOutput>> {
+  return asAiResult(() => generateQuestionsFlow(input));
 }
 
 const generateQuestionsFlow = ai.defineFlow(

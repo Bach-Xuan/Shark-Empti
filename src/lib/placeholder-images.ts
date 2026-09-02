@@ -1,5 +1,3 @@
-import data from '@/app/lib/placeholder-images.json';
-
 export type ImagePlaceholder = {
   id: string;
   description: string;
@@ -7,4 +5,6 @@ export type ImagePlaceholder = {
   imageHint: string;
 };
 
-export const PlaceHolderImages: ImagePlaceholder[] = data.placeholderImages;
+// Image placeholders are optional. Keeping this empty avoids a runtime import of
+// a generated asset that is not part of the repository.
+export const PlaceHolderImages: ImagePlaceholder[] = [];

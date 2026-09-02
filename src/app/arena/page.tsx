@@ -45,6 +45,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import SetupView from '@/components/setup-view';
 import { generateQuestions } from '@/ai/flows/generate-questions-flow';
+import { showErrorToast, showUnexpectedErrorToast } from '@/lib/error-toast';
 
 export default function ArenaPage() {
   const { user } = useUser();
@@ -101,7 +102,12 @@ export default function ArenaPage() {
         language: lang as 'en' | 'vi',
       });
 
-      if (!result.questions || result.questions.length === 0) {
+      if (!result.ok) {
+        showErrorToast(result.error, lang);
+        return;
+      }
+
+      if (!result.data.questions || result.data.questions.length === 0) {
         throw new Error("No questions generated");
       }
 
@@ -109,7 +115,7 @@ export default function ArenaPage() {
       const examData = {
         title: config.topic,
         config,
-        questions: result.questions,
+        questions: result.data.questions,
         authorId: user.uid,
         authorName: user.displayName || 'Learner',
         authorPhoto: user.photoURL || '',
@@ -123,7 +129,7 @@ export default function ArenaPage() {
       router.push(`/arena/${docRef.id}`);
     } catch (e) {
       console.error(e);
-      toast({ variant: "destructive", title: lang === 'vi' ? "Không thể tạo bài thi. Vui lòng thử lại." : "Failed to create exam. Please try again." });
+      showUnexpectedErrorToast('ARENA-CREATE-FAILED', lang === 'vi' ? 'Không thể tạo bài thi.' : 'Failed to create the Arena exam.', {}, lang);
     } finally {
       setIsCreating(false);
     }

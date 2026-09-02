@@ -7,6 +7,7 @@
 import { ai, getAiWithKey } from '@/ai/genkit';
 import { z } from 'genkit';
 import { executeWithFallback } from '@/ai/lib/fallback';
+import { AppResult, asAiResult } from '@/lib/app-error';
 import {
   DEFAULT_GENERATION_CONFIG
 }
@@ -37,8 +38,8 @@ Rules:
 4. Language: Strict compliance with the requested language.
 5. Clarity: The 'front' should be a provocative prompt or question. The 'back' should be a clear, definitive explanation.`;
 
-export async function generateFlashcards(input: GenerateFlashcardsInput): Promise<GenerateFlashcardsOutput> {
-  return generateFlashcardsFlow(input);
+export async function generateFlashcards(input: GenerateFlashcardsInput): Promise<AppResult<GenerateFlashcardsOutput>> {
+  return asAiResult(() => generateFlashcardsFlow(input));
 }
 
 const generateFlashcardsFlow = ai.defineFlow(

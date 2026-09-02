@@ -38,6 +38,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useToast } from '@/hooks/use-toast';
 import FeatureHelp from './feature-help';
+import { showErrorToast, showUnexpectedErrorToast } from '@/lib/error-toast';
 
 interface PlaygroundViewProps {
   t: TranslationSet;
@@ -128,7 +129,10 @@ function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: {
   const [isFlipped, setIsFlipped] = useState(false);
 
   const startSession = async () => {
-    if (!topic.trim()) return;
+    if (!topic.trim()) {
+      showUnexpectedErrorToast('VALIDATION-TOPIC-REQUIRED', 'Enter a topic before starting.', {}, lang);
+      return;
+    }
     
     setIsValidating(true);
     try {
@@ -137,11 +141,16 @@ function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: {
         language: lang as 'en' | 'vi'
       });
 
-      if (!validation.isValid) {
+      if (!validation.ok) {
+        showErrorToast(validation.error, lang);
+        return;
+      }
+
+      if (!validation.data.isValid) {
         toast({
           variant: "destructive",
           title: t.invalidTopic.toUpperCase(),
-          description: validation.reason || t.notAcademic.toUpperCase(),
+          description: validation.data.reason || t.notAcademic.toUpperCase(),
         });
         setIsValidating(false);
         return;
@@ -151,7 +160,11 @@ function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: {
       setIsGenerating(true);
       
       const result = await generateFlashcards({ topic, numCards, language: lang as 'en' | 'vi' });
-      setCards(result.cards);
+      if (!result.ok) {
+        showErrorToast(result.error, lang);
+        return;
+      }
+      setCards(result.data.cards);
       setCurrentIdx(0);
       setIsFlipped(false);
 
@@ -161,7 +174,7 @@ function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: {
           userId: user.uid,
           sourceType: initialConcept ? 'weak_point' : 'manual',
           sourceValue: topic,
-          cards: result.cards,
+          cards: result.data.cards,
           createdAt: new Date().toISOString()
         }).catch(async () => {
           errorEmitter.emit('permission-error', new FirestorePermissionError({ path: sessionRef.path, operation: 'create' }));
@@ -169,6 +182,7 @@ function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: {
       }
     } catch (e) {
       console.error(e);
+      showUnexpectedErrorToast('AI-REQUEST-FAILED', 'Flashcards could not be generated.', {}, lang);
       setIsValidating(false);
     } finally {
       setIsGenerating(false);
@@ -431,7 +445,10 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
   }, [topicsWithMistakes, concept]);
 
   const startSession = async () => {
-    if (!concept.trim()) return;
+    if (!concept.trim()) {
+      showUnexpectedErrorToast('VALIDATION-CONCEPT-REQUIRED', 'Enter a concept before starting.', {}, lang);
+      return;
+    }
     
     setIsValidating(true);
     try {
@@ -440,11 +457,16 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
         language: lang as 'en' | 'vi'
       });
 
-      if (!validation.isValid) {
+      if (!validation.ok) {
+        showErrorToast(validation.error, lang);
+        return;
+      }
+
+      if (!validation.data.isValid) {
         toast({
           variant: "destructive",
           title: t.invalidTopic.toUpperCase(),
-          description: validation.reason || t.notAcademic.toUpperCase(),
+          description: validation.data.reason || t.notAcademic.toUpperCase(),
         });
         setIsValidating(false);
         return;
@@ -454,11 +476,16 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
       setIsGenerating(true);
       
       const result = await generatePractice({ concept, numQuestions, language: lang as 'en' | 'vi' });
-      setQuestions(result.questions);
+      if (!result.ok) {
+        showErrorToast(result.error, lang);
+        return;
+      }
+      setQuestions(result.data.questions);
       setCurrentIdx(0);
       setAnswers([]);
     } catch (e) {
       console.error(e);
+      showUnexpectedErrorToast('AI-REQUEST-FAILED', 'Practice questions could not be generated.', {}, lang);
       setIsValidating(false);
     } finally {
       setIsGenerating(false);

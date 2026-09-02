@@ -10,6 +10,7 @@ import { LatexText } from '@/components/latex-text';
 import { TranslationSet } from '@/lib/translations';
 import { cn } from '@/lib/utils';
 import { getAiErrorMessage } from '@/lib/ai-error-message';
+import { showErrorToast, showUnexpectedErrorToast } from '@/lib/error-toast';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -105,10 +106,17 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
         chatHistory: currentHistory
       });
 
-      const cleanResponse = response.aiResponse.replace(/\\n/g, '\n');
+      if (!response.ok) {
+        showErrorToast(response.error, lang as 'en' | 'vi');
+        setMessages(prev => [...prev, { role: 'model', message: response.error.message }]);
+        return;
+      }
+
+      const cleanResponse = response.data.aiResponse.replace(/\\n/g, '\n');
       setMessages(prev => [...prev, { role: 'model', message: cleanResponse }]);
     } catch (e) {
       console.error("Chatbot error:", e);
+      showUnexpectedErrorToast('AI-REQUEST-FAILED', 'The chatbot could not respond.', {}, lang as 'en' | 'vi');
       setMessages(prev => [...prev, {
         role: 'model',
         message: getAiErrorMessage(e, lang as 'en' | 'vi')
