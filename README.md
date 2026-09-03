@@ -15,6 +15,8 @@ Shark Empti biến một chủ đề bạn muốn chinh phục thành hành trì
 
 AI luôn được kiểm tra schema ở server và dùng fallback OpenRouter để trải nghiệm không phụ thuộc vào một model duy nhất. Kết quả AI là hỗ trợ học tập, không thay thế việc tự kiểm chứng kiến thức.
 
+Khi AI không hoàn tất, popup giữ mã lỗi và metadata an toàn như thao tác, số model đã thử, lỗi cuối và HTTP status nếu có; không hiển thị prompt, phản hồi raw, stack trace hay secret.
+
 ## Bắt đầu
 
 Yêu cầu Node 24, npm và cấu hình Firebase Web App. Dùng PowerShell trên Windows:
@@ -85,6 +87,8 @@ Shark Empti turns a topic you want to master into a clear learning journey: crea
 - **Focus Shield:** supports concentration with an in-browser camera feature when you choose to enable it.
 
 AI responses are schema-validated on the server and use OpenRouter fallback, so the experience does not depend on one model alone. AI output supports learning; it does not replace checking your own understanding.
+
+When AI cannot complete a request, the popup retains an error code and safe metadata such as operation, attempted-model count, last failure and HTTP status when available; it never shows prompts, raw responses, stack traces or secrets.
 
 ## Getting started
 

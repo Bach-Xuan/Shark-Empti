@@ -7,7 +7,7 @@ import { translatedError } from '@/lib/i18n/errors';
 type SupportedLanguage = 'en' | 'vi';
 
 function formatValues(values: Record<string, ErrorValue>): string {
-  const entries = Object.entries(values).filter(([key, value]) => value !== '' && ['httpStatus', 'providerCode', 'retryAfterSeconds', 'operation'].includes(key));
+  const entries = Object.entries(values).filter(([key, value]) => value !== '' && ['httpStatus', 'providerCode', 'retryAfterSeconds', 'operation', 'attemptedModels', 'lastFailure'].includes(key));
   return entries.length ? entries.map(([key, value]) => `${key}: ${value}`).join(' | ') : '';
 }
 

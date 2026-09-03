@@ -24,13 +24,13 @@ it.each([
   [{ ...question, correct: '5' }], [{ ...question, type: 'Unknown' }], [question, question],
 ].map(questions => ({ questions })))('rejects unusable question output after every fallback model rejects it', async ({ questions }) => {
   const request = reply({ questions });
-  expect(await generateQuestions(input)).toMatchObject({ ok: false, error: { code: 'AI-INVALID-RESPONSE' } });
+  expect(await generateQuestions(input)).toMatchObject({ ok: false, error: { code: 'AI-FALLBACK-EXHAUSTED', values: { operation: 'generate-questions', attemptedModels: 3, lastFailure: 'AI-INVALID-RESPONSE' } } });
   expect(request).toHaveBeenCalledTimes(3);
 });
 it('enforces numeric Arena answers while allowing free text in personal quizzes', async () => {
   const free = { ...question, options: undefined, type: 'Short Answer', correct: 'four' };
   reply({ questions: [free] });
-  expect(await generateQuestions({ ...input, type: 'Short Answer', arenaMode: true })).toMatchObject({ ok: false, error: { code: 'AI-INVALID-RESPONSE' } });
+  expect(await generateQuestions({ ...input, type: 'Short Answer', arenaMode: true })).toMatchObject({ ok: false, error: { code: 'AI-FALLBACK-EXHAUSTED' } });
   expect((await generateQuestions({ ...input, type: 'Short Answer' })).ok).toBe(true);
 });
 it('supports valid mixed types and Vietnamese true/false', async () => {
@@ -40,7 +40,7 @@ it('supports valid mixed types and Vietnamese true/false', async () => {
 });
 it('rejects feedback metrics outside the chatbot contract', async () => {
   reply({ ...analysis, topicEn: 'Addition', topicVi: 'Phép cộng', cognitiveMetrics: { ...analysis.cognitiveMetrics, conceptMastery: 101 } });
-  expect(await personalizedQuizPerformanceFeedback({ quizResults: [], originalTopic: 'Addition' })).toMatchObject({ ok: false, error: { code: 'AI-INVALID-RESPONSE' } });
+  expect(await personalizedQuizPerformanceFeedback({ quizResults: [], originalTopic: 'Addition' })).toMatchObject({ ok: false, error: { code: 'AI-FALLBACK-EXHAUSTED' } });
 });
 it.each(['4', '-0.25', '+12.5', '.5'])('accepts numeric Arena answer %s', async correct => {
   reply({ questions: [{ ...question, type: 'Short Answer', options: undefined, correct }] });
@@ -48,14 +48,14 @@ it.each(['4', '-0.25', '+12.5', '.5'])('accepts numeric Arena answer %s', async 
 });
 it('validates practice options and exact counts, and nonempty flashcards', async () => {
   reply({ questions: [{ ...question, options: ['4', '3'] }] });
-  expect(await generatePractice({ concept: 'Addition', numQuestions: 1, language: 'en' })).toMatchObject({ ok: false, error: { code: 'AI-INVALID-RESPONSE' } });
+  expect(await generatePractice({ concept: 'Addition', numQuestions: 1, language: 'en' })).toMatchObject({ ok: false, error: { code: 'AI-FALLBACK-EXHAUSTED' } });
   reply({ cards: [{ front: '2+2', back: '   ' }] });
-  expect(await generateFlashcards({ topic: 'Addition', numCards: 1, language: 'en' })).toMatchObject({ ok: false, error: { code: 'AI-INVALID-RESPONSE' } });
+  expect(await generateFlashcards({ topic: 'Addition', numCards: 1, language: 'en' })).toMatchObject({ ok: false, error: { code: 'AI-FALLBACK-EXHAUSTED' } });
   reply({ cards: [{ front: '2+2', back: '4' }] });
-  expect(await generateFlashcards({ topic: 'Addition', numCards: 2, language: 'en' })).toMatchObject({ ok: false, error: { code: 'AI-INVALID-RESPONSE' } });
+  expect(await generateFlashcards({ topic: 'Addition', numCards: 2, language: 'en' })).toMatchObject({ ok: false, error: { code: 'AI-FALLBACK-EXHAUSTED' } });
 });
 it('enforces Vietnamese true/false labels but retains the English subject exception', async () => {
   reply({ questions: [{ ...question, type: 'True/False', options: ['True', 'False'], correct: 'True' }] });
-  expect(await generateQuestions({ ...input, type: 'True/False', language: 'vi' })).toMatchObject({ ok: false, error: { code: 'AI-INVALID-RESPONSE' } });
+  expect(await generateQuestions({ ...input, type: 'True/False', language: 'vi' })).toMatchObject({ ok: false, error: { code: 'AI-FALLBACK-EXHAUSTED' } });
   expect((await generateQuestions({ ...input, type: 'True/False', language: 'vi', subject: 'english' })).ok).toBe(true);
 });

@@ -6,7 +6,7 @@ import { LAST_RESORT_OPENROUTER_MODEL, modelsWithNativeStructuredOutput, OPENROU
 type Message = { role: 'user' | 'assistant'; content: string };
 const pause = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));
 const failure = (code: string, status?: number) => new OpenRouterProviderError(
-  createAppError(code, 'The AI request could not be completed.', status ? { httpStatus: status } : {}),
+  createAppError(code, 'The AI request could not be completed.', status ? { httpStatus: status, providerCode: String(status) } : {}),
 );
 
 let preferredModel: OpenRouterModel = OPENROUTER_MODEL_PRIORITY[0];
@@ -33,9 +33,11 @@ const orderedModels = (first: OpenRouterModel) => [
   ...OPENROUTER_MODEL_PRIORITY.filter(model => model !== first),
 ];
 
-const cancellationOrder = () => [
-  LAST_RESORT_OPENROUTER_MODEL,
-  ...OPENROUTER_MODEL_PRIORITY.filter(model => model !== LAST_RESORT_OPENROUTER_MODEL),
+const cancellationOrder = (interruptedModel: OpenRouterModel) => [
+  // If a non-Nemotron request was interrupted, try Nemotron immediately.
+  ...(interruptedModel === LAST_RESORT_OPENROUTER_MODEL ? [] : [LAST_RESORT_OPENROUTER_MODEL]),
+  // Then complete one normal priority pass, including Nemotron at the end.
+  ...OPENROUTER_MODEL_PRIORITY,
 ];
 
 const parseJsonContent = (content: string): unknown => {
@@ -44,7 +46,7 @@ const parseJsonContent = (content: string): unknown => {
   return JSON.parse(fenced?.[1] ?? trimmed);
 };
 
-type StructuredRequest<T> = { system: string; prompt: string; schema: z.ZodType<T>; messages?: Message[] };
+type StructuredRequest<T> = { operation: string; system: string; prompt: string; schema: z.ZodType<T>; messages?: Message[] };
 const FLOW_MODEL_TIMEOUT_MS = 20_000;
 const WARMUP_MODEL_TIMEOUT_MS = 8_000;
 
@@ -97,25 +99,35 @@ async function requestStructured<T>(model: OpenRouterModel, { system, prompt, sc
 
 /** Every public flow shares the same bounded, model-aware fallback sequence. */
 export async function generateStructured<T>(request: StructuredRequest<T>): Promise<T> {
-  let lastError: unknown = failure('AI-REQUEST-FAILED');
+  let lastError = createAppError('AI-REQUEST-FAILED', 'The AI request could not be completed.');
+  let attemptedModels = 0;
+  let hasCancellationRollover = false;
   let models = orderedModels(preferredModel);
   while (models.length) {
     const model = models.shift()!;
+    attemptedModels++;
     try {
       const result = await requestStructured(model, request);
       preferredModel = model;
       return result;
     } catch (error) {
-      lastError = error;
+      lastError = getAiAppError(error);
       if (!canTryAnotherModel(error)) throw error;
-      if (isCancellation(error)) {
+      if (isCancellation(error) && !hasCancellationRollover) {
         // A cancelled generation gets the requested last-resort model first.
         // If that also fails, continue once through the normal priority list.
-        models = cancellationOrder().filter(candidate => candidate !== model || candidate !== LAST_RESORT_OPENROUTER_MODEL);
+        models = cancellationOrder(model);
+        hasCancellationRollover = true;
       }
     }
   }
-  throw lastError;
+  throw new OpenRouterProviderError(createAppError('AI-FALLBACK-EXHAUSTED', 'No fallback model could complete the AI request.', {
+    operation: request.operation,
+    attemptedModels,
+    lastFailure: lastError.code,
+    ...(typeof lastError.values.httpStatus === 'number' ? { httpStatus: lastError.values.httpStatus } : {}),
+    ...(typeof lastError.values.providerCode === 'string' ? { providerCode: lastError.values.providerCode } : {}),
+  }));
 }
 
 /** A lightweight structured response proves the same contract used by the real flows. */
@@ -123,6 +135,7 @@ export async function warmOpenRouterModels(): Promise<{ available: boolean; retr
   for (const model of OPENROUTER_MODEL_PRIORITY) {
     try {
       await requestStructured(model, {
+        operation: 'warmup',
         system: 'You are a service health check.',
         prompt: 'Return {"ready":true}.',
         schema: z.object({ ready: z.literal(true) }),

@@ -15,4 +15,13 @@ describe('error toast', () => {
     expect(screen.getByText(/providerCode: 502/)).toBeTruthy();
     expect(screen.queryByText(/Request unavailable/)).toBeNull();
   });
+
+  it('shows fallback diagnostics but not the provider message', async () => {
+    render(<Toaster />);
+    showErrorToast({ code: 'AI-FALLBACK-EXHAUSTED', message: 'raw provider message', values: { operation: 'generate-questions', attemptedModels: 3, lastFailure: 'AI-TIMEOUT', providerCode: '403' } }, 'vi');
+    expect(await screen.findByText('Mã lỗi: AI-FALLBACK-EXHAUSTED')).toBeTruthy();
+    expect(screen.getByText(/attemptedModels: 3/)).toBeTruthy();
+    expect(screen.getByText(/lastFailure: AI-TIMEOUT/)).toBeTruthy();
+    expect(screen.queryByText(/raw provider message/)).toBeNull();
+  });
 });

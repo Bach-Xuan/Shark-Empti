@@ -57,7 +57,7 @@ Wildcard users/{uid}/{collection}/{document=**} chỉ áp dụng subcollection; 
 
 Route error.tsx và global-error.tsx dùng retry của Next16. ErrorBoundary riêng bọc Focus và Dashboard; lỗi render không kéo toàn app xuống. Global fallback có HTML/body và không cần Firebase/context bắt buộc. Lỗi event/request/camera/clipboard/subscription phải catch tại nguồn, không trông chờ boundary.
 
-Mã an toàn qua i18n/errors và error-toast. Chẩn đoán toast chỉ allowlist httpStatus/providerCode/retryAfterSeconds/operation. FirestorePermissionError là tên export tương thích; nội bộ phân loại permission/unavailable/auth/not-found/generic bằng cause, không tự coi mọi lỗi là permission. Callsite chưa truyền cause sẽ hiện lỗi chung.
+Mã an toàn qua i18n/errors và error-toast. Chẩn đoán toast chỉ allowlist `httpStatus`, `providerCode`, `retryAfterSeconds`, `operation`, `attemptedModels` và `lastFailure`. Khi adapter cạn fallback, nó trả `AI-FALLBACK-EXHAUSTED` với số model đã thử và mã lỗi cuối; không trả tên model, raw provider payload, prompt, stack hoặc secret. FirestorePermissionError là tên export tương thích; nội bộ phân loại permission/unavailable/auth/not-found/generic bằng cause, không tự coi mọi lỗi là permission. Callsite chưa truyền cause sẽ hiện lỗi chung.
 
 ## 6. AI transport, prompt và Focus Shield
 
@@ -235,7 +235,7 @@ The users/{uid}/{collection}/{document=**} wildcard applies only to subcollectio
 
 Route error.tsx and global-error.tsx use Next16 retry. Local ErrorBoundary wraps Focus and Dashboard, isolating render failures. Global fallback owns HTML/body without mandatory Firebase/context. Event/request/camera/clipboard/subscription errors must be caught at their source, not delegated to render boundaries.
 
-Safe codes are translated through i18n/errors and error-toast. Toast diagnostics allow only httpStatus/providerCode/retryAfterSeconds/operation. FirestorePermissionError remains a compatibility export; internally cause distinguishes permission/unavailable/auth/not-found/generic instead of treating everything as permission. Call sites without cause receive a generic error.
+Safe codes are translated through i18n/errors and error-toast. Toast diagnostics allow only `httpStatus`, `providerCode`, `retryAfterSeconds`, `operation`, `attemptedModels` and `lastFailure`. When the adapter exhausts fallback, it returns `AI-FALLBACK-EXHAUSTED` with an attempted-model count and final failure code; it never returns a model name, raw provider payload, prompt, stack or secret. FirestorePermissionError remains a compatibility export; internally cause distinguishes permission/unavailable/auth/not-found/generic instead of treating everything as permission. Call sites without cause receive a generic error.
 
 ## 6. AI transport, prompts and Focus Shield
 

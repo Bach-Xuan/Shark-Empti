@@ -5,7 +5,7 @@ vi.mock('server-only', () => ({}));
 import { generateStructured, resetOpenRouterModelPreferenceForTest, warmOpenRouterModels } from '@/ai/openrouter';
 
 const schema = z.object({ answer: z.string() });
-const request = () => generateStructured({ system: 'Teach clearly.', prompt: 'Question', schema });
+const request = () => generateStructured({ operation: 'test-request', system: 'Teach clearly.', prompt: 'Question', schema });
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 const success = (answer = '42') => response({ choices: [{ message: { content: JSON.stringify({ answer }) } }] });
 
@@ -67,6 +67,23 @@ describe('OpenRouter structured response contract', () => {
     expect(models).toEqual(['thinkingmachines/inkling:free', 'nvidia/nemotron-3.5-lightning:free']);
   });
 
+  it('performs only one bounded cancellation rollover before returning aggregate diagnostics', async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new DOMException('fixture', 'AbortError'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(request()).rejects.toMatchObject({ appError: {
+      code: 'AI-FALLBACK-EXHAUSTED',
+      values: { attemptedModels: 5, lastFailure: 'AI-TRANSPORT' },
+    } });
+    expect(fetchMock.mock.calls.map(([, options]) => JSON.parse(options.body).model)).toEqual([
+      'thinkingmachines/inkling:free',
+      'nvidia/nemotron-3.5-lightning:free',
+      'thinkingmachines/inkling:free',
+      'google/gemma-4-31b-it:free',
+      'nvidia/nemotron-3.5-lightning:free',
+    ]);
+  });
+
   it('accepts a JSON code fence from a model without native structured output', async () => {
     const fetchMock = vi.fn().mockResolvedValue(response({ choices: [{ message: { content: '```json\n{"answer":"42"}\n```' } }] }));
     vi.stubGlobal('fetch', fetchMock);
@@ -74,14 +91,17 @@ describe('OpenRouter structured response contract', () => {
     expect(await request()).toEqual({ answer: '42' });
   });
 
-  it('keeps the last safe model error when every candidate returns invalid output', async () => {
+  it('returns safe aggregate metadata when every candidate returns invalid output', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(response({ choices: [] }))
       .mockResolvedValueOnce(response({ choices: [] }))
       .mockResolvedValueOnce(response({ choices: [] }));
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(request()).rejects.toMatchObject({ appError: { code: 'AI-INVALID-RESPONSE' } });
+    await expect(request()).rejects.toMatchObject({ appError: {
+      code: 'AI-FALLBACK-EXHAUSTED',
+      values: { operation: 'test-request', attemptedModels: 3, lastFailure: 'AI-INVALID-RESPONSE' },
+    } });
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
