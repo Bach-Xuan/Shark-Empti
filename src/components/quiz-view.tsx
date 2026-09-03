@@ -9,9 +9,9 @@ import { LatexText } from '@/components/latex-text';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { getAiErrorMessage } from '@/lib/ai-error-message';
+import { getAiError } from '@/lib/ai-error-message';
 import { answersMatch } from '@/lib/arena-scoring';
-import { showErrorToast,showUnexpectedErrorToast } from '@/lib/error-toast';
+import { showErrorToast } from '@/lib/error-toast';
 import { translatedError } from '@/lib/i18n/errors';
 import type { QuizQuestion } from '@/lib/learning-session';
 import { TranslationSet } from '@/lib/translations';
@@ -91,8 +91,9 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
         setQuestionStartTime(Date.now());
       } catch (err) {
         console.error("Failed to generate questions", err);
-        showUnexpectedErrorToast('AI-REQUEST-FAILED', 'Questions could not be generated.', {}, questionLanguage as 'en' | 'vi');
-        setError(getAiErrorMessage(err, questionLanguage as 'en' | 'vi'));
+        const aiError = getAiError(err);
+        showErrorToast(aiError, questionLanguage as 'en' | 'vi');
+        setError(translatedError(aiError.code, questionLanguage === 'vi' ? 'vi' : 'en'));
       } finally {
         if (active) setIsLoading(false);
       }
@@ -189,7 +190,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
         }
       } catch (e) {
         answerPending.current = false;
-        showUnexpectedErrorToast('AI-REQUEST-FAILED', '', {}, lang as 'en' | 'vi');
+        showErrorToast(getAiError(e), lang as 'en' | 'vi');
         return;
       } finally {
         setIsAnalyzing(false);

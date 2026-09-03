@@ -144,18 +144,6 @@ type Toast = Omit<ToasterToast, "id">
 
 function toast({ ...props }: Toast) {
   const id = genId()
-  const hasExplicitCode =
-    (typeof props.title === "string" && props.title.includes("Error code")) ||
-    (typeof props.description === "string" && props.description.includes("Error code:"))
-  const normalizedProps = props.variant === "destructive" && !hasExplicitCode
-    ? {
-        ...props,
-        description: typeof props.description === "string"
-          ? [props.description, "Error code: APP-REQUEST-FAILED"].filter(Boolean).join(" — ")
-          : "Error code: APP-REQUEST-FAILED",
-      }
-    : props
-
   const update = (props: ToasterToast) =>
     dispatch({
       type: "UPDATE_TOAST",
@@ -166,7 +154,7 @@ function toast({ ...props }: Toast) {
   dispatch({
     type: "ADD_TOAST",
     toast: {
-      ...normalizedProps,
+      ...props,
       id,
       open: true,
       onOpenChange: (open) => {

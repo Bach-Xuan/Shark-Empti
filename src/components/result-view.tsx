@@ -9,6 +9,7 @@ import { UiText } from "@/components/ui-text";
 import { Button } from '@/components/ui/button';
 import { Card,CardContent,CardHeader,CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { getAiError } from '@/lib/ai-error-message';
 import { showErrorToast,showUnexpectedErrorToast } from '@/lib/error-toast';
 import type { QuizQuestion } from '@/lib/learning-session';
 import { TranslationSet } from '@/lib/translations';
@@ -55,7 +56,7 @@ export default function ResultView({ t, lang, results, onViewDashboard, onRetake
     } catch (e) {
       console.error("AI Performance Analysis failed", e);
       if (!mounted.current) return;
-      showUnexpectedErrorToast('AI-REQUEST-FAILED', 'The performance analysis could not be generated.', {}, requestLanguage);
+      showErrorToast(getAiError(e), requestLanguage);
       setError(true);
     } finally {
       if (mounted.current) setIsAnalyzing(false);

@@ -61,7 +61,7 @@ Mã an toàn qua i18n/errors và error-toast. Chẩn đoán toast chỉ allowlis
 
 ## 6. AI transport, prompt và Focus Shield
 
-Bảy public flow giữ tên hàm/input/output/AppResult: academic-validation, generate-questions, generate-flashcards, generate-practice, short-answer-analysis, personalized-quiz-feedback, ai-coaching-chatbot. Input được Zod parse; adapter chuyển output schema sang JSON Schema, gọi một model rồi validate response. Không có framework thay Genkit hoặc key rotation.
+Bảy public flow giữ tên hàm/input/output/AppResult: academic-validation, generate-questions, generate-flashcards, generate-practice, short-answer-analysis, personalized-quiz-feedback, ai-coaching-chatbot. Input được Zod parse; adapter dùng fallback chung Inkling → Gemma → Nemotron và luôn validate response bằng Zod. Gemma nhận JSON Schema native; Inkling/Nemotron nhận JSON-only để tránh gửi `response_format` không được metadata của chúng quảng cáo. Không có framework thay Genkit hoặc key rotation.
 
 Base prompt chỉ dùng vai trò Shark Guru, phong cách, locale và LaTeX. Luật số câu, loại câu, rubric feedback và numeric Arena nằm trong flow. JSON dữ liệu người dùng được đánh dấu là task data, không instruction override; đây là giảm nhập nhằng, không bảo đảm miễn nhiễm prompt injection. Chat history model được map assistant; toàn bộ context review được đưa vào prompt.
 
@@ -172,7 +172,7 @@ TypeScript6.0.3 và ESLint9.39.5 giữ dưới latest vì peer compatibility; @t
 
 Đã ánh xạ shadow-sm → shadow-xs, blur-sm → blur-xs và outline-none → outline-hidden theo [hướng dẫn Tailwind](https://tailwindcss.com/docs/upgrade-guide); giữ border-radius tùy chỉnh thay vì thay toàn bộ class. Nút làm lại bài xếp dọc ở mobile để không tràn ngang. Có ảnh sau migration; không có bộ ảnh trước tương ứng để tính pixel diff đáng tin.
 
-Live smoke từng trả AI-INVALID-RESPONSE, sau đó quiz/chat riêng và smoke tổng đều qua. Đây là bằng chứng phản hồi model có thể không ổn định; giữ một model, không retry schema sai hoặc che lỗi. Không đưa nội dung upstream vào báo cáo.
+Live smoke từng trả AI-INVALID-RESPONSE, sau đó quiz/chat riêng và smoke tổng đều qua. Đây là bằng chứng phản hồi model có thể không ổn định; fallback thử model khác nhưng vẫn trả mã lỗi an toàn nếu toàn bộ danh sách thất bại. Không đưa nội dung upstream vào báo cáo.
 
 ---
 
@@ -239,7 +239,7 @@ Safe codes are translated through i18n/errors and error-toast. Toast diagnostics
 
 ## 6. AI transport, prompts and Focus Shield
 
-Seven public flows preserve function names, input/output and AppResult: academic-validation, generate-questions, generate-flashcards, generate-practice, short-answer-analysis, personalized-quiz-feedback, ai-coaching-chatbot. Zod parses inputs; the adapter converts output schema to JSON Schema, calls one model and validates the response. There is no replacement framework or key rotation.
+Seven public flows preserve function names, input/output and AppResult: academic-validation, generate-questions, generate-flashcards, generate-practice, short-answer-analysis, personalized-quiz-feedback, ai-coaching-chatbot. Zod parses inputs; the adapter shares the Inkling → Gemma → Nemotron fallback and always validates responses with Zod. Gemma receives native JSON Schema; Inkling/Nemotron receive a JSON-only contract so no unsupported `response_format` is sent according to their advertised metadata. There is no replacement framework or key rotation.
 
 The base prompt carries only Shark Guru role, style, locale and LaTeX. Counts, question types, feedback rubric and numeric Arena rules belong to flows. User JSON is marked as task data rather than overriding instructions; this reduces ambiguity, not a guarantee against prompt injection. Chat model roles map to assistant; complete review context enters the prompt.
 
@@ -350,4 +350,4 @@ TypeScript6.0.3 and ESLint9.39.5 remain below latest for peer compatibility; @ty
 
 Mapped shadow-sm → shadow-xs, blur-sm → blur-xs and outline-none → outline-hidden following the [Tailwind guide](https://tailwindcss.com/docs/upgrade-guide); retained custom border-radius definitions. Retake buttons stack on mobile to prevent overflow. Post-migration screenshots exist, without matching pre-migration images for reliable pixel diffs.
 
-One live smoke returned AI-INVALID-RESPONSE; subsequent separate quiz/chat checks and the full smoke passed. This demonstrates potentially inconsistent model output; one model is retained, without retrying invalid schemas or hiding failures. Upstream content is not included in reports.
+One live smoke returned AI-INVALID-RESPONSE; subsequent separate quiz/chat checks and the full smoke passed. This demonstrates potentially inconsistent model output; fallback tries another model but still returns a safe error code if every candidate fails. Upstream content is not included in reports.

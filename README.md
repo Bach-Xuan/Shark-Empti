@@ -4,6 +4,17 @@ English below. Đây là trang bắt đầu: phạm vi, lệnh phát triển và
 
 Nền tảng học tập với quiz AI, phân tích kết quả, flashcards, bài luyện tập, Forum, Arena và Focus Shield. Đợt tối ưu thứ hai giữ URL, dữ liệu lịch sử và quy tắc tính điểm; không deploy hoặc sửa dữ liệu production.
 
+## Học có định hướng, thấy rõ tiến bộ
+
+Shark Empti biến một chủ đề bạn muốn chinh phục thành hành trình học tập rõ ràng: tạo quiz theo môn, trình độ và độ khó; nhận phản hồi để hiểu điểm mạnh/yếu; rồi luyện lại bằng flashcards và bài thực hành. Dashboard biến lịch sử làm bài thành insight, còn Shark Guru sẵn sàng giải thích khi bạn cần một gợi ý.
+
+- **Quiz AI và phản hồi cá nhân hóa:** tạo câu hỏi, chấm Short Answer, phân tích lỗi và đề xuất bước tiếp theo.
+- **Practice, Flashcards và Dashboard:** củng cố đúng điểm cần luyện, theo dõi hoạt động và tiến bộ qua thời gian.
+- **Arena và Forum:** tạo thử thách cộng đồng, bảng xếp hạng, thảo luận và tương tác học tập.
+- **Focus Shield:** hỗ trợ duy trì sự tập trung bằng camera chạy ngay trong trình duyệt khi bạn chủ động bật.
+
+AI luôn được kiểm tra schema ở server và dùng fallback OpenRouter để trải nghiệm không phụ thuộc vào một model duy nhất. Kết quả AI là hỗ trợ học tập, không thay thế việc tự kiểm chứng kiến thức.
+
 ## Bắt đầu
 
 Yêu cầu Node 24, npm và cấu hình Firebase Web App. Dùng PowerShell trên Windows:
@@ -19,7 +30,7 @@ Mở http://localhost:9002. Bật Google provider và authorized domain trong Fi
 
 ## Công nghệ và phạm vi
 
-Next 16 / React 19, Firebase Auth + Firestore, Zod 4, Tailwind 4, Radix, Recharts và KaTeX. AI dùng fetch OpenRouter trực tiếp; một model cấu hình, không failover. TensorFlow chỉ tải runtime/model khi bật Focus Shield. Genkit, Dev UI và Jaeger đã được loại bỏ.
+Next 16 / React 19, Firebase Auth + Firestore, Zod 4, Tailwind 4, Radix, Recharts và KaTeX. AI dùng fetch OpenRouter trực tiếp với fallback server-side theo thứ tự Inkling → Gemma → Nemotron. Khi khởi động, browser lên lịch probe nền không chặn UI; flow thực vẫn tự fallback nếu probe chưa xong hoặc model đổi trạng thái. TensorFlow chỉ tải runtime/model khi bật Focus Shield. Genkit, Dev UI và Jaeger đã được loại bỏ.
 
 Trình duyệt mục tiêu: Safari 16.4+, Chrome 111+, Firefox 128+. E2E hiện cấu hình Chromium desktop/mobile; đây không phải bằng chứng đã kiểm thử mọi trình duyệt mục tiêu.
 
@@ -64,6 +75,17 @@ English below. This is the starting page for the application scope, development 
 
 A learning platform with AI quizzes, performance feedback, flashcards, practice, Forum, Arena and Focus Shield. The second optimization pass preserves URLs, historical data and scoring rules; it does not deploy or modify production data.
 
+## Learn with direction and see your progress
+
+Shark Empti turns a topic you want to master into a clear learning journey: create quizzes by subject, level and difficulty; use feedback to understand strengths and gaps; then reinforce them through flashcards and practice. The dashboard turns attempt history into insight, while Shark Guru is ready to explain when you need a hint.
+
+- **AI quizzes and personalized feedback:** generate questions, assess short answers, analyse mistakes and suggest next steps.
+- **Practice, Flashcards and Dashboard:** reinforce the right skills and follow activity and progress over time.
+- **Arena and Forum:** create community challenges, follow leaderboards and discuss learning.
+- **Focus Shield:** supports concentration with an in-browser camera feature when you choose to enable it.
+
+AI responses are schema-validated on the server and use OpenRouter fallback, so the experience does not depend on one model alone. AI output supports learning; it does not replace checking your own understanding.
+
 ## Getting started
 
 Requires Node 24, npm and Firebase Web App configuration. On Windows, use PowerShell:
@@ -79,7 +101,7 @@ Open http://localhost:9002. Enable the Google provider and authorized domain in 
 
 ## Technology and scope
 
-Next 16 / React 19, Firebase Auth + Firestore, Zod 4, Tailwind 4, Radix, Recharts and KaTeX. AI uses direct OpenRouter fetch with one configured model and no failover. TensorFlow runtime/model load when Focus Shield is enabled. Genkit, its Dev UI and Jaeger have been removed.
+Next 16 / React 19, Firebase Auth + Firestore, Zod 4, Tailwind 4, Radix, Recharts and KaTeX. AI uses direct OpenRouter fetch with server-side fallback in this order: Inkling → Gemma → Nemotron. On startup, the browser schedules a background probe that never blocks the UI; real flows still fall back if the probe has not completed or model availability changes. TensorFlow runtime/model load when Focus Shield is enabled. Genkit, its Dev UI and Jaeger have been removed.
 
 Target browsers: Safari 16.4+, Chrome 111+, Firefox 128+. E2E currently configures desktop/mobile Chromium; this is not evidence that every target browser has been tested.
 

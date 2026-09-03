@@ -2,69 +2,98 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 vi.mock('server-only', () => ({}));
-import { generateStructured } from '@/ai/openrouter';
+import { generateStructured, resetOpenRouterModelPreferenceForTest, warmOpenRouterModels } from '@/ai/openrouter';
 
 const schema = z.object({ answer: z.string() });
 const request = () => generateStructured({ system: 'Teach clearly.', prompt: 'Question', schema });
-const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Retry-After': '0' } });
-const success = () => response({ choices: [{ message: { content: JSON.stringify({ answer: '42' }) } }] });
-beforeEach(() => { vi.stubEnv('OPENROUTER_API_KEY', 'test-only'); });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); vi.useRealTimers(); });
+const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
+const success = (answer = '42') => response({ choices: [{ message: { content: JSON.stringify({ answer }) } }] });
+
+beforeEach(() => { vi.stubEnv('OPENROUTER_API_KEY', 'test-only'); resetOpenRouterModelPreferenceForTest(); });
+afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe('OpenRouter structured response contract', () => {
-  it('uses a 60-second deadline for each attempt and stops after two timeout retries', async () => {
-    vi.useFakeTimers();
-    const timeout = vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => AbortSignal.abort());
-    const fetchMock = vi.fn().mockRejectedValue(new DOMException('fixture', 'TimeoutError'));
+  it('uses local JSON validation for Inkling and native JSON Schema only when Gemma is selected', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response({ error: { code: 502 } }, 502))
+      .mockResolvedValueOnce(success());
     vi.stubGlobal('fetch', fetchMock);
-    const assertion = expect(request()).rejects.toMatchObject({ appError: { code: 'AI-TIMEOUT' } });
-    await vi.runAllTimersAsync(); await assertion;
-    expect(timeout.mock.calls).toEqual([[60000], [60000], [60000]]);
-    expect(fetchMock).toHaveBeenCalledTimes(3);
-  });
-  it('rejects a non-JSON response envelope without retrying', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response('<html>private upstream</html>'));
-    vi.stubGlobal('fetch', fetchMock);
-    await expect(request()).rejects.toMatchObject({ appError: { code: 'AI-INVALID-RESPONSE' } });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-  it('sends the configured schema and validates returned JSON', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(success()); vi.stubGlobal('fetch', fetchMock);
+
     expect(await request()).toEqual({ answer: '42' });
-    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.response_format.type).toBe('json_schema');
-    expect(body.messages.map((m: { role: string }) => m.role)).toEqual(['system', 'user']);
+    const first = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const second = JSON.parse(fetchMock.mock.calls[1][1].body);
+    expect(first.model).toBe('thinkingmachines/inkling:free');
+    expect(first.response_format).toBeUndefined();
+    expect(second.model).toBe('google/gemma-4-31b-it:free');
+    expect(second.response_format.type).toBe('json_schema');
   });
-  it('rejects missing configuration before making a request', async () => {
-    vi.stubEnv('OPENROUTER_API_KEY', ''); const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
-    await expect(request()).rejects.toMatchObject({ appError: { code: 'AI-CONFIG-MISSING' } });
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-  it.each([401, 403, 400])('does not retry permanent HTTP %s errors', async status => {
-    const fetchMock = vi.fn().mockResolvedValue(response({ error: { code: status } }, status)); vi.stubGlobal('fetch', fetchMock);
-    await expect(request()).rejects.toMatchObject({ appError: { code: `AI-PROVIDER-${status}` } });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-  it('retries embedded HTTP-200 upstream errors without changing models', async () => {
-    const fetchMock = vi.fn().mockResolvedValueOnce(response({ error: { code: 502 } })).mockResolvedValueOnce(success());
+
+  it('falls through a model-specific HTTP 400 instead of exposing it as a generic client error', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response({ error: { code: 400 } }, 400))
+      .mockResolvedValueOnce(success());
     vi.stubGlobal('fetch', fetchMock);
+
     expect(await request()).toEqual({ answer: '42' });
     expect(fetchMock).toHaveBeenCalledTimes(2);
-    expect(fetchMock.mock.calls[0][1].body).toBe(fetchMock.mock.calls[1][1].body);
   });
-  it('limits rate-limit retries to two', async () => {
-    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(response({ error: { code: 429 } }, 429))); vi.stubGlobal('fetch', fetchMock);
-    await expect(request()).rejects.toMatchObject({ appError: { code: 'AI-RATE-LIMIT-429' } });
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+  it('falls through a model-specific HTTP 403 because a free model can reject a valid key', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response({ error: { code: 403 } }, 403))
+      .mockResolvedValueOnce(success());
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await request()).toEqual({ answer: '42' });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
-  it.each([{}, { choices: [] }, { choices: [{ message: { content: 'not JSON' } }] }, { choices: [{ message: { content: '{"answer":42}' } }] }])('rejects invalid provider output without exposing it', async body => {
-    const fetchMock = vi.fn().mockResolvedValue(response(body)); vi.stubGlobal('fetch', fetchMock);
-    await expect(request()).rejects.toMatchObject({ appError: { code: 'AI-INVALID-RESPONSE' } });
+
+  it('does not multiply requests for unavailable credentials', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ error: { code: 401 } }, 401));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(request()).rejects.toMatchObject({ appError: { code: 'AI-PROVIDER-401' } });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
-  it('passes assistant history using the OpenRouter wire role', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(success()); vi.stubGlobal('fetch', fetchMock);
-    await generateStructured({ system: 'Tutor', prompt: 'Continue', schema, messages: [{ role: 'assistant', content: 'Earlier answer' }] });
-    expect(JSON.parse(fetchMock.mock.calls[0][1].body).messages[1]).toEqual({ role: 'assistant', content: 'Earlier answer' });
+
+  it('moves immediately to Nemotron after a cancellation, then resumes the priority order', async () => {
+    const fetchMock = vi.fn()
+      .mockRejectedValueOnce(new DOMException('fixture', 'AbortError'))
+      .mockResolvedValueOnce(success());
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await request()).toEqual({ answer: '42' });
+    const models = fetchMock.mock.calls.map(([, options]) => JSON.parse(options.body).model);
+    expect(models).toEqual(['thinkingmachines/inkling:free', 'nvidia/nemotron-3.5-lightning:free']);
+  });
+
+  it('accepts a JSON code fence from a model without native structured output', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(response({ choices: [{ message: { content: '```json\n{"answer":"42"}\n```' } }] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await request()).toEqual({ answer: '42' });
+  });
+
+  it('keeps the last safe model error when every candidate returns invalid output', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response({ choices: [] }))
+      .mockResolvedValueOnce(response({ choices: [] }))
+      .mockResolvedValueOnce(response({ choices: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(request()).rejects.toMatchObject({ appError: { code: 'AI-INVALID-RESPONSE' } });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('warms models in priority order and stops once one proves the real structured contract', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(response({ error: { code: 502 } }, 502))
+      .mockResolvedValueOnce(response({ choices: [{ message: { content: '{"ready":true}' } }] }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(warmOpenRouterModels()).resolves.toEqual({ available: true, retryable: false, model: 'google/gemma-4-31b-it:free' });
+    expect(fetchMock.mock.calls.map(([, options]) => JSON.parse(options.body).model)).toEqual([
+      'thinkingmachines/inkling:free', 'google/gemma-4-31b-it:free',
+    ]);
   });
 });

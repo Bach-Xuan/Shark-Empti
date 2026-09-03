@@ -6,8 +6,8 @@ import { aiCoachingChatbotForQuizReview } from '@/ai/flows/ai-coaching-chatbot-f
 import { LatexText } from '@/components/latex-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { getAiErrorMessage } from '@/lib/ai-error-message';
-import { showErrorToast,showUnexpectedErrorToast } from '@/lib/error-toast';
+import { getAiError } from '@/lib/ai-error-message';
+import { showErrorToast } from '@/lib/error-toast';
 import { translatedError } from '@/lib/i18n/errors';
 import { TranslationSet } from '@/lib/translations';
 import type { QuizHistoryItem } from '@/lib/types';
@@ -121,15 +121,15 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
         return;
       }
 
-      const cleanResponse = response.data.aiResponse.replace(/\\n/g, '\n');
-      setMessages(prev => [...prev, { role: 'model', message: cleanResponse }]);
+      setMessages(prev => [...prev, { role: 'model', message: response.data.aiResponse }]);
     } catch (e) {
       if (requestGeneration !== generation.current) return;
       console.error("Chatbot error:", e);
-      showUnexpectedErrorToast('AI-REQUEST-FAILED', 'The chatbot could not respond.', {}, lang as 'en' | 'vi');
+      const aiError = getAiError(e);
+      showErrorToast(aiError, lang as 'en' | 'vi');
       setMessages(prev => [...prev, {
         role: 'model',
-        message: getAiErrorMessage(e, lang as 'en' | 'vi')
+        message: translatedError(aiError.code, lang === 'vi' ? 'vi' : 'en')
       }]);
     } finally {
       if (requestGeneration === generation.current) { requestPending.current = false; setIsTyping(false); }

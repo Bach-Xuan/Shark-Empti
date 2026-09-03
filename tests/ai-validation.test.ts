@@ -22,10 +22,10 @@ it.each([-2.5, 0, 1.5, 51])('rejects count %s before contacting AI', async numQu
 it.each([
   [], [{ ...question, options: undefined }], [{ ...question, options: ['4', '4', '2', '1'] }],
   [{ ...question, correct: '5' }], [{ ...question, type: 'Unknown' }], [question, question],
-].map(questions => ({ questions })))('rejects unusable question output %# without retrying upstream', async ({ questions }) => {
+].map(questions => ({ questions })))('rejects unusable question output after every fallback model rejects it', async ({ questions }) => {
   const request = reply({ questions });
   expect(await generateQuestions(input)).toMatchObject({ ok: false, error: { code: 'AI-INVALID-RESPONSE' } });
-  expect(request).toHaveBeenCalledTimes(1);
+  expect(request).toHaveBeenCalledTimes(3);
 });
 it('enforces numeric Arena answers while allowing free text in personal quizzes', async () => {
   const free = { ...question, options: undefined, type: 'Short Answer', correct: 'four' };

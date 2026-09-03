@@ -13,7 +13,6 @@ Chỉ copy .env.example thành .env nếu .env chưa tồn tại; không ghi đ�
 | Biến | Phạm vi | Ý nghĩa |
 |---|---|---|
 | OPENROUTER_API_KEY | Server secret | Bearer key cho AI |
-| OPENROUTER_MODEL | Server | Model ID nguyên bản, mặc định liquid/lfm-2.5-2.6b:free; không thêm openai/ |
 | NEXT_PUBLIC_FIREBASE_API_KEY | Browser | Firebase Web API key; Rules bảo vệ dữ liệu |
 | NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN | Browser | Domain Firebase Auth |
 | NEXT_PUBLIC_FIREBASE_PROJECT_ID | Browser | Project dữ liệu |
@@ -61,11 +60,11 @@ npm run test:integration
 
 ## 5. AI và chẩn đoán
 
-Adapter ở src/ai/openrouter.ts dùng POST /api/v1/chat/completions. Mỗi attempt có timeout60s, tối đa hai retry cho lỗi mạng, 429 hoặc 5xx. Retry-After được giới hạn10s; backoff mặc định500ms rồi1000ms. Toàn bộ request có thể dài hơn60s vì nhiều attempt. Không retry lỗi authentication, cấu hình, JSON/schema output.
+Adapter ở src/ai/openrouter.ts dùng POST /api/v1/chat/completions và dùng thứ tự cố định `thinkingmachines/inkling:free` → `google/gemma-4-31b-it:free` → `nvidia/nemotron-3.5-lightning:free`. Mỗi model trong flow có deadline20s; probe nền dùng8s mỗi model để không cạnh tranh lâu với tính năng thật. Khi một model trả lỗi model-specific (bao gồm400/403), rate limit, upstream, transport hoặc output sai schema, flow thử model kế tiếp; chỉ lỗi401, cấu hình và input sai dừng ngay vì fallback không thể sửa chúng. Nếu generation bị huỷ/transport bị ngắt, Nemotron được thử ngay trước rồi mới chạy tiếp thứ tự ưu tiên. Toàn bộ feature request hữu hạn: không lặp vô hạn và không reload/mất draft ở client.
 
-HTTP200 vẫn có thể chứa error. Adapter đọc body, kiểm tra envelope, parse content JSON rồi Zod validation. UI chỉ nhận mã lỗi và thông báo an toàn, không raw upstream body. Model availability/quota thay đổi theo thời gian; một lần smoke thành công không bảo đảm lần sau.
+Inkling và Nemotron không được giả định hỗ trợ `response_format`: adapter yêu cầu JSON-only rồi parse/Zod tại server. Gemma dùng JSON Schema native. HTTP200 vẫn có thể chứa error. UI chỉ nhận mã an toàn và không nhận raw upstream body. Browser lên lịch một probe nền sau startup, từng model theo thứ tự và dừng khi thành công; khi cả vòng thất bại, retry exponential bounded chạy nền và không chặn UI hay flow thật. Model availability/quota thay đổi theo thời gian; một lần smoke thành công không bảo đảm lần sau.
 
-ai:health kiểm tra key có được khai báo, đọc danh mục /api/v1/models và metadata response_format của model. Nó KHÔNG xác thực key hợp lệ, quota hay khả năng inference; script cũng chưa có timeout riêng. ai:smoke sinh quiz và chat thực qua cùng flow, có thể tiêu thụ quota. Không chạy live smoke trong CI. Nếu 429, kiểm tra quota/cooldown; 401/403 kiểm tra key; timeout/transport kiểm tra mạng; AI-INVALID-RESPONSE kiểm tra khả năng structured output của model. Không thêm failover để che lỗi.
+ai:health kiểm tra key có được khai báo và tất cả model fallback có mặt trong danh mục; nó KHÔNG xác thực key hợp lệ, quota hay khả năng inference. ai:smoke sinh quiz và chat thực qua cùng fallback adapter, có thể tiêu thụ quota. Không chạy live smoke trong CI. Nếu 429, kiểm tra quota/cooldown; 401 kiểm tra key; 403 có thể là giới hạn riêng model và sẽ fallback; timeout/transport kiểm tra mạng; AI-INVALID-RESPONSE kiểm tra model output. Không log credential hay raw provider response.
 
 ## 6. CI và release checklist
 
@@ -113,7 +112,6 @@ Copy .env.example to .env only if .env does not exist; never overwrite configure
 | Variable | Scope | Meaning |
 |---|---|---|
 | OPENROUTER_API_KEY | Server secret | AI Bearer key |
-| OPENROUTER_MODEL | Server | Raw model ID, default liquid/lfm-2.5-2.6b:free; do not add openai/ |
 | NEXT_PUBLIC_FIREBASE_API_KEY | Browser | Firebase Web API key; Rules protect data |
 | NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN | Browser | Firebase Auth domain |
 | NEXT_PUBLIC_FIREBASE_PROJECT_ID | Browser | Data project |
@@ -161,11 +159,11 @@ This is a local workaround, unnecessary on Linux CI. Do not delete TEMP or user 
 
 ## 5. AI and troubleshooting
 
-The adapter in src/ai/openrouter.ts uses POST /api/v1/chat/completions. Each attempt times out after60s, with at most two retries for network errors,429 or5xx. Retry-After is capped at10s; default backoff is500ms then1000ms. Total request time may exceed60s across attempts. Authentication, configuration and JSON/schema output errors are not retried.
+The adapter in src/ai/openrouter.ts uses POST /api/v1/chat/completions and this fixed order: `thinkingmachines/inkling:free` → `google/gemma-4-31b-it:free` → `nvidia/nemotron-3.5-lightning:free`. Each flow-model request has a20s deadline; the background probe uses8s per model so it does not compete with a real feature for long. A model-specific error (including400/403), rate limit, upstream, transport, or invalid schema output advances to the next model; only401, configuration and invalid input stop immediately because fallback cannot repair them. A cancelled/interrupted generation tries Nemotron immediately, then continues the priority order. A foreground feature request is finite: it never loops forever or reloads the page/discards a client draft.
 
-HTTP200 may still contain error. The adapter reads the body, checks the envelope, parses content JSON and validates with Zod. UI receives safe codes/messages, never raw upstream bodies. Model availability/quota vary over time; one successful smoke run does not guarantee future success.
+Inkling and Nemotron are not assumed to support `response_format`: the adapter requests JSON-only and parses/validates it with Zod on the server. Gemma uses native JSON Schema. HTTP200 may still contain error. UI receives safe codes/messages, never raw upstream bodies. After startup, the browser schedules a non-blocking probe of models in priority order and stops at the first success; after a failed full pass, a bounded exponential background retry runs without blocking the UI or a real flow. Model availability/quota vary over time; one successful smoke run does not guarantee future success.
 
-ai:health checks that a key is declared, reads /api/v1/models and checks model response_format metadata. It does NOT validate key authenticity, quota or inference, and it has no explicit timeout yet. ai:smoke generates a real quiz and chat through the same flows and may consume quota. Do not run live smoke in CI. For429 check quota/cooldown;401/403 check keys; timeout/transport check connectivity; AI-INVALID-RESPONSE check model structured-output support. Do not add failover to hide errors.
+ai:health checks that a key is declared and every fallback model is listed in the catalog; it does NOT validate key authenticity, quota or inference. ai:smoke generates a real quiz and chat through the same fallback adapter and may consume quota. Do not run live smoke in CI. For429 check quota/cooldown;401 checks the key;403 can be model-specific and falls back; timeout/transport check connectivity; AI-INVALID-RESPONSE checks model output. Never log credentials or raw provider responses.
 
 ## 6. CI and release checklist
 

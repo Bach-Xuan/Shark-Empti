@@ -16,6 +16,7 @@ import { useFirestore,useUser } from '@/firebase';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useToast } from '@/hooks/use-toast';
+import { getAiError } from '@/lib/ai-error-message';
 import { showErrorToast,showUnexpectedErrorToast } from '@/lib/error-toast';
 import { TranslationSet } from '@/lib/translations';
 import { Flashcard,Language,PracticeQuestion } from '@/lib/types';
@@ -191,7 +192,7 @@ function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: {
       }
     } catch (e) {
       console.error(e);
-      showUnexpectedErrorToast('AI-REQUEST-FAILED', 'Flashcards could not be generated.', {}, lang);
+      showErrorToast(getAiError(e), lang);
       setIsValidating(false);
     } finally {
       pending.current = false;
@@ -505,7 +506,7 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
       setAnswers([]);
     } catch (e) {
       console.error(e);
-      showUnexpectedErrorToast('AI-REQUEST-FAILED', 'Practice questions could not be generated.', {}, lang);
+      showErrorToast(getAiError(e), lang);
       setIsValidating(false);
     } finally {
       pending.current = false;

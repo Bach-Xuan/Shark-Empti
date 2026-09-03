@@ -17,7 +17,8 @@ SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { showErrorToast,showUnexpectedErrorToast } from '@/lib/error-toast';
+import { getAiError } from '@/lib/ai-error-message';
+import { showErrorToast } from '@/lib/error-toast';
 import { BaseViewProps,QuizConfig } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import {
@@ -153,7 +154,7 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
       }
     } catch (err) {
       console.error("Validation error:", err);
-      showUnexpectedErrorToast('AI-REQUEST-FAILED', 'The topic could not be validated.', {}, lang as 'en' | 'vi');
+      showErrorToast(getAiError(err), lang as 'en' | 'vi');
       return;
     } finally {
       setIsValidating(false);
