@@ -1,16 +1,16 @@
 'use client';
 
 import {
-  useEffect,
-  useMemo,
-  useState
+useEffect,
+useMemo,
+useState
 } from 'react';
 
 import {
-  doc,
-  onSnapshot,
-  DocumentReference,
-  DocumentData
+doc,
+DocumentData,
+DocumentReference,
+onSnapshot
 } from 'firebase/firestore';
 
 import { useFirestore } from '../provider';
@@ -54,6 +54,8 @@ export function useDoc<
 
   useEffect(() => {
     setError(null);
+    setData(null);
+    let active = true;
 
     if (!docRef) {
       setData(null);
@@ -63,10 +65,11 @@ export function useDoc<
 
     setLoading(true);
 
-    return onSnapshot(
+    const unsubscribe = onSnapshot(
       docRef,
 
       (snapshot) => {
+        if (!active) return;
         setData(
           snapshot.exists()
             ? snapshot.data()
@@ -77,6 +80,7 @@ export function useDoc<
       },
 
       (snapshotError) => {
+        if (!active) return;
         setError(
           snapshotError
         );
@@ -84,6 +88,7 @@ export function useDoc<
         setLoading(false);
       }
     );
+    return () => { active = false; unsubscribe(); };
 
   }, [docRef]);
 

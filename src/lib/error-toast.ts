@@ -1,12 +1,13 @@
 'use client';
 
 import { toast } from '@/hooks/use-toast';
-import { AppError, ErrorValue } from '@/lib/app-error';
+import { AppError,ErrorValue } from '@/lib/app-error';
+import { translatedError } from '@/lib/i18n/errors';
 
 type SupportedLanguage = 'en' | 'vi';
 
 function formatValues(values: Record<string, ErrorValue>): string {
-  const entries = Object.entries(values).filter(([, value]) => value !== '');
+  const entries = Object.entries(values).filter(([key, value]) => value !== '' && ['httpStatus', 'providerCode', 'retryAfterSeconds', 'operation'].includes(key));
   return entries.length ? entries.map(([key, value]) => `${key}: ${value}`).join(' | ') : '';
 }
 
@@ -15,7 +16,7 @@ export function showErrorToast(error: AppError, language: SupportedLanguage = 'e
   toast({
     variant: 'destructive',
     title: `${prefix}: ${error.code}`,
-    description: [error.message, formatValues(error.values)].filter(Boolean).join(' — '),
+    description: [translatedError(error.code, language), formatValues(error.values)].filter(Boolean).join(' — '),
   });
 }
 

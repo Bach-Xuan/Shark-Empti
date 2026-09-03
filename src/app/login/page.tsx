@@ -1,26 +1,26 @@
 'use client';
+import { useLanguageState,useThemeState } from '@/components/app-preferences';
+import { UiText } from "@/components/ui-text";
+import { useGoogleSignIn } from '@/hooks/use-google-sign-in';
+import { uiMessage } from '@/lib/i18n';
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { useAuth, useFirestore, useUser } from '@/firebase';
+import { logo as LogoComponent } from '@/components/logo';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { logo as LogoComponent } from '@/components/logo';
-import { Loader2, Languages, Sun, Moon, Check } from 'lucide-react';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
+DropdownMenu,
+DropdownMenuContent,
+DropdownMenuItem,
+DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useAuth,useFirestore,useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { translations, TranslationSet } from '@/lib/translations';
+import { translations,TranslationSet } from '@/lib/translations';
 import { Language } from '@/lib/types';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 import { cn } from '@/lib/utils';
+import { Check,Languages,Loader2,Moon,Sun } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import React,{ useEffect } from 'react';
 
 export default function LoginPage() {
   const auth = useAuth();
@@ -28,9 +28,9 @@ export default function LoginPage() {
   const { user, loading } = useUser();
   const router = useRouter();
   const { toast } = useToast();
-  const [isSigningIn, setIsSigningIn] = useState(false);
-  const [lang, setLang] = useState<Language>('en');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const { handleGoogleSignIn, isSigningIn } = useGoogleSignIn();
+  const [lang, setLang] = useLanguageState();
+  const [theme, setTheme] = useThemeState();
 
   // Auto-hide/reveal logic
   const [isVisible, setIsVisible] = React.useState(true);
@@ -39,20 +39,20 @@ export default function LoginPage() {
   React.useEffect(() => {
     const handleScroll = () => {
       const currentScrollY = window.scrollY;
-      
+
       // Always show at the very top
       if (currentScrollY < 20) {
         setIsVisible(true);
-      } 
+      }
       // Hide when scrolling down and passed 120px threshold
       else if (currentScrollY > lastScrollY.current && currentScrollY > 120) {
         setIsVisible(false);
-      } 
+      }
       // Show when scrolling up
       else if (currentScrollY < lastScrollY.current) {
         setIsVisible(true);
       }
-      
+
       lastScrollY.current = currentScrollY;
     };
 
@@ -60,21 +60,6 @@ export default function LoginPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  useEffect(() => {
-    const savedLang = localStorage.getItem('shark_lang') as Language;
-    const savedTheme = localStorage.getItem('shark_theme') as 'light' | 'dark';
-    
-    if (savedLang) setLang(savedLang);
-    
-    let initialTheme: 'light' | 'dark' = 'light';
-    if (savedTheme) {
-      initialTheme = savedTheme;
-    } else {
-      initialTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    setTheme(initialTheme);
-    document.documentElement.classList.toggle('dark', initialTheme === 'dark');
-  }, []);
 
   useEffect(() => {
     if (!loading && user) {
@@ -86,59 +71,18 @@ export default function LoginPage() {
 
   const changeLang = (newLang: Language) => {
     setLang(newLang);
-    localStorage.setItem('shark_lang', newLang);
+
     // Dispatch custom event for global components like FocusTrackerWidget
-    window.dispatchEvent(new CustomEvent('shark-lang-changed', { detail: newLang }));
+
   };
 
   const toggleTheme = () => {
     const newTheme = theme === 'light' ? 'dark' : 'light';
     setTheme(newTheme);
-    localStorage.setItem('shark_theme', newTheme);
-    document.documentElement.classList.toggle('dark', newTheme === 'dark');
+
+
   };
 
-  const handleGoogleSignIn = useCallback(async () => {
-    if (isSigningIn) return;
-    
-    setIsSigningIn(true);
-    const provider = new GoogleAuthProvider();
-
-    try {
-      const result = await signInWithPopup(auth, provider);
-      if (result.user) {
-        const userDocRef = doc(firestore, 'users', result.user.uid);
-        const userData = {
-          displayName: result.user.displayName || 'Learner',
-          email: result.user.email,
-          photoURL: result.user.photoURL,
-          updatedAt: serverTimestamp(),
-          createdAt: serverTimestamp(),
-        };
-        
-        setDoc(userDocRef, userData, { merge: true })
-          .catch(async () => {
-            const permissionError = new FirestorePermissionError({
-              path: userDocRef.path,
-              operation: 'write',
-              requestResourceData: userData,
-            });
-            errorEmitter.emit('permission-error', permissionError);
-          });
-
-        router.push('/');
-      }
-    } catch (error: any) {
-      if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-closure-by-user') {
-        toast({
-          variant: "destructive",
-          title: "Sign-in Failed",
-          description: error.message || "An unexpected error occurred. Please check your internet or browser settings.",
-        });
-      }
-      setIsSigningIn(false);
-    }
-  }, [auth, firestore, isSigningIn, router, toast]);
 
   if (loading) {
     return (
@@ -173,7 +117,7 @@ export default function LoginPage() {
                 <Button variant="ghost" className="rounded-2xl hover:bg-muted h-10 px-3 md:h-12 md:px-5 border-[3px] border-transparent hover:border-border transition-all btn-duo bg-card">
                   <Languages className="w-5 h-5 text-primary" />
                   <span className="text-xs font-black uppercase tracking-widest hidden md:inline">
-                    {lang === 'en' ? 'English' : 'Tiếng Việt'}
+                    {uiMessage(lang, "auth.english")}
                   </span>
                 </Button>
               </DropdownMenuTrigger>
@@ -203,10 +147,10 @@ export default function LoginPage() {
               <LogoComponent className="w-12 h-12 md:w-16 md:h-16" />
             </div>
             <h1 className="text-3xl md:text-4xl font-headline font-black text-primary uppercase tracking-tight">
-              {lang === 'en' ? 'Welcome Back' : 'Chào Mừng'}
+              {uiMessage(lang, "auth.welcome_back")}
             </h1>
             <p className="text-muted-foreground font-black text-[10px] md:text-xs uppercase tracking-[0.2em]">
-              {lang === 'en' ? 'Sign in to your learning journey' : 'Đăng nhập để bắt đầu học tập'}
+              {uiMessage(lang, "auth.sign_in_to_your_learning_journey")}
             </p>
           </div>
 
@@ -225,14 +169,14 @@ export default function LoginPage() {
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                 </svg>
-                {lang === 'en' ? 'Continue with Google' : 'Tiếp tục với Google'}
+                {uiMessage(lang, "auth.continue_with_google")}
               </>
             )}
           </Button>
 
           <div className="text-center">
             <Button variant="link" onClick={() => router.push('/register')} className="text-xs font-black uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors active:scale-95">
-              {lang === 'en' ? "Don't have an account? Sign up" : "Chưa có tài khoản? Đăng ký ngay"}
+              {uiMessage(lang, "auth.don_t_have_an_account_sign_up")}
             </Button>
           </div>
         </Card>
@@ -240,7 +184,7 @@ export default function LoginPage() {
 
       <footer className="p-8 text-center border-t-[5px] border-border/30 bg-card/30">
         <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
-          @ 2026 Shark Empti. All rights reserved.
+          <UiText id="copyright" />
         </p>
       </footer>
     </div>

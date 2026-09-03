@@ -40,6 +40,7 @@ export function createAppError(
 
 export function getAiAppError(error: unknown): AppError {
   if (error instanceof OpenRouterProviderError) return error.appError;
+  if (error instanceof Error && error.name === 'ZodError') return createAppError('AI-INVALID-INPUT', 'Invalid AI request data.');
 
   const message = error instanceof Error ? error.message : safeText(error);
   const normalized = message.toLowerCase();
@@ -58,9 +59,7 @@ export function getAiAppError(error: unknown): AppError {
   if (normalized.includes('no output') || normalized.includes('invalid output') || normalized.includes('json schema')) {
     return createAppError('AI-INVALID-RESPONSE', 'The model returned an invalid response format.');
   }
-  return createAppError('AI-REQUEST-FAILED', 'The AI request could not be completed.', {
-    reason: safeText(message),
-  });
+  return createAppError('AI-REQUEST-FAILED', 'The AI request could not be completed.');
 }
 
 export async function asAiResult<T>(callback: () => Promise<T>): Promise<AppResult<T>> {

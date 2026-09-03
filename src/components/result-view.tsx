@@ -1,31 +1,38 @@
 
 "use client";
+import { uiMessage } from '@/lib/i18n';
+import { copyTextToClipboard } from '@/lib/clipboard';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Trophy, ArrowRight, BrainCircuit, RotateCcw, RefreshCw, Copy, Check, AlertCircle, Loader2 } from 'lucide-react';
-import { personalizedQuizPerformanceFeedback, PersonalizedQuizFeedbackOutput } from '@/ai/flows/personalized-quiz-feedback-flow';
+import { personalizedQuizPerformanceFeedback } from '@/ai/flows/personalized-quiz-feedback-flow';
 import { LatexText } from '@/components/latex-text';
-import { TranslationSet } from '@/lib/translations';
+import { UiText } from "@/components/ui-text";
+import { Button } from '@/components/ui/button';
+import { Card,CardContent,CardHeader,CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
+import { showErrorToast,showUnexpectedErrorToast } from '@/lib/error-toast';
+import type { QuizQuestion } from '@/lib/learning-session';
+import { TranslationSet } from '@/lib/translations';
+import { Language,QuizAnalysis,QuizHistoryItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { Language } from '@/lib/types';
-import { showErrorToast, showUnexpectedErrorToast } from '@/lib/error-toast';
+import { AlertCircle,ArrowRight,BrainCircuit,Check,Copy,Loader2,RefreshCw,RotateCcw,Trophy } from 'lucide-react';
+import { useCallback,useEffect,useRef,useState } from 'react';
 
 interface ResultViewProps {
   t: TranslationSet;
   lang: Language;
-  results: any;
+  results: Omit<QuizHistoryItem, 'date' | 'lang'>;
   onViewDashboard: () => void;
-  onRetakeSame: (questions: any[]) => void;
+  onRetakeSame: (questions: QuizQuestion[]) => void;
   onRetakeNew: () => void;
   isArena?: boolean;
 }
 
 export default function ResultView({ t, lang, results, onViewDashboard, onRetakeSame, onRetakeNew, isArena }: ResultViewProps) {
   const { toast } = useToast();
-  const [analysisData, setAnalysisData] = useState<PersonalizedQuizFeedbackOutput | null>(results.analysis || null);
+  const [analysisData, setAnalysisData] = useState<QuizAnalysis | null>(results.analysis || null);
+  const [requestLanguage] = useState(lang);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [isAnalyzing, setIsAnalyzing] = useState(!results.analysis);
   const [error, setError] = useState<boolean>(false);
   const [activeCopiedId, setActiveCopiedId] = useState<string | null>(null);
@@ -34,24 +41,26 @@ export default function ResultView({ t, lang, results, onViewDashboard, onRetake
     setIsAnalyzing(true);
     setError(false);
     try {
-      const data = await personalizedQuizPerformanceFeedback({ 
+      const data = await personalizedQuizPerformanceFeedback({
         quizResults: results.quizResults,
         originalTopic: results.config.topic
       });
+      if (!mounted.current) return;
       if (!data.ok) {
-        showErrorToast(data.error, lang);
+        showErrorToast(data.error, requestLanguage);
         setError(true);
         return;
       }
       setAnalysisData(data.data);
     } catch (e) {
       console.error("AI Performance Analysis failed", e);
-      showUnexpectedErrorToast('AI-REQUEST-FAILED', 'The performance analysis could not be generated.', {}, lang);
+      if (!mounted.current) return;
+      showUnexpectedErrorToast('AI-REQUEST-FAILED', 'The performance analysis could not be generated.', {}, requestLanguage);
       setError(true);
     } finally {
-      setIsAnalyzing(false);
+      if (mounted.current) setIsAnalyzing(false);
     }
-  }, [results]);
+  }, [results, requestLanguage]);
 
   useEffect(() => {
     if (!results.analysis) {
@@ -63,17 +72,17 @@ export default function ResultView({ t, lang, results, onViewDashboard, onRetake
   const currentAnalysis = analysisData?.[lang];
   const currentTopic = lang === 'vi' ? (results.config.topicVi || results.config.topic) : (results.config.topicEn || results.config.topic);
 
-  const handleCopyToClipboard = useCallback((items: string[], title: string, id: string) => {
+  const handleCopyToClipboard = useCallback(async (items: string[], title: string, id: string) => {
     const textContent = `${title.toUpperCase()}\n${items.map(item => `• ${item}`).join('\n')}`;
-    navigator.clipboard.writeText(textContent).then(() => {
+    if (await copyTextToClipboard(textContent)) {
       setActiveCopiedId(id);
       toast({ title: t.copied });
       setTimeout(() => setActiveCopiedId(null), 2000);
-    });
-  }, [t.copied, toast]);
+    } else showUnexpectedErrorToast('APP-CLIPBOARD-FAILED', '', {}, lang);
+  }, [t.copied, toast, lang]);
 
-  const correctCount = results.quizResults.filter((r: any) => r.isCorrect).length;
-  const quizScore = Math.round((correctCount / results.quizResults.length) * 100);
+  const correctCount = results.quizResults.filter(r => r.isCorrect).length;
+  const quizScore = results.quizResults.length ? Math.round((correctCount / results.quizResults.length) * 100) : 0;
 
   const getScoreFeedback = () => {
     if (quizScore >= 90) return { text: t.scoreExcellent, variant: "primary" };
@@ -86,7 +95,7 @@ export default function ResultView({ t, lang, results, onViewDashboard, onRetake
   const timeMinutes = Math.floor(results.totalTime / 60);
   const timeSeconds = results.totalTime % 60;
 
-  const retakeQuestions = results.quizResults.map((r: any) => ({
+  const retakeQuestions = results.quizResults.map(r => ({
     question: r.question,
     options: r.options,
     correct: r.correct,
@@ -106,11 +115,11 @@ export default function ResultView({ t, lang, results, onViewDashboard, onRetake
             {scoreFeedback.text}
           </div>
         </div>
-        
+
         <h1 className="text-5xl md:text-8xl font-headline font-black text-primary uppercase tracking-tighter">
           {t.scoreLabel}: {quizScore}%
         </h1>
-        
+
         <p className="text-muted-foreground font-black text-[10px] md:text-base uppercase tracking-widest px-4 max-w-2xl mx-auto leading-relaxed">
           {t.topic.toUpperCase()}: {currentTopic.toUpperCase()} - {t.completedIn.toUpperCase()} {timeMinutes}{t.minShort} {timeSeconds}{t.secShort}
         </p>
@@ -126,30 +135,33 @@ export default function ResultView({ t, lang, results, onViewDashboard, onRetake
         ) : error || !currentAnalysis ? (
           <div className="md:col-span-3 flex flex-col items-center justify-center p-12 bg-destructive/5 rounded-[2.5rem] border-4 border-dashed border-destructive/20 text-center space-y-4">
             <AlertCircle className="w-12 h-12 text-destructive" />
-            <p className="font-black uppercase tracking-widest text-sm text-destructive">{lang === 'vi' ? 'KHÔNG THỂ TẢI PHÂN TÍCH' : 'COULD NOT LOAD ANALYSIS'}</p>
+            <p className="font-black uppercase tracking-widest text-sm text-destructive">{uiMessage(lang, "resultview.could_not_load_analysis")}</p>
             <Button variant="outline" onClick={fetchAnalysis} className="btn-duo border-destructive/20 text-destructive font-black uppercase tracking-widest text-xs px-8 h-12">
-              {lang === 'vi' ? 'THỬ LẠI' : 'RETRY'}
+              {uiMessage(lang, "resultview.retry")}
             </Button>
           </div>
         ) : (
           <>
-            <PerformanceInsightCard 
-              title={t.strengths} 
-              items={currentAnalysis.strengths} 
+            <PerformanceInsightCard
+              title={t.strengths}
+              copyLabel={t.copy}
+              items={currentAnalysis.strengths}
               variantClass="text-green-700 border-green-500/20 bg-green-500/5 hover-lift"
               onCopy={() => handleCopyToClipboard(currentAnalysis.strengths, t.strengths, 'strengths')}
               isCopied={activeCopiedId === 'strengths'}
             />
-            <PerformanceInsightCard 
-              title={t.weaknesses} 
-              items={currentAnalysis.weaknesses} 
+            <PerformanceInsightCard
+              title={t.weaknesses}
+              copyLabel={t.copy}
+              items={currentAnalysis.weaknesses}
               variantClass="text-red-700 border-red-500/20 bg-red-500/5 hover-lift"
               onCopy={() => handleCopyToClipboard(currentAnalysis.weaknesses, t.weaknesses, 'weaknesses')}
               isCopied={activeCopiedId === 'weaknesses'}
             />
-            <PerformanceInsightCard 
-              title={t.recommendations} 
-              items={currentAnalysis.recommendations} 
+            <PerformanceInsightCard
+              title={t.recommendations}
+              copyLabel={t.copy}
+              items={currentAnalysis.recommendations}
               variantClass="text-primary border-primary/20 bg-primary/5 hover-lift"
               onCopy={() => handleCopyToClipboard(currentAnalysis.recommendations, t.recommendations, 'recommendations')}
               isCopied={activeCopiedId === 'recommendations'}
@@ -161,7 +173,7 @@ export default function ResultView({ t, lang, results, onViewDashboard, onRetake
 
       {/* Action Buttons */}
       <div className="flex flex-col md:flex-row gap-4 md:gap-8 justify-center items-center pt-8">
-        <div className="flex w-full md:w-auto gap-4 md:gap-6">
+        <div className="flex flex-col sm:flex-row w-full md:w-auto gap-4 md:gap-6 min-w-0">
           <Button variant="outline" size="lg" onClick={() => onRetakeSame(retakeQuestions)} className="btn-duo h-14 md:h-18 rounded-2xl flex-1 md:px-10 border-[3px] font-black text-xs md:text-sm uppercase tracking-wider bg-card">
             <RotateCcw className="mr-2 w-5 h-5" /> {t.retakeSame}
           </Button>
@@ -179,7 +191,7 @@ export default function ResultView({ t, lang, results, onViewDashboard, onRetake
   );
 }
 
-function PerformanceInsightCard({ title, items, variantClass, onCopy, isCopied, isEducational }: { title: string, items: string[], variantClass: string, onCopy: () => void, isCopied: boolean, isEducational?: boolean }) {
+function PerformanceInsightCard({ title, copyLabel, items, variantClass, onCopy, isCopied, isEducational }: { title: string, copyLabel: string, items: string[], variantClass: string, onCopy: () => void, isCopied: boolean, isEducational?: boolean }) {
   return (
     <Card className={cn("card-duo border-[3px] transition-all duration-300 overflow-hidden", variantClass)}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 p-6 md:p-8">
@@ -187,11 +199,12 @@ function PerformanceInsightCard({ title, items, variantClass, onCopy, isCopied, 
           <div className="w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-current animate-pulse" /> {title}
         </CardTitle>
         {items && items.length > 0 && (
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-8 w-8 md:h-10 md:w-10 rounded-xl opacity-40 hover:opacity-100 hover:bg-current/10 transition-all" 
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 md:h-10 md:w-10 rounded-xl opacity-40 hover:opacity-100 hover:bg-current/10 transition-all"
             onClick={(e) => { e.stopPropagation(); onCopy(); }}
+            aria-label={`${copyLabel}: ${title}`}
           >
             {isCopied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
           </Button>
@@ -211,7 +224,7 @@ function PerformanceInsightCard({ title, items, variantClass, onCopy, isCopied, 
               </li>
             ))
           ) : (
-            <li className="text-xs italic opacity-50">No data available</li>
+            <li className="text-xs italic opacity-50"><UiText id="noData" /></li>
           )}
         </ul>
       </CardContent>

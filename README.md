@@ -1,97 +1,115 @@
-> English below.
+# Shark Empti · v1.15.1
 
-# Shark Empti
+English below. Đây là trang bắt đầu: phạm vi, lệnh phát triển và tài liệu kỹ thuật của ứng dụng.
 
-Nền tảng học tập thông minh với quiz, phân tích kết quả, Flashcards, luyện tập cá nhân hóa, Firebase và AI qua OpenRouter.
+Nền tảng học tập với quiz AI, phân tích kết quả, flashcards, bài luyện tập, Forum, Arena và Focus Shield. Đợt tối ưu thứ hai giữ URL, dữ liệu lịch sử và quy tắc tính điểm; không deploy hoặc sửa dữ liệu production.
 
-## Bắt đầu nhanh
+## Bắt đầu
 
-Yêu cầu Node.js 20+ và một Firebase Web App đã bật Authentication/Firestore.
+Yêu cầu Node 24, npm và cấu hình Firebase Web App. Dùng PowerShell trên Windows:
 
-```bash
-npm install
-Copy-Item .env.example .env
-# Điền giá trị Firebase và OPENROUTER_API_KEY vào .env
+```powershell
+if (-not (Test-Path -LiteralPath .env)) { Copy-Item -LiteralPath .env.example -Destination .env }
+# Điền cấu hình Firebase và OpenRouter trong .env; không commit file này.
+npm ci
 npm run dev
 ```
 
-Ứng dụng chạy tại `http://localhost:9002`.
+Mở http://localhost:9002. Bật Google provider và authorized domain trong Firebase Authentication. Các API Forum/Arena cần Firebase Admin; AI cần OPENROUTER_API_KEY. Không đưa secret vào biến NEXT_PUBLIC_.
 
-## Biến môi trường
+## Công nghệ và phạm vi
 
-Sao chép `.env.example` thành `.env`. Không commit `.env`.
+Next 16 / React 19, Firebase Auth + Firestore, Zod 4, Tailwind 4, Radix, Recharts và KaTeX. AI dùng fetch OpenRouter trực tiếp; một model cấu hình, không failover. TensorFlow chỉ tải runtime/model khi bật Focus Shield. Genkit, Dev UI và Jaeger đã được loại bỏ.
 
-| Biến | Mục đích |
-| --- | --- |
-| `OPENROUTER_API_KEY` | API key phía server để gọi OpenRouter. |
-| `OPENROUTER_MODEL` | Tùy chọn; model OpenRouter không gồm tiền tố `openai/`. |
-| `NEXT_PUBLIC_FIREBASE_*` | Cấu hình Web App Firebase dùng ở trình duyệt. |
-| `FIREBASE_ADMIN_*` | Secret chỉ phía server Vercel để chấm và trao thưởng Arena an toàn. |
+Trình duyệt mục tiêu: Safari 16.4+, Chrome 111+, Firefox 128+. E2E hiện cấu hình Chromium desktop/mobile; đây không phải bằng chứng đã kiểm thử mọi trình duyệt mục tiêu.
 
-`OPENROUTER_MODEL` mặc định là `liquid/lfm-2.5-2.6b:free`. Ứng dụng chỉ dùng model được cấu hình, không tự động chuyển model khi provider quá tải. Cấu hình Firebase Web App không phải secret, nhưng quyền truy cập dữ liệu phải được bảo vệ bằng Firebase Authentication và Security Rules.
+Giao diện hỗ trợ VI/EN, lưu ngôn ngữ/theme giữa trang và tab. Không dịch lại dữ liệu người dùng hoặc lịch sử khi đổi ngôn ngữ. Camera chạy trong trình duyệt, cần HTTPS hoặc localhost và quyền camera.
 
-Arena chấm điểm ở server: câu trả lời ngắn của đề Arena mới chỉ là số (chấp nhận `,` hoặc `.` cho số thập phân). Vercel cần ba biến `FIREBASE_ADMIN_*` từ Firebase service account; không được đặt các biến này với tiền tố `NEXT_PUBLIC_`.
+## Lệnh kiểm tra
 
-## Lệnh hữu ích
+| Lệnh | Mục đích |
+|---|---|
+| npm run lint | ESLint, Next và React Hooks |
+| npm run typecheck | TypeScript không phát sinh JavaScript |
+| npm test | Unit/component, không cần production |
+| npm run test:coverage | Coverage V8 |
+| npm run test:integration | Auth/Firestore Emulator, Rules và API |
+| npm run test:rules | Chỉ kiểm tra Rules qua Emulator |
+| npm run build | Build production |
+| npm run test:e2e | App thật, Emulator và AI fixture, Chromium desktop/mobile |
+| npm run ai:health | Kiểm tra metadata model, không xác thực key/quota hoặc khả năng sinh nội dung |
+| npm run ai:smoke | Quiz và chatbot thật; có thể tiêu thụ quota |
+| npm run clean | Chỉ xóa cache .next, giữ node_modules |
 
-```bash
-npm run dev          # Chạy Next.js ở cổng 9002
-npm run genkit:dev   # Chạy Genkit Developer UI
-npm run ai:health    # Kiểm tra API key, kết nối và model OpenRouter
-npm run ai:smoke     # Kiểm tra structured output qua Genkit/OpenRouter
-npm run typecheck    # Kiểm tra kiểu TypeScript
-npm run build        # Build production (works on Windows, macOS and Linux)
-```
+Integration/E2E cần Java 21 và trình duyệt Playwright: `npx playwright install chromium`. Không chạy integration trực tiếp thiếu Emulator: cấu hình phải báo thất bại. CI nằm ở .github/workflows/ci.yml và dùng demo-shark-empti, không cần secret production.
 
-Xem [hướng dẫn cấu hình và chẩn đoán](docs/CONFIGURATION.md) và [tài liệu kỹ thuật](docs/TECHNICAL_DOCUMENTATION.md).
+## Tài liệu
+
+- [Cấu hình, Windows, CI/Vercel và chẩn đoán](docs/CONFIGURATION.md).
+- [Kiến trúc, contracts, bảo trì, dependency inventory và giới hạn](docs/TECHNICAL_DOCUMENTATION.md).
+
+Có test không đồng nghĩa tất cả kịch bản đã được chứng minh. Xem báo cáo chạy thực tế trước khi release; không coi ảnh chụp sau migration là so sánh trước/sau. Giữ phiên bản 1.15.1; chỉ deploy sau một yêu cầu riêng.
+
+Chạy các lệnh kiểm tra phù hợp với thay đổi trước khi bàn giao. Kết quả chỉ có ý nghĩa cho đúng môi trường, fixture và thời điểm chạy; kiểm thử browser, camera thật và dịch vụ AI trực tiếp cần được xác nhận riêng khi phạm vi thay đổi liên quan.
+
+Ba tài liệu chính dùng Việt–Anh trong cùng file. AGENTS.md/CLAUDE.md chỉ dẫn quy trình bảo trì; docs/backend.json là sơ đồ dữ liệu có chú thích, không phải validator hoặc nguồn Rules. Không lưu báo cáo lâu dài trong coverage/test-results vì công cụ có thể tạo lại chúng. .gitignore bảo vệ các biến thể .env và artifact local; nó không xóa secret đã từng được theo dõi bởi Git.
 
 ---
 
-# English version
+English below
 
-Shark Empti is an intelligent learning platform with quizzes, result analysis, Flashcards, personalized practice, Firebase, and OpenRouter AI.
+# Shark Empti · v1.15.1
 
-## Quick start
+English below. This is the starting page for the application scope, development commands and technical documentation.
 
-Requires Node.js 20+ and a Firebase Web App with Authentication and Firestore enabled.
+A learning platform with AI quizzes, performance feedback, flashcards, practice, Forum, Arena and Focus Shield. The second optimization pass preserves URLs, historical data and scoring rules; it does not deploy or modify production data.
 
-```bash
-npm install
-Copy-Item .env.example .env
-# Fill in Firebase values and OPENROUTER_API_KEY in .env
+## Getting started
+
+Requires Node 24, npm and Firebase Web App configuration. On Windows, use PowerShell:
+
+```powershell
+if (-not (Test-Path -LiteralPath .env)) { Copy-Item -LiteralPath .env.example -Destination .env }
+# Fill Firebase and OpenRouter settings in .env; never commit this file.
+npm ci
 npm run dev
 ```
 
-The app runs at `http://localhost:9002`.
+Open http://localhost:9002. Enable the Google provider and authorized domain in Firebase Authentication. Forum/Arena APIs require Firebase Admin; AI requires OPENROUTER_API_KEY. Never put secrets in NEXT_PUBLIC_ variables.
 
-## Environment variables
+## Technology and scope
 
-Copy `.env.example` to `.env`; never commit `.env`.
+Next 16 / React 19, Firebase Auth + Firestore, Zod 4, Tailwind 4, Radix, Recharts and KaTeX. AI uses direct OpenRouter fetch with one configured model and no failover. TensorFlow runtime/model load when Focus Shield is enabled. Genkit, its Dev UI and Jaeger have been removed.
 
-| Variable | Purpose |
-| --- | --- |
-| `OPENROUTER_API_KEY` | Server-side key for OpenRouter. |
-| `OPENROUTER_MODEL` | Optional OpenRouter model ID override. |
-| `NEXT_PUBLIC_FIREBASE_*` | Browser Firebase Web App configuration. |
-| `FIREBASE_ADMIN_*` | Vercel-only secrets for trusted Arena scoring and rewards. |
+Target browsers: Safari 16.4+, Chrome 111+, Firefox 128+. E2E currently configures desktop/mobile Chromium; this is not evidence that every target browser has been tested.
 
-The default model is `liquid/lfm-2.5-2.6b:free`. The app uses one configured model and does not automatically fail over to another model.
+The UI supports VI/EN with shared language/theme persistence across pages and tabs. Changing language does not translate user content or historical data. Camera inference runs in the browser and requires HTTPS or localhost plus camera permission.
 
-Arena scoring runs on the server. New Arena short answers are numeric only and accept either `,` or `.` decimals. Configure the three `FIREBASE_ADMIN_*` service-account values in Vercel only; they must never use the `NEXT_PUBLIC_` prefix.
+## Validation commands
 
-## Useful commands
+| Command | Purpose |
+|---|---|
+| npm run lint | ESLint, Next and React Hooks |
+| npm run typecheck | TypeScript without JavaScript output |
+| npm test | Unit/component tests without production |
+| npm run test:coverage | V8 coverage |
+| npm run test:integration | Auth/Firestore Emulator, Rules and API |
+| npm run test:rules | Rules-only Emulator validation |
+| npm run build | Production build |
+| npm run test:e2e | Real app, Emulator and AI fixture, desktop/mobile Chromium |
+| npm run ai:health | Check model metadata, not key validity/quota or successful inference |
+| npm run ai:smoke | Live quiz and chatbot; may consume quota |
+| npm run clean | Remove only .next cache, retain node_modules |
 
-```bash
-npm run dev          # Start Next.js on port 9002
-npm run genkit:dev   # Start the Genkit Developer UI
-npm run ai:health    # Check key, model availability, and structured-output support
-npm run ai:smoke     # Exercise quiz and chatbot structured-output contracts
-npm run typecheck    # TypeScript validation
-npm test             # Unit and component tests
-npm run test:rules   # Firebase Firestore Emulator rules tests
-npm run build        # Production build
-```
+Integration/E2E require Java 21 and Playwright browsers: `npx playwright install chromium`. Do not run integration directly without Emulator: configuration must fail. CI lives in .github/workflows/ci.yml and uses demo-shark-empti without production secrets.
 
-Firebase Emulator tests require Java 11+ on `PATH`.
+## Documentation
 
-See [configuration and troubleshooting](docs/CONFIGURATION.md) and [technical documentation](docs/TECHNICAL_DOCUMENTATION.md).
+- [Configuration, Windows, CI/Vercel and troubleshooting](docs/CONFIGURATION.md).
+- [Architecture, contracts, maintenance, dependency inventory and limitations](docs/TECHNICAL_DOCUMENTATION.md).
+
+Having tests does not prove every scenario. Review actual execution results before release; post-migration screenshots are not before/after comparisons. Version remains 1.15.1; deployment requires a separate request.
+
+Run validation commands appropriate to the change before handoff. Results apply only to the environment, fixtures and time in which they ran; browser coverage, physical cameras and live AI services need separate confirmation when the change involves them.
+
+The three main documents keep Vietnamese and English in the same file. Agent instruction files, when present, provide maintenance guidance; docs/backend.json is an annotated data map, not a validator or Rules source. Keep durable reports out of coverage/test-results because tools may recreate them. .gitignore protects .env variants and local artifacts; it does not remove secrets already tracked by Git.

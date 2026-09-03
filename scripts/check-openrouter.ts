@@ -1,6 +1,3 @@
-import { config } from 'dotenv';
-
-config();
 
 const apiKey = process.env.OPENROUTER_API_KEY?.trim();
 const model =

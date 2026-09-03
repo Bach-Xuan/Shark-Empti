@@ -1,49 +1,51 @@
 
 "use client";
+import { messages, uiMessage } from '@/lib/i18n';
+import type { DashboardStats } from '@/lib/stats-utils';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { 
-  Gamepad2, 
-  Layers, 
-  Zap, 
-  RotateCcw, 
-  ArrowRight, 
-  ArrowLeft,
-  Loader2, 
-  Sparkles, 
-  CheckCircle2, 
-  XCircle,
-  BrainCircuit,
-  MessageSquare,
-  Trophy,
-  Check,
-  Target,
-  Info
-} from 'lucide-react';
+import { validateAcademicTopic } from '@/ai/flows/academic-validation-flow';
 import { generateFlashcards } from '@/ai/flows/generate-flashcards-flow';
 import { generatePractice } from '@/ai/flows/generate-practice-flow';
-import { validateAcademicTopic } from '@/ai/flows/academic-validation-flow';
 import { LatexText } from '@/components/latex-text';
-import { TranslationSet } from '@/lib/translations';
-import { Flashcard, PracticeQuestion, Language } from '@/lib/types';
-import { cn } from '@/lib/utils';
-import { useUser, useFirestore } from '@/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs,TabsContent,TabsList,TabsTrigger } from '@/components/ui/tabs';
+import { useFirestore,useUser } from '@/firebase';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useToast } from '@/hooks/use-toast';
+import { showErrorToast,showUnexpectedErrorToast } from '@/lib/error-toast';
+import { TranslationSet } from '@/lib/translations';
+import { Flashcard,Language,PracticeQuestion } from '@/lib/types';
+import { cn } from '@/lib/utils';
+import { addDoc,collection } from 'firebase/firestore';
+import {
+ArrowLeft,
+ArrowRight,
+BrainCircuit,
+Check,
+CheckCircle2,
+Gamepad2,
+Info,
+Layers,
+Loader2,
+MessageSquare,
+RotateCcw,
+Sparkles,
+Target,
+Trophy,
+XCircle,
+Zap
+} from 'lucide-react';
+import React,{ useEffect,useMemo,useRef,useState } from 'react';
 import FeatureHelp from './feature-help';
-import { showErrorToast, showUnexpectedErrorToast } from '@/lib/error-toast';
 
 interface PlaygroundViewProps {
   t: TranslationSet;
   lang: Language;
-  weakPoints: any[];
+  weakPoints: DashboardStats['processedGroupedInsights'];
   totalAttempts: number;
   totalErrors: number;
   initialConfig: { tab: 'flashcards' | 'practice'; concept?: string } | null;
@@ -52,7 +54,7 @@ interface PlaygroundViewProps {
 
 export default function PlaygroundView({ t, lang, weakPoints, totalAttempts, totalErrors, initialConfig, onAskGuru }: PlaygroundViewProps) {
   const [activeTab, setActiveTab] = useState<'flashcards' | 'practice'>(initialConfig?.tab || 'flashcards');
-  
+
   return (
     <div className="flex flex-col items-center w-full space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700 pb-20">
       {/* Header Section */}
@@ -63,7 +65,7 @@ export default function PlaygroundView({ t, lang, weakPoints, totalAttempts, tot
         <div className="space-y-2">
           <h1 className="text-3xl md:text-7xl font-headline font-black text-primary uppercase tracking-tighter leading-tight flex items-center justify-center gap-4">
             {t.playground}
-            <FeatureHelp 
+            <FeatureHelp
               helpTitle={t.helpTitle}
               title={t.playground}
               items={t.playgroundHelp}
@@ -76,39 +78,39 @@ export default function PlaygroundView({ t, lang, weakPoints, totalAttempts, tot
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full flex flex-col items-center">
+      <Tabs value={activeTab} onValueChange={value => { if (value === 'flashcards' || value === 'practice') setActiveTab(value); }} className="w-full flex flex-col items-center">
         <div className="flex justify-center mb-6 md:mb-12 px-4 w-full">
           <TabsList className="h-14 md:h-20 p-1.5 md:p-2 bg-muted/30 border-[3px] md:border-[4px] border-border rounded-full w-full max-w-md shadow-inner">
-            <TabsTrigger 
-              value="flashcards" 
+            <TabsTrigger
+              value="flashcards"
               className="flex-1 rounded-full h-full font-black uppercase text-[8px] md:text-xs tracking-[0.1em] md:tracking-[0.15em] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-[0_4px_0_0_rgba(0,0,0,0.2)] md:data-[state=active]:shadow-[0_8px_0_0_rgba(0,0,0,0.2)] transition-all duration-300 gap-1.5 md:gap-3 group active:translate-y-1"
             >
-              <Layers className="w-3.5 h-3.5 md:w-5 md:h-5 group-data-[state=active]:animate-pulse" /> 
+              <Layers className="w-3.5 h-3.5 md:w-5 md:h-5 group-data-[state=active]:animate-pulse" />
               {t.flashcards}
             </TabsTrigger>
-            <TabsTrigger 
-              value="practice" 
+            <TabsTrigger
+              value="practice"
               className="flex-1 rounded-full h-full font-black uppercase text-[8px] md:text-xs tracking-[0.1em] md:tracking-[0.15em] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-[0_4px_0_0_rgba(0,0,0,0.2)] md:data-[state=active]:shadow-[0_8px_0_0_rgba(0,0,0,0.2)] transition-all duration-300 gap-1.5 md:gap-3 group active:translate-y-1"
             >
-              <Zap className="w-3.5 h-3.5 md:w-5 md:h-5 group-data-[state=active]:animate-pulse" /> 
+              <Zap className="w-3.5 h-3.5 md:w-5 md:h-5 group-data-[state=active]:animate-pulse" />
               {t.practice}
             </TabsTrigger>
           </TabsList>
         </div>
 
-        <TabsContent value="flashcards" className="w-full animate-in zoom-in-95 duration-500 outline-none flex flex-col items-center focus:ring-0">
+        <TabsContent value="flashcards" className="w-full animate-in zoom-in-95 duration-500 outline-hidden flex flex-col items-center focus:ring-0">
           <FlashcardGame t={t} lang={lang} weakPoints={weakPoints} totalAttempts={totalAttempts} initialConcept={initialConfig?.tab === 'flashcards' ? initialConfig.concept : undefined} />
         </TabsContent>
 
-        <TabsContent value="practice" className="w-full animate-in zoom-in-95 duration-500 outline-none flex flex-col items-center focus:ring-0">
-          <PracticeMode 
-            t={t} 
-            lang={lang} 
-            weakPoints={weakPoints} 
+        <TabsContent value="practice" className="w-full animate-in zoom-in-95 duration-500 outline-hidden flex flex-col items-center focus:ring-0">
+          <PracticeMode
+            t={t}
+            lang={lang}
+            weakPoints={weakPoints}
             totalAttempts={totalAttempts}
             totalErrors={totalErrors}
-            initialConcept={initialConfig?.tab === 'practice' ? initialConfig.concept : undefined} 
-            onAskGuru={onAskGuru} 
+            initialConcept={initialConfig?.tab === 'practice' ? initialConfig.concept : undefined}
+            onAskGuru={onAskGuru}
           />
         </TabsContent>
       </Tabs>
@@ -116,7 +118,7 @@ export default function PlaygroundView({ t, lang, weakPoints, totalAttempts, tot
   );
 }
 
-function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: { t: TranslationSet, lang: Language, weakPoints: any[], totalAttempts: number, initialConcept?: string }) {
+function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: { t: TranslationSet, lang: Language, weakPoints: DashboardStats['processedGroupedInsights'], totalAttempts: number, initialConcept?: string }) {
   const { user } = useUser();
   const db = useFirestore();
   const { toast } = useToast();
@@ -127,13 +129,18 @@ function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: {
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [currentIndex, setCurrentIdx] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+  const pending = useRef(false);
+  const mounted = useRef(false);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   const startSession = async () => {
+    if (pending.current) return;
     if (!topic.trim()) {
       showUnexpectedErrorToast('VALIDATION-TOPIC-REQUIRED', 'Enter a topic before starting.', {}, lang);
       return;
     }
-    
+
+    pending.current = true;
     setIsValidating(true);
     try {
       const validation = await validateAcademicTopic({
@@ -141,6 +148,7 @@ function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: {
         language: lang as 'en' | 'vi'
       });
 
+      if (!mounted.current) return;
       if (!validation.ok) {
         showErrorToast(validation.error, lang);
         return;
@@ -158,8 +166,9 @@ function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: {
 
       setIsValidating(false);
       setIsGenerating(true);
-      
+
       const result = await generateFlashcards({ topic, numCards, language: lang as 'en' | 'vi' });
+      if (!mounted.current) return;
       if (!result.ok) {
         showErrorToast(result.error, lang);
         return;
@@ -176,8 +185,8 @@ function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: {
           sourceValue: topic,
           cards: result.data.cards,
           createdAt: new Date().toISOString()
-        }).catch(async () => {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({ path: sessionRef.path, operation: 'create' }));
+        }).catch(error => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({ path: sessionRef.path, operation: 'create' }, error));
         });
       }
     } catch (e) {
@@ -185,6 +194,8 @@ function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: {
       showUnexpectedErrorToast('AI-REQUEST-FAILED', 'Flashcards could not be generated.', {}, lang);
       setIsValidating(false);
     } finally {
+      pending.current = false;
+      setIsValidating(false);
       setIsGenerating(false);
     }
   };
@@ -255,7 +266,7 @@ function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: {
 
         <div className="relative h-[300px] sm:h-[400px] md:h-[500px] perspective-2000">
           <div className="w-full h-full transition-all duration-300 hover:-translate-y-2">
-            <div 
+            <div
               onClick={() => setIsFlipped(!isFlipped)}
               className={cn(
                 "w-full h-full relative preserve-3d transition-transform duration-700 cursor-pointer",
@@ -273,10 +284,10 @@ function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: {
                   </h3>
                 </div>
                 <p className="text-[7px] md:text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40 animate-pulse mt-3 md:mt-4">
-                  {lang === 'vi' ? 'NHẤN ĐỂ LẬT THẺ' : 'TAP TO REVEAL'}
+                  {uiMessage(lang, "playgroundview.tap_to_reveal")}
                 </p>
               </div>
-              
+
               {/* Back Side */}
               <div className="absolute inset-0 backface-hidden rotate-y-180 p-6 md:p-12 flex flex-col items-center justify-center text-center bg-primary/5 border-[3px] md:border-[5px] border-primary/30 rounded-[1.2rem] md:rounded-[3rem] shadow-duo">
                 <div className="w-10 h-10 md:w-16 md:h-16 rounded-xl md:rounded-[1.2rem] bg-primary/20 flex items-center justify-center border-[2px] md:border-[3px] border-primary/30 shrink-0 mb-4 md:mb-6">
@@ -288,7 +299,7 @@ function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: {
                   </div>
                 </div>
                 <p className="text-[7px] md:text-[10px] font-black uppercase tracking-[0.3em] text-primary opacity-60 mt-3 md:mt-4">
-                  {lang === 'vi' ? 'LẬT LẠI' : 'REVERSE'}
+                  {uiMessage(lang, "playgroundview.reverse")}
                 </p>
               </div>
             </div>
@@ -296,8 +307,8 @@ function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: {
         </div>
 
         <div className="flex gap-3 md:gap-8 justify-center">
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             disabled={currentIndex === 0}
             onClick={handlePrev}
             className="btn-duo flex-1 h-12 md:h-20 rounded-xl md:rounded-[2rem] border-[3px] border-border text-foreground font-black uppercase tracking-[0.1em] md:tracking-[0.15em] text-[9px] md:text-lg bg-card disabled:opacity-50"
@@ -306,14 +317,14 @@ function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: {
           </Button>
 
           {isLastCard ? (
-            <Button 
+            <Button
               onClick={handleFinish}
               className="btn-duo flex-1 h-12 md:h-20 rounded-xl md:rounded-[2rem] bg-foreground text-background border-[3px] border-foreground/20 font-black uppercase tracking-[0.1em] md:tracking-[0.15em] text-[9px] md:text-lg"
             >
               <Check className="mr-1.5 md:mr-3 w-3.5 h-3.5 md:w-6 md:h-6" /> {t.finishSession}
             </Button>
           ) : (
-            <Button 
+            <Button
               onClick={handleNext}
               className="btn-duo flex-1 h-12 md:h-20 rounded-xl md:rounded-[2rem] bg-primary text-white border-[3px] border-white/20 font-black uppercase tracking-[0.1em] md:tracking-[0.15em] text-[9px] md:text-lg"
             >
@@ -335,7 +346,7 @@ function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: {
           <Layers className="w-8 h-8 md:w-14 md:h-14 text-primary" />
         </div>
         <h2 className="text-2xl md:text-5xl font-headline font-black text-primary uppercase tracking-tighter leading-tight">{t.flashcards}</h2>
-        <p className="text-[9px] md:text-xs font-black text-muted-foreground uppercase tracking-[0.2em]">{lang === 'vi' ? 'ÔN TẬP KIẾN THỨC CỐT LÕI' : 'REVIEW CORE CONCEPTS'}</p>
+        <p className="text-[9px] md:text-xs font-black text-muted-foreground uppercase tracking-[0.2em]">{uiMessage(lang, "playgroundview.review_core_concepts")}</p>
       </div>
 
       <div className="space-y-8 md:space-y-10">
@@ -343,18 +354,18 @@ function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: {
           <Label className="text-[9px] md:text-xs font-black uppercase text-muted-foreground tracking-[0.2em] px-1 flex items-center gap-2 group-hover:text-primary transition-colors">
             <Target className="w-3.5 h-3.5 md:w-4 md:h-4 transition-transform group-hover:-translate-y-0.5" /> {t.topic}
           </Label>
-          
+
           {!isFlashcardsDisabled ? (
             <div className="flex flex-wrap gap-2 md:gap-3">
               {weakPoints.map((wp, i) => (
-                <Button 
-                  key={i} 
+                <Button
+                  key={i}
                   variant={topic === wp.topic ? "default" : "outline"}
                   onClick={() => setTopic(wp.topic)}
                   className={cn(
                     "h-10 md:h-16 rounded-lg md:rounded-[1.5rem] text-[9px] md:text-sm font-black uppercase tracking-widest border-[2px] md:border-[3px] px-4 md:px-10 btn-duo shadow-none transition-all",
-                    topic === wp.topic 
-                      ? "bg-primary text-white border-primary/20 translate-y-[-4px] shadow-duo" 
+                    topic === wp.topic
+                      ? "bg-primary text-white border-primary/20 translate-y-[-4px] shadow-duo"
                       : "bg-card border-border hover:border-primary/40 hover:bg-primary/5"
                   )}
                 >
@@ -384,20 +395,20 @@ function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: {
             <Layers className="w-3.5 h-3.5 md:w-4 md:h-4" /> {t.numCards} (1-50)
           </Label>
           <div className="flex items-center gap-3 md:gap-6">
-            <Input 
-              type="number" 
-              value={numCards} 
+            <Input
+              type="number"
+              value={numCards}
               onChange={handleNumChange}
               onBlur={handleNumBlur}
               min={1} max={50}
               disabled={isFlashcardsDisabled}
               className="h-12 md:h-20 rounded-xl md:rounded-[1.5rem] border-[3px] border-border font-black text-lg md:text-4xl bg-muted/10 text-center w-24 md:w-40 shadow-inner focus:ring-4 md:ring-8 focus:ring-primary/10 transition-all focus:border-primary disabled:opacity-30"
             />
-            <span className="text-muted-foreground font-black uppercase text-[9px] md:text-xs tracking-[0.2em]">{lang === 'vi' ? 'THẺ GHI NHỚ' : 'CARDS'}</span>
+            <span className="text-muted-foreground font-black uppercase text-[9px] md:text-xs tracking-[0.2em]">{uiMessage(lang, "playgroundview.cards")}</span>
           </div>
         </div>
 
-        <Button 
+        <Button
           onClick={startSession}
           disabled={!topic.trim() || isGenerating || isValidating || isFlashcardsDisabled}
           className="w-full h-14 md:h-24 rounded-xl md:rounded-[2.5rem] btn-duo bg-primary text-white border-[3px] md:border-[5px] border-white/20 font-black text-base md:text-3xl uppercase tracking-[0.1em] shadow-duo group active:translate-y-2"
@@ -418,12 +429,13 @@ function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: {
   );
 }
 
-function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initialConcept, onAskGuru }: { t: TranslationSet, lang: Language, weakPoints: any[], totalAttempts: number, totalErrors: number, initialConcept?: string, onAskGuru: (msg: string) => void }) {
+type PracticeFeedback = PracticeQuestion & { userAnswer: string; isCorrect: boolean };
+function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initialConcept, onAskGuru }: { t: TranslationSet, lang: Language, weakPoints: DashboardStats['processedGroupedInsights'], totalAttempts: number, totalErrors: number, initialConcept?: string, onAskGuru: (msg: string) => void }) {
   const { user } = useUser();
   const db = useFirestore();
   const { toast } = useToast();
-  
-  const topicsWithMistakes = useMemo(() => 
+
+  const topicsWithMistakes = useMemo(() =>
     weakPoints.filter(wp => wp.errorCount && wp.errorCount > 0)
   , [weakPoints]);
 
@@ -433,10 +445,14 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
   const [isValidating, setIsValidating] = useState(false);
   const [questions, setQuestions] = useState<PracticeQuestion[]>([]);
   const [currentIndex, setCurrentIdx] = useState(0);
-  const [answers, setAnswers] = useState<any[]>([]);
-  const [currentFeedback, setCurrentFeedback] = useState<any>(null);
+  const [answers, setAnswers] = useState<PracticeFeedback[]>([]);
+  const [currentFeedback, setCurrentFeedback] = useState<PracticeFeedback | null>(null);
   const [shortAnswer, setShortAnswer] = useState("");
   const [isFinishing, setIsFinishing] = useState(false);
+  const pending = useRef(false);
+  const mounted = useRef(false);
+  const advancing = useRef(false);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   useEffect(() => {
     if (!concept && topicsWithMistakes.length > 0) {
@@ -445,11 +461,13 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
   }, [topicsWithMistakes, concept]);
 
   const startSession = async () => {
+    if (pending.current) return;
     if (!concept.trim()) {
       showUnexpectedErrorToast('VALIDATION-CONCEPT-REQUIRED', 'Enter a concept before starting.', {}, lang);
       return;
     }
-    
+
+    pending.current = true;
     setIsValidating(true);
     try {
       const validation = await validateAcademicTopic({
@@ -457,6 +475,7 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
         language: lang as 'en' | 'vi'
       });
 
+      if (!mounted.current) return;
       if (!validation.ok) {
         showErrorToast(validation.error, lang);
         return;
@@ -474,8 +493,9 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
 
       setIsValidating(false);
       setIsGenerating(true);
-      
+
       const result = await generatePractice({ concept, numQuestions, language: lang as 'en' | 'vi' });
+      if (!mounted.current) return;
       if (!result.ok) {
         showErrorToast(result.error, lang);
         return;
@@ -488,6 +508,8 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
       showUnexpectedErrorToast('AI-REQUEST-FAILED', 'Practice questions could not be generated.', {}, lang);
       setIsValidating(false);
     } finally {
+      pending.current = false;
+      setIsValidating(false);
       setIsGenerating(false);
     }
   };
@@ -502,6 +524,7 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
 
   const handleAnswer = (ans: string) => {
     if (currentFeedback) return;
+    advancing.current = false;
     const q = questions[currentIndex];
     const isCorrect = ans.toLowerCase().trim() === q.correct.toLowerCase().trim();
     const feedback = { ...q, userAnswer: ans, isCorrect };
@@ -509,6 +532,8 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
   };
 
   const handleNext = () => {
+    if (!currentFeedback || isFinishing || advancing.current) return;
+    advancing.current = true;
     const updated = [...answers, currentFeedback];
     setAnswers(updated);
     setCurrentFeedback(null);
@@ -528,8 +553,8 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
           userAnswers: updated,
           score,
           createdAt: new Date().toISOString()
-        }).catch(async () => {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({ path: sessionRef.path, operation: 'create' }));
+        }).catch(error => {
+          errorEmitter.emit('permission-error', new FirestorePermissionError({ path: sessionRef.path, operation: 'create' }, error));
         });
       }
     }
@@ -538,7 +563,7 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
   const handleAskGuruForDetail = () => {
     const q = questions[currentIndex];
     if (!q || !currentFeedback) return;
-    const message = `${t.askSharkGuruPrompt}\n\n📍 **Question**: "${q.question}"\n✅ **Correct Answer**: "${q.correct}"\n📝 **Initial Explanation**: "${q.explanation}"`;
+    const message = `${t.askSharkGuruPrompt}\n\n📍 **${messages(lang).common.question}**: "${q.question}"\n✅ **${t.correctAnswer}**: "${q.correct}"\n📝 **${t.explanation}**: "${q.explanation}"`;
     onAskGuru(message);
   };
 
@@ -596,7 +621,7 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
               {score}%
             </div>
           </div>
-          
+
           <div className="space-y-3 md:space-y-4">
             <h2 className="text-2xl md:text-6xl font-headline font-black text-primary uppercase tracking-tighter leading-tight">{t.practiceResult}</h2>
             <p className="text-sm md:text-2xl font-bold text-muted-foreground italic leading-relaxed max-w-2xl mx-auto px-1">
@@ -635,7 +660,7 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
 
         <Card className="card-duo p-5 md:p-16 min-h-[350px] md:min-h-[550px] flex flex-col justify-between shadow-none hover:shadow-[0_15px_0_0_var(--duo-shadow)] transition-all relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl pointer-events-none" />
-          
+
           <div className="space-y-6 md:space-y-12 relative z-10">
             <h2 className="text-lg sm:text-2xl md:text-3xl font-headline font-black leading-normal tracking-tight text-foreground uppercase">
               <LatexText text={q.question} />
@@ -644,8 +669,8 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
             {q.type === 'Multiple Choice' ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6">
                 {q.options?.map((opt, i) => (
-                  <Button 
-                    key={i} 
+                  <Button
+                    key={i}
                     variant="outline"
                     disabled={!!currentFeedback}
                     onClick={() => handleAnswer(opt)}
@@ -662,7 +687,7 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
               </div>
             ) : (
               <div className="space-y-5 md:space-y-10">
-                <Input 
+                <Input
                   value={shortAnswer}
                   onChange={(e) => setShortAnswer(e.target.value)}
                   disabled={!!currentFeedback}
@@ -690,7 +715,7 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
                   {currentFeedback.isCorrect ? t.correct : t.incorrect}
                 </span>
               </div>
-              
+
               <div className="space-y-6 md:space-y-8">
                 <div className="space-y-2">
                   <p className="font-black text-muted-foreground uppercase text-[7px] md:text-xs tracking-widest pl-1">{t.correctAnswer}:</p>
@@ -704,9 +729,9 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
                 <div className="space-y-4">
                   <div className="flex items-center justify-between pl-1">
                     <span className="uppercase text-[7px] md:text-xs font-black text-muted-foreground tracking-widest">{t.explanation}:</span>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       onClick={handleAskGuruForDetail}
                       className="h-9 md:h-12 rounded-lg md:rounded-2xl text-[9px] md:text-sm font-black uppercase tracking-[0.15em] border-[2px] border-primary/20 text-primary hover:bg-primary/10 flex items-center gap-2 transition-all active:scale-95"
                     >
@@ -739,7 +764,7 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
           <BrainCircuit className="w-8 h-8 md:w-14 md:h-14 text-primary" />
         </div>
         <h2 className="text-2xl md:text-5xl font-headline font-black text-primary uppercase tracking-tighter leading-tight">{t.mistakePractice}</h2>
-        <p className="text-[9px] md:text-xs font-black text-muted-foreground uppercase tracking-[0.2em]">{lang === 'vi' ? 'RÈN LUYỆN LỖI SAI CỦA BẠN' : 'MASTER YOUR MISTAKES'}</p>
+        <p className="text-[9px] md:text-xs font-black text-muted-foreground uppercase tracking-[0.2em]">{uiMessage(lang, "playgroundview.master_your_mistakes")}</p>
       </div>
 
       <div className="space-y-8 md:space-y-10">
@@ -747,18 +772,18 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
           <Label className="text-[9px] md:text-xs font-black uppercase text-muted-foreground tracking-[0.2em] px-1 flex items-center gap-2 group-hover:text-primary transition-colors">
             <Target className="w-3.5 h-3.5 md:w-4 md:h-4 transition-transform group-hover:-translate-y-0.5" /> {t.selectTarget}
           </Label>
-          
+
           {!isPracticeDisabled && topicsWithMistakes.length > 0 ? (
             <div className="flex flex-wrap gap-2 md:gap-3">
               {topicsWithMistakes.map((wp, i) => (
-                <Button 
-                  key={i} 
+                <Button
+                  key={i}
                   variant={concept === wp.topic ? "default" : "outline"}
                   onClick={() => setConcept(wp.topic)}
                   className={cn(
                     "h-10 md:h-16 rounded-lg md:rounded-[1.5rem] text-[9px] md:text-sm font-black uppercase tracking-widest border-[2px] md:border-[3px] px-4 md:px-10 btn-duo shadow-none transition-all",
-                    concept === wp.topic 
-                      ? "bg-primary text-white border-primary/20 translate-y-[-4px] shadow-duo" 
+                    concept === wp.topic
+                      ? "bg-primary text-white border-primary/20 translate-y-[-4px] shadow-duo"
                       : "bg-card border-border hover:border-primary/40 hover:bg-primary/5"
                   )}
                 >
@@ -783,20 +808,20 @@ function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initial
              <Zap className="w-3.5 h-3.5 md:w-4 md:h-4" /> {t.numQuestions} (1-50)
           </Label>
           <div className="flex items-center gap-3 md:gap-6">
-            <Input 
-              type="number" 
-              value={numQuestions} 
+            <Input
+              type="number"
+              value={numQuestions}
               onChange={handleNumChange}
               onBlur={handleNumBlur}
               min={1} max={50}
               disabled={isPracticeDisabled}
               className="h-12 md:h-20 rounded-xl md:rounded-[1.5rem] border-[3px] border-border font-black text-lg md:text-4xl bg-muted/10 text-center w-24 md:w-40 shadow-inner focus:ring-4 md:ring-8 focus:ring-primary/10 transition-all focus:border-primary disabled:opacity-30"
             />
-            <span className="text-muted-foreground font-black uppercase text-[9px] md:text-xs tracking-[0.2em]">{lang === 'vi' ? 'CÂU HỎI THỰC HÀNH' : 'PRACTICE QUESTIONS'}</span>
+            <span className="text-muted-foreground font-black uppercase text-[9px] md:text-xs tracking-[0.2em]">{uiMessage(lang, "playgroundview.practice_questions")}</span>
           </div>
         </div>
 
-        <Button 
+        <Button
           onClick={startSession}
           disabled={!concept.trim() || isGenerating || isValidating || isPracticeDisabled}
           className="w-full h-14 md:h-24 rounded-xl md:rounded-[2.5rem] btn-duo bg-primary text-white border-[3px] md:border-[5px] border-white/20 font-black text-base md:text-3xl uppercase tracking-[0.1em] shadow-duo group active:translate-y-2"

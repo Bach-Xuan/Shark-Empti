@@ -1,118 +1,80 @@
 "use client";
+import { useUser } from '@/firebase';
+import { uiMessage } from '@/lib/i18n';
+import { errorCategoryLabel } from '@/lib/quiz-labels';
+import { copyTextToClipboard } from '@/lib/clipboard';
+import { showUnexpectedErrorToast } from '@/lib/error-toast';
+import type { DashboardStats } from '@/lib/stats-utils';
+import type { TranslationSet } from '@/lib/translations';
+import { readRoadmapChecks,writeRoadmapChecks } from '@/lib/roadmap-storage';
 
-import React, { useMemo, useState, useCallback, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { LatexText } from '@/components/latex-text';
+import { UiText } from "@/components/ui-text";
 import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { 
-  Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer,
-  BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, CartesianGrid
-} from 'recharts';
-import { 
-  Target, AlertCircle, TrendingUp, History, 
-  LayoutDashboard, BrainCircuit, Star, BookOpen, 
-  StickyNote, Pencil, Copy, Check, Zap, SearchX,
-  Maximize2, Clock, 
-  ChevronDown, ChevronUp, Sparkles,
-  CheckCircle2, Info,
-  Sigma,
-  Gamepad2,
-  XCircle,
-  Map,
-  CheckSquare,
-  Square,
-  Binary,
-  Type,
-  FlaskConical
-} from 'lucide-react';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle,
+import { Card,CardContent,CardHeader,CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+Dialog,
+DialogContent,
+DialogHeader,
+DialogTitle,
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Checkbox } from '@/components/ui/checkbox';
-import { LatexText } from '@/components/latex-text';
-import { BaseViewProps, QuizHistoryItem, Language } from '@/lib/types';
-import { calculateDashboardStats } from '@/lib/stats-utils';
-import { cn } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
+import { Textarea } from '@/components/ui/textarea';
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useToast } from '@/hooks/use-toast';
+import { calculateDashboardStats } from '@/lib/stats-utils';
+import { BaseViewProps,QuizHistoryItem } from '@/lib/types';
+import { cn } from '@/lib/utils';
+import {
+AlertCircle,
+BookOpen,
+BrainCircuit,
+Check,
+CheckCircle2,
+CheckSquare,
+ChevronDown,ChevronUp,
+Clock,
+Copy,
+Gamepad2,
+History,
+Info,
+LayoutDashboard,
+Map,
+Maximize2,
+Pencil,
+SearchX,
+Sigma,
+Sparkles,
+Square,
+Star,
+StickyNote,
+Target,
+TrendingUp,
+XCircle,
+Zap
+} from 'lucide-react';
+import React,{ useCallback,useEffect,useMemo,useRef,useState } from 'react';
+import {
+Bar,
+BarChart,
+CartesianGrid,
+PolarAngleAxis,
+PolarGrid,
+Radar,RadarChart,
+Tooltip as RechartsTooltip,
+ResponsiveContainer,
+XAxis,YAxis
+} from 'recharts';
 import FeatureHelp from './feature-help';
 import { Badge } from './ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-const LATEX_SNIPPETS = [
-  {
-    id: 'math',
-    label: 'Toán học',
-    icon: Binary,
-    items: [
-      { code: '\\frac{a}{b}', label: 'Phân số' },
-      { code: '\\sqrt{x}', label: 'Căn bậc 2' },
-      { code: '\\sqrt[n]{x}', label: 'Căn n' },
-      { code: 'x^{2}', label: 'Mũ 2' },
-      { code: 'x^{n}', label: 'Mũ n' },
-      { code: 'x_{n}', label: 'Chỉ số' },
-      { code: '\\sum_{i=1}^{n}', label: 'Tổng' },
-      { code: '\\int_{a}^{b}', label: 'Tích phân' },
-      { code: '\\lim_{x \\to \\infty}', label: 'Giới hạn' },
-      { code: '\\log_{a}x', label: 'Log a' },
-      { code: '\\ln x', label: 'Log nepe' },
-      { code: '\\sin x', label: 'Sin' },
-      { code: '\\cos x', label: 'Cos' },
-      { code: '\\tan x', label: 'Tan' },
-    ]
-  },
-  {
-    id: 'symbols',
-    label: 'Ký hiệu',
-    icon: Type,
-    items: [
-      { code: '\\pi', label: 'Pi' },
-      { code: '\\alpha', label: 'Alpha' },
-      { code: '\\beta', label: 'Beta' },
-      { code: '\\gamma', label: 'Gamma' },
-      { code: '\\Delta', label: 'Delta' },
-      { code: '\\theta', label: 'Theta' },
-      { code: '\\lambda', label: 'Lambda' },
-      { code: '\\omega', label: 'Omega' },
-      { code: '\\infty', label: 'Vô cực' },
-      { code: '\\neq', label: 'Khác' },
-      { code: '\\approx', label: 'Xấp xỉ' },
-      { code: '\\leq', label: 'Nhỏ/bằng' },
-      { code: '\\geq', label: 'Lớn/bằng' },
-      { code: '\\rightarrow', label: 'Suy ra' },
-      { code: '\\forall', label: 'Với mọi' },
-      { code: '\\exists', label: 'Tồn tại' },
-    ]
-  },
-  {
-    id: 'chem',
-    label: 'Hóa học',
-    icon: FlaskConical,
-    items: [
-      { code: 'H_{2}O', label: 'Nước' },
-      { code: 'CO_{2}', label: 'CO2' },
-      { code: 'O_{2}', label: 'Oxy' },
-      { code: 'H_{2}SO_{4}', label: 'H2SO4' },
-      { code: 'C_{6}H_{12}O_{6}', label: 'Glucose' },
-      { code: '\\rightarrow', label: 'Mũi tên' },
-      { code: '\\rightleftharpoons', label: 'Thuận nghịch' },
-      { code: '\\uparrow', label: 'Bay hơi' },
-      { code: '\\downarrow', label: 'Kết tủa' },
-      { code: 'SO_{4}^{2-}', label: 'Sunfat' },
-      { code: 'OH^{-}', label: 'Hydroxit' },
-      { code: 'H^{+}', label: 'Proton' },
-    ]
-  }
-];
+import { LatexQuickToolbar } from '@/components/latex-toolbar';
 
-const CustomRadarTick = (props: any) => {
+const CustomRadarTick = (props: { x?: number; y?: number; payload?: { value?: string }; textAnchor?: 'start' | 'middle' | 'end' | 'inherit' }) => {
   const { x, y, payload, textAnchor } = props;
-  const label = payload.value;
-  
+  const label = payload?.value ?? '';
+
   return (
     <g transform={`translate(${x},${y})`}>
       <text
@@ -130,32 +92,36 @@ const CustomRadarTick = (props: any) => {
 interface DashboardViewProps extends BaseViewProps {
   history: QuizHistoryItem[];
   personalNotes: string;
-  onNotesChange: (notes: string) => void;
+  onNotesChange: (notes: string) => Promise<boolean>;
+  stats?: ReturnType<typeof calculateDashboardStats>;
   onFixWeakness?: (concept: string, type: 'practice' | 'flashcards') => void;
 }
 
-export default function DashboardView({ t, history, lang, personalNotes, onNotesChange, onFixWeakness }: DashboardViewProps) {
+export default function DashboardView({ t, history, lang, personalNotes, onNotesChange, onFixWeakness, stats }: DashboardViewProps) {
+  const { user } = useUser();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const savingNotes = useRef(false);
   const [tempNotesContent, setTempNotesContent] = useState("");
   const [activeCopiedId, setActiveCopiedId] = useState<string | null>(null);
   const [expandedAttemptIdx, setExpandedAttemptIdx] = useState<number | null>(null);
-  
+
   const [isAttemptsOpen, setIsAttemptsOpen] = useState(false);
   const [isErrorsOpen, setIsErrorsOpen] = useState(false);
   const [isRoadmapOpen, setIsRoadmapOpen] = useState(false);
 
   const [roadmapStatus, setRoadmapStatus] = useState<Record<string, Record<number, boolean>>>({});
 
-  const dashboardStats = useMemo(() => calculateDashboardStats(history, t, lang), [history, t, lang]);
+  const dashboardStats = useMemo(() => stats === undefined ? calculateDashboardStats(history, t, lang) : stats, [stats, history, t, lang]);
 
-  const sortedHistory = useMemo(() => 
+  const sortedHistory = useMemo(() =>
     [...history].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   , [history]);
 
   const allErrors = useMemo(() => {
-    return history.flatMap(session => 
+    return history.flatMap(session =>
       session.quizResults
         .filter(r => !r.isCorrect)
         .map(r => ({ ...r, sessionDate: session.date, topic: lang === 'vi' ? (session.config.topicVi || session.config.topic) : (session.config.topicEn || session.config.topic) }))
@@ -163,15 +129,10 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
   }, [history, lang]);
 
   useEffect(() => {
-    const saved = localStorage.getItem('shark_roadmap_checks');
-    if (saved) {
-      try {
-        setRoadmapStatus(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to parse roadmap checks", e);
-      }
-    }
-  }, []);
+    const sync = () => setRoadmapStatus(readRoadmapChecks(user?.uid));
+    sync(); window.addEventListener('storage', sync);
+    return () => window.removeEventListener('storage', sync);
+  }, [user?.uid]);
 
   const toggleCheck = (topic: string, index: number) => {
     const newStatus = {
@@ -182,7 +143,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
       }
     };
     setRoadmapStatus(newStatus);
-    localStorage.setItem('shark_roadmap_checks', JSON.stringify(newStatus));
+    writeRoadmapChecks(user?.uid, newStatus);
   };
 
   const getStartTime = (finishDate: string, durationSeconds: number) => {
@@ -192,13 +153,13 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
   };
 
   const formatDateTime = (dateStr: string) => {
-    return new Date(dateStr).toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US', { 
+    return new Date(dateStr).toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US', {
       day: '2-digit', month: '2-digit', year: 'numeric',
       hour: '2-digit', minute: '2-digit'
     });
   };
 
-  const handleCopySection = useCallback((sectionType: 'insights' | 'feedback' | 'notes') => {
+  const handleCopySection = useCallback(async (sectionType: 'insights' | 'feedback' | 'notes') => {
     let copyText = "";
 
     if (sectionType === 'notes') {
@@ -221,24 +182,35 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
 
     if (!copyText) return;
 
-    navigator.clipboard.writeText(copyText.trim()).then(() => {
+    if (await copyTextToClipboard(copyText.trim())) {
       setActiveCopiedId(sectionType);
       toast({ title: t.copied });
       setTimeout(() => setActiveCopiedId(null), 2000);
-    });
-  }, [dashboardStats, t, personalNotes, toast]);
+    } else toast({ variant: 'destructive', title: uiMessage(lang, 'quicknotes.could_not_copy_please_try_again') });
+  }, [dashboardStats, t, personalNotes, toast, lang]);
 
-  const handleSaveNotes = () => {
-    onNotesChange(tempNotesContent);
-    setIsEditingNotes(false);
+  const handleSaveNotes = async () => {
+    if (savingNotes.current) return;
+    savingNotes.current = true;
+    setIsSavingNotes(true);
+    try {
+      if (await onNotesChange(tempNotesContent)) setIsEditingNotes(false);
+    } catch {
+      showUnexpectedErrorToast('APP-NOTES-SAVE-FAILED', 'Notes could not be saved.', {}, lang);
+    } finally {
+      savingNotes.current = false;
+      setIsSavingNotes(false);
+    }
   };
 
   const insertLatex = (type: 'inline' | 'block') => {
+    if (savingNotes.current) return;
     const wrapper = type === 'inline' ? '$' : '$$';
     setTempNotesContent(prev => prev + wrapper + wrapper);
   };
 
   const insertSnippet = (snippet: string) => {
+    if (savingNotes.current) return;
     setTempNotesContent(prev => prev + `$${snippet}$`);
   };
 
@@ -277,58 +249,22 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
     );
   }
 
-  const chartAxisStyle = { 
-    fontSize: isMobile ? 8 : 11, 
-    fontWeight: 900, 
+  const chartAxisStyle = {
+    fontSize: isMobile ? 8 : 11,
+    fontWeight: 900,
     fill: 'hsl(var(--foreground))',
     fontFamily: 'Space Grotesk, sans-serif',
     textTransform: 'uppercase' as const,
-    opacity: 1 
+    opacity: 1
   };
 
-  const LatexQuickToolbar = ({ onSelect }: { onSelect: (s: string) => void }) => (
-    <Card className="border-[3px] rounded-2xl md:rounded-[2rem] p-3 md:p-5 bg-muted/5 shadow-inner">
-      <Tabs defaultValue="math" className="w-full">
-        <TabsList className="bg-transparent h-auto p-0 flex flex-wrap gap-2 mb-4 justify-start">
-          {LATEX_SNIPPETS.map(group => (
-            <TabsTrigger 
-              key={group.id} 
-              value={group.id} 
-              className="rounded-xl px-3 md:px-6 py-2 md:py-3 border-2 border-border data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:border-primary/20 text-[8px] md:text-xs font-black uppercase tracking-widest transition-all"
-            >
-              <group.icon className="w-3.5 h-3.5 md:w-5 md:h-5 mr-1.5 md:mr-2" />
-              {group.label}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-        {LATEX_SNIPPETS.map(group => (
-          <TabsContent key={group.id} value={group.id} className="mt-0 outline-none">
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-              {group.items.map((item, idx) => (
-                <Button 
-                  key={idx} 
-                  variant="outline" 
-                  size="sm" 
-                  className="h-10 md:h-12 justify-start px-2 md:px-3 rounded-xl md:rounded-2xl border-2 hover:border-primary hover:bg-primary/5 bg-card transition-all btn-duo shadow-none"
-                  onClick={() => onSelect(item.code)}
-                >
-                  <span className="font-code text-[8px] md:text-sm text-primary truncate flex-1">{item.code}</span>
-                  <span className="text-[6px] md:text-[8px] font-black uppercase opacity-40 truncate ml-1 shrink-0">{item.label}</span>
-                </Button>
-              ))}
-            </div>
-          </TabsContent>
-        ))}
-      </Tabs>
-    </Card>
-  );
 
   return (
     <div className="flex flex-col gap-10 md:gap-24 animate-slide-up-snappy pb-24 px-1 md:px-0 scroll-mt-32">
       <div id="overview-header" className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6 scroll-mt-32 px-2">
         <h1 className="text-3xl md:text-8xl font-headline font-black text-primary flex items-center gap-3 md:gap-6 uppercase tracking-tighter group whitespace-normal break-words text-left">
           <LayoutDashboard className="w-8 h-8 md:w-20 md:h-20 group-hover:-translate-y-1 transition-transform duration-500 shrink-0" /> {t.dashboard}
-          <FeatureHelp 
+          <FeatureHelp
             helpTitle={t.helpTitle}
             title={t.dashboard}
             items={t.dashboardHelp}
@@ -338,23 +274,23 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
       </div>
 
       <div id="overview-metrics" className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-12 scroll-mt-32 px-2">
-        <DashboardMetricCard 
-          title={t.totalAttempts} 
-          value={dashboardStats?.totalAttempts} 
-          icon={<Target className="text-blue-500 w-5 h-5 md:w-12 md:h-12" />} 
+        <DashboardMetricCard
+          title={t.totalAttempts}
+          value={dashboardStats?.totalAttempts ?? 0}
+          icon={<Target className="text-blue-500 w-5 h-5 md:w-12 md:h-12" />}
           onExpand={() => setIsAttemptsOpen(true)}
         />
-        <DashboardMetricCard 
-          title={t.totalErrors} 
-          value={dashboardStats?.totalErrors} 
-          icon={<AlertCircle className="text-red-500 w-5 h-5 md:w-12 md:h-12" />} 
+        <DashboardMetricCard
+          title={t.totalErrors}
+          value={dashboardStats?.totalErrors ?? 0}
+          icon={<AlertCircle className="text-red-500 w-5 h-5 md:w-12 md:h-12" />}
           onExpand={() => setIsErrorsOpen(true)}
         />
-        <DashboardMetricCard 
-          title={t.frequentError} 
-          value={dashboardStats?.mostFrequentError.toUpperCase() || '---'} 
-          icon={getErrorIcon(dashboardStats?.mostFrequentError || '')} 
-          highlight 
+        <DashboardMetricCard
+          title={t.frequentError}
+          value={dashboardStats?.mostFrequentError.toUpperCase() || '---'}
+          icon={getErrorIcon(dashboardStats?.mostFrequentError || '')}
+          highlight
         />
       </div>
 
@@ -369,26 +305,26 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
             </CardTitle>
           </CardHeader>
           <div className="h-[300px] sm:h-[450px] md:h-[700px] relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadarChart 
-                cx="50%" 
-                cy="50%" 
-                outerRadius={isMobile ? "55%" : "80%"} 
+            {dashboardStats?.radarData.some(metric => metric.A !== null) ? <ResponsiveContainer width="100%" height="100%">
+              <RadarChart
+                cx="50%"
+                cy="50%"
+                outerRadius={isMobile ? "55%" : "80%"}
                 data={dashboardStats?.radarData}
                 margin={{ top: 30, right: isMobile ? 60 : 120, bottom: 30, left: isMobile ? 60 : 120 }}
               >
                 <PolarGrid stroke="hsl(var(--muted-foreground))" strokeWidth={1} opacity={0.15} />
                 <PolarAngleAxis dataKey="subject" tick={<CustomRadarTick />} />
-                <Radar 
-                  name="Metrics" 
-                  dataKey="A" 
-                  stroke="hsl(var(--primary))" 
-                  strokeWidth={isMobile ? 4 : 8} 
-                  fill="hsl(var(--primary))" 
-                  fillOpacity={0.6} 
+                <Radar
+                  name={t.learningSkillsChart}
+                  dataKey="A"
+                  stroke="hsl(var(--primary))"
+                  strokeWidth={isMobile ? 4 : 8}
+                  fill="hsl(var(--primary))"
+                  fillOpacity={0.6}
                 />
               </RadarChart>
-            </ResponsiveContainer>
+            </ResponsiveContainer> : <div className="flex h-full items-center justify-center"><UiText id="noData" /></div>}
           </div>
         </Card>
 
@@ -405,38 +341,38 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={dashboardStats?.barData} margin={{ bottom: 80, top: 10, left: -5, right: 10 }}>
                 <CartesianGrid strokeDasharray="6 6" vertical={false} stroke="hsl(var(--muted-foreground))" opacity={0.1} />
-                <XAxis 
-                  dataKey="name" 
-                  tick={chartAxisStyle} 
+                <XAxis
+                  dataKey="name"
+                  tick={chartAxisStyle}
                   tickFormatter={(val) => isMobile && val.length > 10 ? val.substring(0, 8) + '..' : val}
-                  interval={0} 
-                  angle={-45} 
-                  textAnchor="end" 
+                  interval={0}
+                  angle={-45}
+                  textAnchor="end"
                   height={100}
                 />
                 <YAxis tick={chartAxisStyle} axisLine={false} tickLine={false} width={40} />
-                <RechartsTooltip 
+                <RechartsTooltip
                   cursor={{ fill: 'hsl(var(--primary))', opacity: 0.05 }}
-                  contentStyle={{ 
+                  contentStyle={{
                     backgroundColor: 'hsl(var(--card))',
                     color: 'hsl(var(--foreground))',
-                    borderRadius: '1.5rem', 
-                    border: '2px solid hsl(var(--border))', 
-                    fontWeight: '900', 
-                    textTransform: 'uppercase', 
-                    fontSize: '10px', 
+                    borderRadius: '1.5rem',
+                    border: '2px solid hsl(var(--border))',
+                    fontWeight: '900',
+                    textTransform: 'uppercase',
+                    fontSize: '10px',
                     boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
                     padding: '12px'
                   }}
                   itemStyle={{ color: 'hsl(var(--primary))', padding: 0 }}
                   labelStyle={{ marginBottom: '4px', color: 'hsl(var(--foreground))' }}
                 />
-                <Bar 
-                  name={t.total.toUpperCase()} 
-                  dataKey="count" 
-                  fill="hsl(var(--primary))" 
-                  radius={[10, 10, 0, 0]} 
-                  barSize={isMobile ? 30 : 60} 
+                <Bar
+                  name={t.total.toUpperCase()}
+                  dataKey="count"
+                  fill="hsl(var(--primary))"
+                  radius={[10, 10, 0, 0]}
+                  barSize={isMobile ? 30 : 60}
                 />
               </BarChart>
             </ResponsiveContainer>
@@ -446,10 +382,10 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-16 px-2">
         <div id="insights-section" className="scroll-mt-32">
-          <DashboardInsightList 
-            title={t.analyticsHistory} 
-            icon={<Star className="w-5 h-5 md:w-8 md:h-8 fill-current" />} 
-            data={dashboardStats?.processedGroupedInsights || []} 
+          <DashboardInsightList
+            title={t.analyticsHistory}
+            icon={<Star className="w-5 h-5 md:w-8 md:h-8 fill-current" />}
+            data={dashboardStats?.processedGroupedInsights || []}
             type="insights"
             t={t}
             onCopy={() => handleCopySection('insights')}
@@ -460,10 +396,10 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
           />
         </div>
         <div id="recommendations-section" className="scroll-mt-32">
-          <DashboardInsightList 
-            title={t.recommendations} 
-            icon={<BrainCircuit className="w-5 h-5 md:w-8 md:h-8" />} 
-            data={dashboardStats?.processedGroupedInsights || []} 
+          <DashboardInsightList
+            title={t.recommendations}
+            icon={<BrainCircuit className="w-5 h-5 md:w-8 md:h-8" />}
+            data={dashboardStats?.processedGroupedInsights || []}
             type="feedback"
             t={t}
             onCopy={() => handleCopySection('feedback')}
@@ -499,14 +435,15 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
             <div className="space-y-4 md:space-y-8 animate-in zoom-in-95 duration-300">
               <div className="flex flex-col gap-4">
                 <div className="flex flex-wrap gap-1.5 md:gap-2 justify-end mb-[-0.5rem]">
-                  <Button variant="ghost" size="sm" onClick={() => insertLatex('inline')} className="h-7 md:h-8 px-2 md:px-3 text-[9px] md:text-[10px] font-black bg-muted/50 rounded-lg md:rounded-xl hover:bg-primary/10 transition-all">$ Inline</Button>
-                  <Button variant="ghost" size="sm" onClick={() => insertLatex('block')} className="h-7 md:h-8 px-2 md:px-3 text-[9px] md:text-[10px] font-black bg-muted/50 rounded-lg md:rounded-xl hover:bg-primary/10 transition-all">$$ Block</Button>
+                  <Button variant="ghost" size="sm" onClick={() => insertLatex('inline')} className="h-7 md:h-8 px-2 md:px-3 text-[9px] md:text-[10px] font-black bg-muted/50 rounded-lg md:rounded-xl hover:bg-primary/10 transition-all"><UiText id="inlineMath" /></Button>
+                  <Button variant="ghost" size="sm" onClick={() => insertLatex('block')} className="h-7 md:h-8 px-2 md:px-3 text-[9px] md:text-[10px] font-black bg-muted/50 rounded-lg md:rounded-xl hover:bg-primary/10 transition-all"><UiText id="blockMath" /></Button>
                 </div>
-                
+
                 <LatexQuickToolbar onSelect={insertSnippet} />
               </div>
 
-              <Textarea 
+              <Textarea
+                disabled={isSavingNotes}
                 className="min-h-[120px] md:min-h-[300px] bg-background border-2 md:border-[4px] border-primary/20 rounded-xl md:rounded-[2.5rem] focus:ring-4 md:ring-[10px] focus:ring-primary/5 font-bold p-4 md:p-10 text-xs md:text-2xl shadow-inner transition-all"
                 placeholder={t.notesPlaceholder}
                 value={tempNotesContent}
@@ -518,8 +455,8 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                   <Sigma className="w-2.5 h-2.5 md:w-5 md:h-5" /> {t.latexHelp}
                 </p>
                 <div className="flex gap-3 md:gap-4 justify-end">
-                  <Button variant="ghost" onClick={() => setIsEditingNotes(false)} className="btn-duo rounded-xl md:rounded-2xl px-6 md:px-8 h-9 md:h-14 text-[9px] md:text-xs font-black uppercase tracking-widest bg-card">{t.cancel}</Button>
-                  <Button onClick={handleSaveNotes} className="btn-duo bg-primary text-white rounded-xl md:rounded-2xl px-8 md:px-16 h-9 md:h-14 text-[9px] md:text-xs font-black uppercase tracking-widest border-2 md:border-[3px] border-white/20 shadow-none">{t.save}</Button>
+                  <Button disabled={isSavingNotes} variant="ghost" onClick={() => setIsEditingNotes(false)} className="btn-duo rounded-xl md:rounded-2xl px-6 md:px-8 h-9 md:h-14 text-[9px] md:text-xs font-black uppercase tracking-widest bg-card">{t.cancel}</Button>
+                  <Button disabled={isSavingNotes} onClick={handleSaveNotes} className="btn-duo bg-primary text-white rounded-xl md:rounded-2xl px-8 md:px-16 h-9 md:h-14 text-[9px] md:text-xs font-black uppercase tracking-widest border-2 md:border-[3px] border-white/20 shadow-none">{t.save}</Button>
                 </div>
               </div>
             </div>
@@ -551,7 +488,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                 <h3 className="text-lg md:text-3xl font-headline font-black text-primary uppercase tracking-tight flex items-center gap-3 border-b-4 border-primary/10 pb-4 text-left">
                   <Zap className="w-6 h-6 md:w-10 md:h-10 fill-current" /> {t.focusRecommendations}
                 </h3>
-                
+
                 {focusTopics.length > 0 ? (
                   <div className="space-y-4">
                     <p className="text-[10px] md:text-sm font-black text-muted-foreground uppercase tracking-widest px-2 italic text-left">
@@ -570,12 +507,12 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                                    <AlertCircle className="w-3.5 h-3.5" /> {t.errorRate}: {Math.round(topic.errorRate * 100)}%
                                  </div>
                                  <p className="text-[9px] md:text-[10px] font-black text-muted-foreground uppercase tracking-widest">
-                                   {topic.errorCount} {lang === 'vi' ? 'Lỗi' : 'Errors'} / {topic.totalQuestions} {lang === 'vi' ? 'Câu' : 'Total'}
+                                   {topic.errorCount} {uiMessage(lang, "dashboardview.errors")} / {topic.totalQuestions} {uiMessage(lang, "dashboardview.total")}
                                  </p>
                               </div>
                            </div>
-                           <Button 
-                             onClick={() => { setIsRoadmapOpen(false); if(onFixWeakness) onFixWeakness(topic.topic, 'practice'); }} 
+                           <Button
+                             onClick={() => { setIsRoadmapOpen(false); if(onFixWeakness) onFixWeakness(topic.topic, 'practice'); }}
                              className="btn-duo bg-red-500 text-white h-12 md:h-14 rounded-xl font-black uppercase text-[9px] md:text-xs tracking-widest w-full mt-4"
                            >
                              <Zap className="w-4 h-4 mr-2" /> {t.fixMyWeakness}
@@ -624,25 +561,25 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                                 <LatexText text={group.topic} />
                               </h4>
                               {isTopicDone && (
-                                <span className="text-[8px] md:text-10px font-black uppercase text-green-500 tracking-widest animate-pulse">✓ COMPLETED</span>
+                                <span className="text-[8px] md:text-10px font-black uppercase text-green-500 tracking-widest animate-pulse"><UiText id="completed" /></span>
                               )}
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                {group.recommendations.map((rec, rIdx) => (
-                                  <div 
-                                    key={rIdx} 
+                                  <div
+                                    key={rIdx}
                                     className={cn(
                                       "flex items-start gap-4 p-4 md:p-6 rounded-xl md:rounded-2xl border-2 transition-all group/rec cursor-pointer active:translate-y-0.5",
-                                      topicChecks[rIdx] 
-                                        ? "bg-muted/10 border-border opacity-60" 
+                                      topicChecks[rIdx]
+                                        ? "bg-muted/10 border-border opacity-60"
                                         : "bg-card border-primary/5 hover:border-primary/20 hover:shadow-md"
                                     )}
                                     onClick={() => toggleCheck(group.topic, rIdx)}
                                   >
                                     <div className="mt-1 shrink-0">
-                                      <Checkbox 
-                                        checked={!!topicChecks[rIdx]} 
+                                      <Checkbox
+                                        checked={!!topicChecks[rIdx]}
                                         onCheckedChange={() => toggleCheck(group.topic, rIdx)}
                                         className="w-5 h-5 md:w-6 md:h-6 border-2"
                                       />
@@ -680,7 +617,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                 const sessionTopic = lang === 'vi' ? (item.config.topicVi || item.config.topic) : (item.config.topicEn || item.config.topic);
                 return (
                   <Card key={idx} className="card-duo overflow-hidden border-border bg-card hover:border-primary/30 transition-all duration-300 shadow-none">
-                    <div 
+                    <div
                       className="p-3 md:p-8 flex items-center justify-between cursor-pointer group"
                       onClick={() => toggleAttemptExpand(idx)}
                     >
@@ -716,13 +653,13 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                           </div>
                           <div className="p-2 md:p-4 rounded-lg md:rounded-2xl bg-muted/30 border-2 border-border">
                             <span className="text-[6px] md:text-[8px] font-black uppercase tracking-widest text-muted-foreground block mb-1">{t.duration}</span>
-                            <span className="text-sm md:text-xl font-black">{Math.floor(item.totalTime / 60)}p {item.totalTime % 60}s</span>
+                            <span className="text-sm md:text-xl font-black">{Math.floor(item.totalTime / 60)}{t.minShort} {item.totalTime % 60}{t.secShort}</span>
                           </div>
                         </div>
 
                         <div className="space-y-4">
                           <h5 className="text-[8px] md:text-xs font-black uppercase text-primary tracking-[0.2em] flex items-center gap-2 text-left">
-                             <Target className="w-3 h-3 md:w-4 md:h-4" /> {lang === 'vi' ? 'CHI TIẾT CÂU HỎI' : 'QUESTION DETAILS'}
+                             <Target className="w-3 h-3 md:w-4 md:h-4" /> {uiMessage(lang, "dashboardview.question_details")}
                           </h5>
                           <div className="space-y-4 md:space-y-8">
                             {item.quizResults.map((res, qIdx) => (
@@ -741,7 +678,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                                         </Badge>
                                       )}
                                       <p className="text-xs md:text-lg font-bold text-foreground leading-snug break-words">
-                                        <span className="opacity-50 mr-2">Q{qIdx + 1}.</span>
+                                        <span className="opacity-50 mr-2"><UiText id="questionOrdinal" /> {qIdx + 1}.</span>
                                         <LatexText text={res.question} />
                                       </p>
                                     </div>
@@ -755,7 +692,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                                           <LatexText text={res.userAnswer || '---'} />
                                         </div>
                                       </div>
-                                      
+
                                       <div className="flex flex-col gap-1.5">
                                         <span className="text-[7px] md:text-[9px] font-black uppercase text-muted-foreground tracking-widest">{t.correctAnswer}:</span>
                                         <div className="text-[10px] md:text-base font-bold p-3 md:p-4 rounded-xl border-2 bg-green-50/50 border-green-200 text-green-700">
@@ -803,7 +740,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                     <div className="flex flex-col gap-2 md:gap-3 flex-1 min-w-0 text-left">
                       <div className="flex flex-wrap items-center gap-1.5 md:gap-3">
                         <div className="px-2 md:px-4 py-1 md:py-2 bg-destructive text-white rounded-lg md:rounded-2xl text-[6px] md:text-10px font-black uppercase tracking-widest border-2 border-white/20 shadow-duo flex items-center gap-1 md:gap-1.5">
-                          <AlertCircle className="w-2 md:w-3 h-2 md:h-3" /> {error.errorCategory === 'Careless Mistake' ? t.carelessMistake : t.conceptError}
+                          <AlertCircle className="w-2 md:w-3 h-2 md:h-3" /> {errorCategoryLabel(error.errorCategory, t, lang)}
                         </div>
                         <div className="px-2 md:px-4 py-1 md:py-2 bg-primary/10 text-primary rounded-lg md:rounded-2xl text-[6px] md:text-10px font-black uppercase tracking-widest border-2 border-primary/20 flex items-center gap-1 md:gap-1.5">
                           <Target className="w-2 md:w-3 h-2 md:h-3" /> <LatexText text={error.topic} />
@@ -848,17 +785,18 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
   );
 }
 
-function DashboardMetricCard({ title, value, icon, highlight, onExpand }: { title: string, value: any, icon: React.ReactNode, highlight?: boolean, onExpand?: () => void }) {
+function DashboardMetricCard({ title, value, icon, highlight, onExpand }: { title: string, value: string | number, icon: React.ReactNode, highlight?: boolean, onExpand?: () => void }) {
   return (
     <Card className={cn(
-      "card-duo p-4 md:p-8 flex items-center gap-3 md:gap-6 group overflow-hidden relative transition-all duration-300 shadow-none", 
+      "card-duo p-4 md:p-8 flex items-center gap-3 md:gap-6 group overflow-hidden relative transition-all duration-300 shadow-none",
       highlight ? "bg-primary text-white border-primary z-10" : "bg-card"
     )}>
       {onExpand && (
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={onExpand}
+          aria-label={title}
           className={cn(
             "absolute top-2 md:top-4 right-2 md:right-4 h-7 w-7 md:h-10 md:w-10 rounded-lg md:rounded-2xl transition-all hover:bg-muted/20 border-2 border-transparent hover:border-border",
             highlight && "hover:bg-white/20 hover:border-white/30 text-white"
@@ -868,14 +806,14 @@ function DashboardMetricCard({ title, value, icon, highlight, onExpand }: { titl
         </Button>
       )}
       <div className={cn(
-        "w-10 h-10 md:w-18 md:h-18 rounded-xl md:rounded-3xl flex items-center justify-center shrink-0 border-2 md:border-[3px] transition-all group-hover:-translate-y-1 duration-500", 
+        "w-10 h-10 md:w-18 md:h-18 rounded-xl md:rounded-3xl flex items-center justify-center shrink-0 border-2 md:border-[3px] transition-all group-hover:-translate-y-1 duration-500",
         highlight ? 'bg-white/20 border-white/30' : 'bg-muted border-border'
       )}>
         {icon}
       </div>
       <div className="flex flex-col gap-0.5 md:gap-1 min-w-0 flex-1 text-left">
         <p className={cn(
-          "text-[8px] md:text-[10px] font-black uppercase tracking-[0.05em] opacity-60 leading-tight whitespace-normal break-words", 
+          "text-[8px] md:text-[10px] font-black uppercase tracking-[0.05em] opacity-60 leading-tight whitespace-normal break-words",
           highlight ? 'text-white' : 'text-muted-foreground'
         )}>
           {title}
@@ -891,17 +829,17 @@ function DashboardMetricCard({ title, value, icon, highlight, onExpand }: { titl
   );
 }
 
-function DashboardInsightList({ title, icon, data, type, t, onCopy, isCopied, onAction, onExpandRoadmap, roadmapStatus, toggleCheck }: { 
-  title: string, icon: React.ReactNode, data: any[], type: 'insights' | 'feedback', t: any, onCopy: () => void, isCopied: boolean, onAction?: (concept: string, type: 'practice' | 'flashcards') => void, onExpandRoadmap?: () => void, roadmapStatus?: Record<string, Record<number, boolean>>, toggleCheck?: (topic: string, index: number) => void 
+function DashboardInsightList({ title, icon, data, type, t, onCopy, isCopied, onAction, onExpandRoadmap, roadmapStatus, toggleCheck }: {
+  title: string, icon: React.ReactNode, data: DashboardStats['processedGroupedInsights'], type: 'insights' | 'feedback', t: TranslationSet, onCopy: () => void, isCopied: boolean, onAction?: (concept: string, type: 'practice' | 'flashcards') => void, onExpandRoadmap?: () => void, roadmapStatus?: Record<string, Record<number, boolean>>, toggleCheck?: (topic: string, index: number) => void
 }) {
   return (
     <Card className={cn(
-      "card-duo p-5 md:p-12 flex flex-col h-[400px] md:h-[750px] group transition-all duration-300 shadow-none", 
+      "card-duo p-5 md:p-12 flex flex-col h-[400px] md:h-[750px] group transition-all duration-300 shadow-none",
       type === 'insights' ? 'border-orange-500/20 bg-orange-500/5' : 'border-primary/20 bg-primary/5'
     )}>
       <CardHeader className="px-0 pt-0 shrink-0 flex flex-row items-center justify-between mb-4 md:mb-10">
         <CardTitle className={cn(
-          "font-headline font-black flex items-center gap-2.5 md:gap-5 uppercase tracking-tighter text-sm md:text-3xl whitespace-normal break-words text-left", 
+          "font-headline font-black flex items-center gap-2.5 md:gap-5 uppercase tracking-tighter text-sm md:text-3xl whitespace-normal break-words text-left",
           type === 'insights' ? 'text-orange-700 dark:text-orange-400' : 'text-primary'
         )}>
           <div className={cn(
@@ -909,14 +847,14 @@ function DashboardInsightList({ title, icon, data, type, t, onCopy, isCopied, on
             type === 'insights' ? 'bg-orange-500/20 border-orange-500/30' : 'bg-primary/20 border-primary/30'
           )}>
             {icon}
-          </div> 
+          </div>
           {title}
         </CardTitle>
         <div className="flex items-center gap-2 shrink-0">
           {type === 'feedback' && data.length > 0 && onExpandRoadmap && (
-            <Button 
-              variant="outline" 
-              size="sm" 
+            <Button
+              variant="outline"
+              size="sm"
               className="btn-duo h-8 md:h-12 rounded-lg md:rounded-2xl border-2 px-3 md:px-5 font-black uppercase text-[8px] md:text-xs tracking-widest gap-2 bg-card shadow-none"
               onClick={onExpandRoadmap}
             >
@@ -924,11 +862,12 @@ function DashboardInsightList({ title, icon, data, type, t, onCopy, isCopied, on
             </Button>
           )}
           {data.length > 0 && (
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-8 w-8 md:h-12 md:w-12 rounded-lg md:rounded-xl opacity-40 hover:opacity-100 hover:bg-current/10 transition-all active:scale-95 shrink-0" 
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 md:h-12 md:w-12 rounded-lg md:rounded-xl opacity-40 hover:opacity-100 hover:bg-current/10 transition-all active:scale-95 shrink-0"
               onClick={onCopy}
+              aria-label={`${t.copy}: ${title}`}
             >
               {isCopied ? <Check className="w-4 h-4 md:w-6 md:h-6" /> : <Copy className="w-4 h-4 md:w-6 md:h-6" />}
             </Button>
@@ -953,17 +892,17 @@ function DashboardInsightList({ title, icon, data, type, t, onCopy, isCopied, on
                     </h3>
                     {onAction && (
                       <div className="flex gap-1 md:gap-2 shrink-0">
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
+                        <Button
+                          size="sm"
+                          variant="outline"
                           onClick={() => onAction(group.topic, 'flashcards')}
                           className="h-7 w-7 md:h-10 md:w-10 p-0 rounded-lg md:rounded-xl border-2 hover:bg-primary/5 bg-card btn-duo shadow-none flex items-center justify-center"
                           title={t.reviewWithFlashcards}
                         >
                           <Gamepad2 className="w-4 h-4 md:w-5 md:h-5" />
                         </Button>
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           onClick={() => onAction(group.topic, 'practice')}
                           className="h-7 w-7 md:h-10 md:w-10 p-0 rounded-lg md:rounded-xl bg-primary text-white border-2 border-white/20 btn-duo shadow-none flex items-center justify-center"
                           title={t.fixMyWeakness}
@@ -983,7 +922,7 @@ function DashboardInsightList({ title, icon, data, type, t, onCopy, isCopied, on
                             </h4>
                             {group.strengths.map((s: string, i: number) => (
                               <div key={i} className="text-[9px] md:text-lg font-bold flex gap-2 md:gap-4 text-green-800 dark:text-green-300 items-start hover:translate-x-1 transition-transform whitespace-normal break-words leading-relaxed text-left">
-                                <div className="w-1 md:w-2.5 h-1 md:h-2.5 rounded-full bg-current opacity-40 shrink-0 mt-1 md:mt-2" /> 
+                                <div className="w-1 md:w-2.5 h-1 md:h-2.5 rounded-full bg-current opacity-40 shrink-0 mt-1 md:mt-2" />
                                 <LatexText text={s} />
                               </div>
                             ))}
@@ -996,7 +935,7 @@ function DashboardInsightList({ title, icon, data, type, t, onCopy, isCopied, on
                             </h4>
                             {group.weaknesses.map((w: string, i: number) => (
                               <div key={i} className="text-[9px] md:text-lg font-bold flex gap-2 md:gap-4 text-red-800 dark:text-red-300 items-start hover:translate-x-1 transition-transform whitespace-normal break-words leading-relaxed text-left">
-                                <div className="w-1 md:w-2.5 h-1 md:h-2.5 rounded-full bg-current opacity-40 shrink-0 mt-1 md:mt-2" /> 
+                                <div className="w-1 md:w-2.5 h-1 md:h-2.5 rounded-full bg-current opacity-40 shrink-0 mt-1 md:mt-2" />
                                 <LatexText text={w} />
                               </div>
                             ))}
@@ -1007,8 +946,8 @@ function DashboardInsightList({ title, icon, data, type, t, onCopy, isCopied, on
                       group.recommendations.map((r: string, i: number) => {
                         const isDone = !!topicChecks[i];
                         return (
-                          <div 
-                            key={i} 
+                          <div
+                            key={i}
                             className={cn(
                               "p-3 md:p-10 bg-card rounded-xl md:rounded-[2.5rem] border-2 md:border-[4px] flex gap-3 md:gap-8 animate-in zoom-in-95 duration-300 hover:shadow-lg transition-all group/item hover:-translate-y-1 relative cursor-pointer",
                               isDone ? "bg-muted/10 border-border" : "border-primary/10"

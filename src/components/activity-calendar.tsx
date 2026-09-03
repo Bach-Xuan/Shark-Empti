@@ -1,33 +1,34 @@
 
 "use client";
+import { uiMessage } from '@/lib/i18n';
 
-import React, { useState, useMemo } from 'react';
-import { 
-  Calendar as CalendarIcon, 
-  Sparkles,
-  Info
-} from 'lucide-react';
-import { 
-  groupActivityByMonth, 
-  getDaysInMonth
-} from '@/lib/activity-utils';
-import { useUserActivity } from '@/firebase/firestore/use-user-activity';
 import { Button } from '@/components/ui/button';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogTrigger 
+import {
+Dialog,
+DialogContent,
+DialogHeader,
+DialogTitle,
+DialogTrigger
 } from '@/components/ui/dialog';
-import { 
-  Tooltip, 
-  TooltipContent, 
-  TooltipProvider, 
-  TooltipTrigger 
+import {
+Tooltip,
+TooltipContent,
+TooltipProvider,
+TooltipTrigger
 } from '@/components/ui/tooltip';
+import { useUserActivity } from '@/firebase/firestore/use-user-activity';
+import {
+getDaysInMonth,
+groupActivityByMonth
+} from '@/lib/activity-utils';
 import { TranslationSet } from '@/lib/translations';
 import { cn } from '@/lib/utils';
+import {
+Calendar as CalendarIcon,
+Info,
+Sparkles
+} from 'lucide-react';
+import React,{ useMemo,useState } from 'react';
 
 interface ActivityCalendarProps {
   t: TranslationSet;
@@ -57,13 +58,14 @@ export default function ActivityCalendar({ t, lang, isSticky }: ActivityCalendar
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          aria-label={uiMessage(lang, 'activitycalendar.activity_calendar')}
+          variant="ghost"
+          size="icon"
           className={cn(
             "rounded-xl hover:bg-muted transition-all btn-duo bg-card group border-2",
-            isSticky 
-              ? "h-12 w-10 md:h-16 md:w-14 rounded-l-none rounded-r-[1.5rem] md:rounded-r-[2rem] border-l-0 shadow-[4px_4px_0_0_var(--duo-shadow)] hover:translate-x-1" 
+            isSticky
+              ? "h-12 w-10 md:h-16 md:w-14 rounded-l-none rounded-r-[1.5rem] md:rounded-r-[2rem] border-l-0 shadow-[4px_4px_0_0_var(--duo-shadow)] hover:translate-x-1"
               : "h-9 w-9 md:h-11 md:w-11 rounded-xl md:rounded-2xl border-transparent hover:border-border"
           )}
         >
@@ -76,11 +78,11 @@ export default function ActivityCalendar({ t, lang, isSticky }: ActivityCalendar
       <DialogContent className="max-w-2xl w-[95vw] rounded-[2.5rem] border-[4px] border-border shadow-2xl p-6 md:p-10 animate-in fade-in zoom-in-95 duration-300">
         <DialogHeader className="mb-6">
           <DialogTitle className="text-2xl md:text-3xl font-headline font-black text-primary uppercase tracking-tight flex items-center gap-3">
-            <CalendarIcon className="w-8 h-8" /> 
-            {lang === 'vi' ? 'LỊCH HOẠT ĐỘNG' : 'ACTIVITY CALENDAR'}
+            <CalendarIcon className="w-8 h-8" />
+            {uiMessage(lang, "activitycalendar.activity_calendar")}
           </DialogTitle>
           <p className="text-[10px] md:text-xs font-black uppercase tracking-[0.2em] text-muted-foreground mt-1">
-            {lang === 'vi' ? 'THEO DÕI SỰ CHĂM CHỈ CỦA BẠN' : 'TRACK YOUR LEARNING CONSISTENCY'}
+            {uiMessage(lang, "activitycalendar.track_your_learning_consistency")}
           </p>
         </DialogHeader>
 
@@ -89,26 +91,26 @@ export default function ActivityCalendar({ t, lang, isSticky }: ActivityCalendar
             <div className="text-center py-12 opacity-50">
               <Info className="w-12 h-12 mx-auto mb-4" />
               <p className="font-black uppercase tracking-widest text-sm">
-                {lang === 'vi' ? 'CHƯA CÓ DỮ LIỆU HOẠT ĐỘNG' : 'NO ACTIVITY DATA YET'}
+                {uiMessage(lang, "activitycalendar.no_activity_data_yet")}
               </p>
             </div>
           ) : (
             activeMonths.map((mInfo) => {
               const days = getDaysInMonth(mInfo.year, mInfo.month);
               const firstDayOfWeek = days[0].getDay();
-              
+
               return (
                 <div key={`${mInfo.year}-${mInfo.month}`} className="space-y-4">
                   <h3 className="text-sm md:text-base font-black uppercase tracking-widest text-foreground flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-primary" />
                     {monthNames[mInfo.month]} {mInfo.year}
                   </h3>
-                  
+
                   <div className="grid grid-cols-7 gap-1.5 md:gap-2">
                     {Array.from({ length: firstDayOfWeek }).map((_, i) => (
                       <div key={`empty-${i}`} className="aspect-square w-full" />
                     ))}
-                    
+
                     <TooltipProvider delayDuration={0}>
                       {days.map((date) => {
                         const key = getDayKey(date);
@@ -116,11 +118,11 @@ export default function ActivityCalendar({ t, lang, isSticky }: ActivityCalendar
                         return (
                           <Tooltip key={key}>
                             <TooltipTrigger asChild>
-                              <div 
+                              <div
                                 className={cn(
                                   "aspect-square w-full rounded-md md:rounded-lg border-[2px] transition-all duration-300",
-                                  isActive 
-                                    ? "bg-primary border-primary/20 shadow-sm animate-in zoom-in-50" 
+                                  isActive
+                                    ? "bg-primary border-primary/20 shadow-xs animate-in zoom-in-50"
                                     : "bg-muted/40 border-border/30"
                                 )}
                               />

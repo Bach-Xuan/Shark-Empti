@@ -1,9 +1,15 @@
 
-import type { Metadata } from 'next';
-import './globals.css';
-import { FirebaseClientProvider } from '@/firebase';
-import { Toaster } from '@/components/ui/toaster';
 import FocusTrackerWidget from '@/components/FocusTrackerWidget';
+import { AppPreferencesProvider } from '@/components/app-preferences';
+import { ErrorBoundary } from '@/components/error-boundary';
+import { Toaster } from '@/components/ui/toaster';
+import { FirebaseClientProvider } from '@/firebase';
+import type { Metadata } from 'next';
+import { Inter,Space_Grotesk } from 'next/font/google';
+import './globals.css';
+
+const inter = Inter({ subsets: ['latin', 'vietnamese'], variable: '--font-inter' });
+const spaceGrotesk = Space_Grotesk({ subsets: ['latin', 'vietnamese'], variable: '--font-space-grotesk' });
 
 export const metadata: Metadata = {
   title: 'Shark Empti',
@@ -16,18 +22,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
-      </head>
-      <body className="font-body antialiased bg-background text-foreground">
-        <FirebaseClientProvider>
+    <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
+      <body className={`${inter.variable} ${spaceGrotesk.variable} font-body antialiased bg-background text-foreground`}>
+        <AppPreferencesProvider><FirebaseClientProvider>
           {children}
           <Toaster />
-          <FocusTrackerWidget />
-        </FirebaseClientProvider>
+          <ErrorBoundary><FocusTrackerWidget /></ErrorBoundary>
+        </FirebaseClientProvider></AppPreferencesProvider>
       </body>
     </html>
   );

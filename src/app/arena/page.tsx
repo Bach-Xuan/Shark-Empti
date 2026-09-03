@@ -1,51 +1,50 @@
 "use client";
+import { useLanguageState,useThemeState } from '@/components/app-preferences';
+import { formatStoredDate } from '@/lib/date-format';
+import { uiMessage } from '@/lib/i18n';
+import { quizLabel } from '@/lib/quiz-labels';
 
-import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { 
-  collection, 
-  query, 
-  orderBy, 
-  onSnapshot, 
-  addDoc, 
-  serverTimestamp,
-  doc
-} from 'firebase/firestore';
-import { useUser, useFirestore, useDoc } from '@/firebase';
-import { translations, TranslationSet } from '@/lib/translations';
-import { Language, ArenaExam, QuizConfig } from '@/lib/types';
+import { generateQuestions } from '@/ai/flows/generate-questions-flow';
 import Navigation from '@/components/navigation';
+import SetupView from '@/components/setup-view';
+import { Avatar,AvatarFallback,AvatarImage } from '@/components/ui/avatar';
+import { Badge } from "@/components/ui/badge";
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { 
-  Trophy, 
-  Plus, 
-  Clock, 
-  Search, 
-  Sparkles, 
-  Coins, 
-  Gift,
-  Target,
-  Layers,
-  Settings2,
-  CalendarDays,
-  Play,
-  Loader2
-} from 'lucide-react';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
+Dialog,
+DialogContent,
+DialogHeader,
+DialogTitle,
 } from "@/components/ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { cn } from '@/lib/utils';
+import { Tabs,TabsContent,TabsList,TabsTrigger } from "@/components/ui/tabs";
+import { useDoc,useFirestore,useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import SetupView from '@/components/setup-view';
-import { generateQuestions } from '@/ai/flows/generate-questions-flow';
-import { showErrorToast, showUnexpectedErrorToast } from '@/lib/error-toast';
+import { showErrorToast,showUnexpectedErrorToast } from '@/lib/error-toast';
+import { translations,TranslationSet } from '@/lib/translations';
+import { ArenaExam,QuizConfig } from '@/lib/types';
+import {
+addDoc,
+collection,
+onSnapshot,
+orderBy,
+query,
+serverTimestamp
+} from 'firebase/firestore';
+import {
+CalendarDays,
+Coins,
+Gift,
+Layers,
+Loader2,
+Play,
+Plus,
+Search,
+Sparkles,
+Trophy
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect,useState } from 'react';
 
 export default function ArenaPage() {
   const { user } = useUser();
@@ -53,22 +52,14 @@ export default function ArenaPage() {
   const { data: profile } = useDoc(user ? `users/${user.uid}` : null);
   const router = useRouter();
   const { toast } = useToast();
-  
-  const [lang, setLang] = useState<Language>('en');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  const [lang, setLang] = useLanguageState();
+  const [theme, setTheme] = useThemeState();
   const [exams, setExams] = useState<ArenaExam[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
-  useEffect(() => {
-    const savedLang = localStorage.getItem('shark_lang') as Language;
-    const savedTheme = localStorage.getItem('shark_theme') as 'light' | 'dark';
-    if (savedLang) setLang(savedLang);
-    let initialTheme: 'light' | 'dark' = savedTheme || (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    setTheme(initialTheme);
-    document.documentElement.classList.toggle('dark', initialTheme === 'dark');
-  }, []);
 
   useEffect(() => {
     if (!db) return;
@@ -126,11 +117,11 @@ export default function ArenaPage() {
 
       const docRef = await addDoc(collection(db, 'arenaExams'), examData);
       setIsCreateDialogOpen(false);
-      toast({ title: lang === 'vi' ? "TẠO BÀI THI THÀNH CÔNG!" : "ARENA EXAM CREATED!" });
+      toast({ title: uiMessage(lang, "arena.arena_exam_created") });
       router.push(`/arena/${docRef.id}`);
     } catch (e) {
       console.error(e);
-      showUnexpectedErrorToast('ARENA-CREATE-FAILED', lang === 'vi' ? 'Không thể tạo bài thi.' : 'Failed to create the Arena exam.', {}, lang);
+      showUnexpectedErrorToast('ARENA-CREATE-FAILED', uiMessage(lang, "arena.failed_to_create_the_arena_exam"), {}, lang);
     } finally {
       setIsCreating(false);
     }
@@ -138,15 +129,15 @@ export default function ArenaPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background transition-colors duration-500">
-      <Navigation 
-        view="arena" setView={() => {}} lang={lang} 
-        changeLang={(l) => { setLang(l); localStorage.setItem('shark_lang', l); }} 
+      <Navigation
+        view="arena" setView={() => {}} lang={lang}
+        changeLang={(l) => { setLang(l);  }}
         theme={theme} onThemeChange={(isDark) => {
           const nt = isDark ? 'dark' : 'light';
           setTheme(nt);
-          localStorage.setItem('shark_theme', nt);
-          document.documentElement.classList.toggle('dark', isDark);
-        }} t={t} 
+
+
+        }} t={t}
       />
 
       <main className="flex-1 main-container pt-24 md:pt-36 space-y-10 pb-20">
@@ -156,7 +147,7 @@ export default function ArenaPage() {
               <Trophy className="w-10 h-10 md:w-20 md:h-20" /> {t.arena}
             </h1>
             <p className="text-[10px] md:text-sm font-black text-muted-foreground uppercase tracking-[0.2em] opacity-60">
-              {lang === 'vi' ? "THÁCH THỨC CỘNG ĐỒNG - NHẬN SHARK COIN" : "CHALLENGE THE COMMUNITY - EARN SHARK COINS"}
+              {uiMessage(lang, "arena.challenge_the_community_earn_shark_coins")}
             </p>
           </div>
 
@@ -168,7 +159,7 @@ export default function ArenaPage() {
                 <span className="text-lg md:text-3xl font-black">{profile?.sharkCoins || 0}</span>
               </div>
             </Card>
-            <Button 
+            <Button
               onClick={() => setIsCreateDialogOpen(true)}
               className="btn-duo h-12 md:h-20 px-6 md:px-10 rounded-2xl md:rounded-3xl bg-card text-foreground border-border font-black text-xs md:text-xl uppercase tracking-widest gap-3"
             >
@@ -200,18 +191,18 @@ export default function ArenaPage() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-10">
                 {exams.map((exam) => (
-                  <Card 
-                    key={exam.id} 
+                  <Card
+                    key={exam.id}
                     className="card-duo p-6 md:p-10 hover:-translate-y-2 cursor-pointer transition-all bg-card border-border/50 group"
                     onClick={() => router.push(`/arena/${exam.id}`)}
                   >
                     <div className="space-y-6">
                       <div className="flex items-start justify-between gap-4">
                         <Badge className="bg-primary/10 text-primary border-primary/20 font-black uppercase text-[8px] md:text-[10px] tracking-widest px-3 py-1">
-                          {exam.config.subject.toUpperCase()}
+                          {quizLabel('subject', exam.config.subject, t).toUpperCase()}
                         </Badge>
                         <span className="text-[8px] md:text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1">
-                          <CalendarDays className="w-3 h-3" /> {new Date(exam.createdAt?.toDate ? exam.createdAt.toDate() : exam.createdAt).toLocaleDateString()}
+                          <CalendarDays className="w-3 h-3" /> {formatStoredDate(exam.createdAt, lang, { day: 'numeric', month: 'numeric', year: 'numeric' })}
                         </span>
                       </div>
 
@@ -222,7 +213,7 @@ export default function ArenaPage() {
                       <div className="grid grid-cols-2 gap-3">
                          <div className="p-3 rounded-xl bg-muted/30 border-2 border-border flex flex-col">
                             <span className="text-[7px] font-black text-muted-foreground uppercase">{t.difficulty}</span>
-                            <span className="text-[10px] font-black">{exam.config.difficulty}</span>
+                            <span className="text-[10px] font-black">{quizLabel('difficulty', exam.config.difficulty, t)}</span>
                          </div>
                          <div className="p-3 rounded-xl bg-muted/30 border-2 border-border flex flex-col">
                             <span className="text-[7px] font-black text-muted-foreground uppercase">{t.numQuestions}</span>
@@ -277,7 +268,7 @@ export default function ArenaPage() {
                 </div>
                 <div className="space-y-4">
                   <h2 className="text-2xl md:text-4xl font-headline font-black text-primary uppercase tracking-tight">{t.analyzing}</h2>
-                  <p className="text-muted-foreground font-black uppercase text-[10px] md:text-sm tracking-widest">{lang === 'vi' ? 'SHARK GURU ĐANG SOẠN ĐỀ THI VĨNH VIỄN CHO CỘNG ĐỒNG...' : 'SHARK GURU IS PREPARING A PERMANENT EXAM FOR THE COMMUNITY...'}</p>
+                  <p className="text-muted-foreground font-black uppercase text-[10px] md:text-sm tracking-widest">{uiMessage(lang, "arena.shark_guru_is_preparing_a_permanent_exam")}</p>
                 </div>
              </div>
            ) : (

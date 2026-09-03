@@ -1,38 +1,45 @@
 
 "use client";
+import { uiMessage } from '@/lib/i18n';
 
-import React, { useState, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { validateAcademicTopic } from '@/ai/flows/academic-validation-flow';
 import { Button } from '@/components/ui/button';
+import { Card,CardContent,CardDescription,CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup,RadioGroupItem } from "@/components/ui/radio-group";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
 } from "@/components/ui/select";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { 
-  BookOpen, 
-  GraduationCap, 
-  Target, 
-  XCircle, 
-  Layers, 
-  Settings2, 
-  Clock, 
-  Play, 
-  Loader2,
-  Sparkles
-} from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { validateAcademicTopic } from '@/ai/flows/academic-validation-flow';
-import { QuizConfig, BaseViewProps } from '@/lib/types';
+import { showErrorToast,showUnexpectedErrorToast } from '@/lib/error-toast';
+import { BaseViewProps,QuizConfig } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import {
+BookOpen,
+Clock,
+GraduationCap,
+Layers,
+Loader2,
+Play,
+Settings2,
+Sparkles,
+Target,
+XCircle
+} from 'lucide-react';
+import React,{ useCallback,useMemo,useState } from 'react';
 import FeatureHelp from './feature-help';
-import { showErrorToast, showUnexpectedErrorToast } from '@/lib/error-toast';
+
+const RequiredLabel = ({ children, icon }: { children: React.ReactNode, icon?: React.ReactNode }) => (
+    <div className="text-[10px] md:text-xs font-black uppercase text-muted-foreground flex items-center gap-2 select-none tracking-[0.2em] mb-3 group-hover:text-primary transition-colors">
+      {icon} {children} <span className="text-destructive font-bold ml-1 animate-pulse">*</span>
+    </div>
+  );
 
 interface SetupViewProps extends BaseViewProps {
   onStart: (config: QuizConfig) => void;
@@ -52,7 +59,7 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
     timeLimit: ''
   });
 
-  const subjects = [
+  const subjects = useMemo(() => [
     { id: 'literature', label: t.literature },
     { id: 'math', label: t.math },
     { id: 'physics', label: t.physics },
@@ -60,7 +67,7 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
     { id: 'biology', label: t.biology },
     { id: 'english', label: t.english },
     { id: 'other', label: t.other }
-  ];
+  ], [t]);
 
   const types = [
     { id: 'Multiple Choice', label: t.multipleChoice },
@@ -117,14 +124,14 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
       toast({
         variant: "destructive",
         title: t.requiredFields.toUpperCase(),
-        description: num > 50 ? (lang === 'vi' ? 'SỐ CÂU HỎI TỐI ĐA LÀ 50.' : 'MAX NUMBER OF QUESTIONS IS 50.') : "",
+        description: num > 50 ? (uiMessage(lang, "setupview.max_number_of_questions_is_50")) : "",
       });
       return;
     }
 
     setIsValidating(true);
     try {
-      const result = await validateAcademicTopic({ 
+      const result = await validateAcademicTopic({
         topic: config.topic,
         subject: config.subject === 'none' ? undefined : subjects.find(s => s.id === config.subject)?.label,
         grade: config.grade === 'none' ? undefined : config.grade,
@@ -134,7 +141,7 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
         showErrorToast(result.error, lang as 'en' | 'vi');
         return;
       }
-      
+
       if (!result.data.isValid) {
         toast({
           variant: "destructive",
@@ -155,11 +162,6 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
     onStart(config);
   }, [config, lang, onStart, t, subjects, toast]);
 
-  const RequiredLabel = ({ children, icon }: { children: React.ReactNode, icon?: React.ReactNode }) => (
-    <div className="text-[10px] md:text-xs font-black uppercase text-muted-foreground flex items-center gap-2 select-none tracking-[0.2em] mb-3 group-hover:text-primary transition-colors">
-      {icon} {children} <span className="text-destructive font-bold ml-1 animate-pulse">*</span>
-    </div>
-  );
 
   return (
     <div className="animate-in fade-in slide-in-from-bottom-12 duration-1000 max-w-5xl mx-auto pb-24 px-2 md:px-0">
@@ -169,7 +171,7 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
           <div className="relative z-10">
             <CardTitle className="font-headline text-3xl md:text-7xl font-black text-primary mb-4 md:mb-8 uppercase tracking-tighter leading-none animate-in zoom-in-95 duration-700 flex items-center justify-center gap-4">
               {t.setupTitle}
-              <FeatureHelp 
+              <FeatureHelp
                 helpTitle={t.helpTitle}
                 title={t.setupTitle}
                 items={t.setupHelp}
@@ -181,7 +183,7 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
             </CardDescription>
           </div>
         </div>
-        
+
         <CardContent className="p-8 md:p-20">
           <form onSubmit={handleSubmit} className="space-y-12 md:space-y-20">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16">
@@ -218,8 +220,8 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
               <div className="space-y-4 md:col-span-2 group">
                 <RequiredLabel icon={<Target className="w-5 h-5 text-primary transition-transform group-hover:-translate-y-1" />}>{t.topic}</RequiredLabel>
                 <div className="relative">
-                  <Input 
-                    placeholder={lang === 'vi' ? 'ví dụ: Giải tích, Phản ứng oxi hóa-khử...' : 'e.g. Calculus, Redox reactions...'} 
+                  <Input
+                    placeholder={uiMessage(lang, "setupview.e_g_calculus_redox_reactions")}
                     className="h-18 md:h-24 rounded-[2rem] border-4 border-border font-black text-xl md:text-3xl focus-visible:ring-8 focus-visible:ring-primary/10 focus:border-primary bg-background transition-all hover:border-primary/50 shadow-duo px-10 placeholder:text-muted-foreground/30"
                     value={config.topic}
                     onChange={(e) => setConfig({ ...config, topic: e.target.value })}
@@ -237,8 +239,8 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
                 <Label className="text-[10px] md:text-xs font-black uppercase text-muted-foreground flex items-center gap-3 select-none tracking-[0.2em] group-hover:text-primary transition-colors">
                   <XCircle className="w-5 h-5 text-primary transition-transform group-hover:-translate-y-1" /> {t.excludeOptional}
                 </Label>
-                <Textarea 
-                  placeholder={t.excludePlaceholder} 
+                <Textarea
+                  placeholder={t.excludePlaceholder}
                   className="min-h-[120px] rounded-[2rem] border-4 border-border font-bold text-base md:text-xl focus-visible:ring-8 focus-visible:ring-primary/10 focus:border-primary bg-background transition-all hover:border-primary/50 shadow-duo p-8 placeholder:text-muted-foreground/30"
                   value={config.excludeNotes}
                   onChange={(e) => setConfig({ ...config, excludeNotes: e.target.value })}
@@ -248,8 +250,8 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
 
               <div className="space-y-6 md:col-span-2">
                 <RequiredLabel icon={<Layers className="w-5 h-5 text-primary" />}>{t.questionType}</RequiredLabel>
-                <RadioGroup 
-                  value={config.type} 
+                <RadioGroup
+                  value={config.type}
                   onValueChange={(v) => setConfig({ ...config, type: v })}
                   className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8"
                   disabled={isValidating}
@@ -257,7 +259,7 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
                   {types.map(type => (
                     <div key={type.id} className="relative group">
                       <RadioGroupItem value={type.id} id={type.id} className="peer sr-only" />
-                      <Label 
+                      <Label
                         htmlFor={type.id}
                         className="flex items-center justify-center p-4 h-full min-h-[80px] md:min-h-[100px] rounded-[1.5rem] md:rounded-3xl border-4 border-border cursor-pointer transition-all peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/10 peer-data-[state=checked]:text-primary peer-data-[state=checked]:translate-y-[-4px] peer-data-[state=checked]:shadow-[0_8px_0_0_var(--duo-shadow)] font-black text-center text-[10px] md:text-sm select-none tracking-normal md:tracking-[0.1em] uppercase hover:bg-primary/5 shadow-duo active:translate-y-1 active:shadow-none whitespace-normal leading-tight"
                       >
@@ -282,8 +284,8 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
                       variant={config.difficulty === diff.id ? "default" : "outline"}
                       className={cn(
                         "h-16 md:h-20 rounded-[1.5rem] md:rounded-3xl border-4 font-black text-[10px] md:text-sm select-none tracking-normal md:tracking-[0.05em] uppercase transition-all btn-duo px-4 whitespace-normal leading-tight",
-                        config.difficulty === diff.id 
-                          ? 'border-primary bg-primary text-white translate-y-[-4px]' 
+                        config.difficulty === diff.id
+                          ? 'border-primary bg-primary text-white translate-y-[-4px]'
                           : 'border-border hover:bg-primary/5 hover:border-primary/50 shadow-duo'
                       )}
                       onClick={() => setConfig({ ...config, difficulty: diff.id })}
@@ -298,11 +300,12 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
                 <div className="space-y-4 group">
                   <RequiredLabel icon={<Settings2 className="w-5 h-5 text-primary transition-transform group-hover:-translate-y-1" />}>{t.numQuestions}</RequiredLabel>
                   <div className="flex items-center gap-6">
-                    <Input 
+                    <Input
                       type="text"
                       inputMode="numeric"
                       className="h-16 md:h-20 rounded-[1.5rem] md:rounded-3xl border-4 border-border font-black text-2xl md:text-4xl focus-visible:ring-8 focus-visible:ring-primary/10 transition-all shadow-duo max-w-[120px] md:max-w-[180px] text-center bg-background"
                       value={config.numQuestions}
+                      aria-label={t.numQuestions}
                       onChange={handleNumQuestionsChange}
                       onBlur={handleNumQuestionsBlur}
                       disabled={isValidating}
@@ -316,10 +319,10 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
                     <Clock className="w-5 h-5 text-primary transition-transform group-hover:-translate-y-1" /> {t.timeLimitOptional}
                   </Label>
                   <div className="flex items-center gap-6">
-                    <Input 
+                    <Input
                       type="text"
                       inputMode="numeric"
-                      placeholder={lang === 'vi' ? 'Phút' : 'Mins'}
+                      placeholder={uiMessage(lang, "setupview.mins")}
                       className="h-16 md:h-20 rounded-[1.5rem] md:rounded-3xl border-4 border-border font-black text-2xl md:text-4xl focus-visible:ring-8 focus-visible:ring-primary/10 transition-all shadow-duo max-w-[120px] md:max-w-[180px] text-center bg-background"
                       value={config.timeLimit}
                       onChange={handleTimeLimitMinutesChange}
@@ -330,9 +333,9 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
               </div>
             </div>
 
-            <Button 
-              type="submit" 
-              size="lg" 
+            <Button
+              type="submit"
+              size="lg"
               disabled={isValidating}
               className="w-full h-24 md:h-36 rounded-[2.5rem] md:rounded-[4rem] text-3xl md:text-6xl font-headline font-black btn-duo bg-primary hover:bg-primary/95 mt-16 md:mt-24 uppercase tracking-tighter border-[6px] border-white/20 transition-all group overflow-hidden active:translate-y-[8px]"
             >

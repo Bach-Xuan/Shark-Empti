@@ -1,87 +1,493 @@
-
 {
+  "$comment": "Descriptive data map, not an executable validation schema. English descriptions have x-description-vi counterparts; technical identifiers are not translated.",
+  "x-purpose-vi": "Sơ đồ dữ liệu mô tả, không phải schema thực thi. Description tiếng Anh có bản Việt tương ứng; không dịch định danh kỹ thuật.",
+  "x-version": "1.15.1",
+  "x-reviewed-at": "2026-09-03",
+  "x-authority": {
+    "description": "Actual contracts: Firestore Rules, AI/API Zod schemas, history/profile readers and server-api.ts. Updating this file changes no validation, migration or access policy.",
+    "x-description-vi": "Hợp đồng thực tế: Firestore Rules, Zod AI/API, reader history/profile và server-api.ts. Sửa file này không đổi validation, migration hoặc quyền truy cập.",
+    "documentation": "TECHNICAL_DOCUMENTATION.md#audit-register-en",
+    "documentationVi": "TECHNICAL_DOCUMENTATION.md#audit-register-vi"
+  },
+  "$defs": {
+    "FirestoreTimestamp": {
+      "type": "object",
+      "x-firestore-type": "Timestamp",
+      "description": "Native Firestore timestamp; this is not a prescribed JSON serialization.",
+      "x-description-vi": "Timestamp gốc của Firestore; không áp đặt một dạng JSON serialization."
+    },
+    "QuizQuestion": {
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": "string"
+        },
+        "section": {
+          "type": "string"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "correct": {
+          "type": "string"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "difficulty": {
+          "type": "string"
+        }
+      }
+    },
+    "QuizResult": {
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": "string"
+        },
+        "section": {
+          "type": "string"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "correct": {
+          "type": "string"
+        },
+        "explanation": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "difficulty": {
+          "type": "string"
+        },
+        "userAnswer": {
+          "type": "string"
+        },
+        "isCorrect": {
+          "type": "boolean"
+        },
+        "timeTakenSeconds": {
+          "type": "number"
+        },
+        "errorCategory": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "aiFeedback": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  },
   "entities": {
     "UserProfile": {
-      "title": "User Profile",
-      "description": "Extended user information stored in Firestore.",
+      "title": "User profile",
+      "x-title-vi": "Hồ sơ người dùng",
       "type": "object",
       "properties": {
         "displayName": {
-          "type": "string",
-          "description": "The user's preferred display name."
+          "type": "string"
         },
         "email": {
-          "type": "string",
-          "format": "email",
-          "description": "The user's email address."
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "photoURL": {
-          "type": "string",
-          "description": "URL to the user's profile picture."
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "bio": {
-          "type": "string",
-          "description": "Short biography or notes about the user."
+          "type": "string"
         },
         "sharkCoins": {
-          "type": "number",
-          "description": "The user's earned shark coins."
+          "type": "number"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/FirestoreTimestamp"
         },
         "updatedAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "The last time the profile was updated."
+          "$ref": "#/$defs/FirestoreTimestamp"
         }
       },
-      "required": ["email"]
+      "description": "Profiles may be partial: Admin coin increments can create a record without email. Runtime reader and Rules define actual acceptance.",
+      "x-description-vi": "Hồ sơ có thể thiếu trường: Admin tăng coins có thể tạo document chưa có email. Reader và Rules mới quyết định dữ liệu được chấp nhận."
+    },
+    "QuizHistory": {
+      "title": "Quiz history",
+      "x-title-vi": "Lịch sử quiz",
+      "type": "object",
+      "properties": {
+        "config": {
+          "type": "object"
+        },
+        "quizResults": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/QuizResult"
+          }
+        },
+        "totalTime": {
+          "type": "number"
+        },
+        "analysis": {
+          "type": "object"
+        },
+        "date": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "lang": {
+          "enum": [
+            "vi",
+            "en"
+          ]
+        }
+      },
+      "description": "Document ID is supplied by the reader, not necessarily persisted. Legacy defaults come from history-schema.ts; F03 persistence is still open.",
+      "x-description-vi": "ID lấy từ document khi đọc, không nhất thiết được ghi. Default legacy theo history-schema.ts; lỗi ghi F03 vẫn mở."
+    },
+    "UserNotes": {
+      "title": "Personal notes",
+      "x-title-vi": "Ghi chú cá nhân",
+      "type": "object",
+      "properties": {
+        "content": {
+          "type": "string"
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/FirestoreTimestamp"
+        }
+      }
+    },
+    "UserActivity": {
+      "title": "Calendar activity",
+      "x-title-vi": "Hoạt động trên lịch",
+      "type": "object",
+      "properties": {
+        "activeDays": {
+          "type": "object",
+          "additionalProperties": { "type": "boolean" },
+          "description": "Keys are local calendar dates YYYY-MM-DD.",
+          "x-description-vi": "Khóa là ngày lịch local YYYY-MM-DD."
+        },
+        "updatedAt": { "$ref": "#/$defs/FirestoreTimestamp" }
+      },
+      "description": "ActivityCalendar calls trackToday when ready. This records an active day, not proof of quiz completion.",
+      "x-description-vi": "ActivityCalendar gọi trackToday khi sẵn sàng. Đây là ngày có hoạt động, không phải bằng chứng hoàn tất quiz."
+    },
+    "FlashcardSession": {
+      "title": "Saved flashcard session",
+      "x-title-vi": "Phiên flashcard đã lưu",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "sourceType": {
+          "enum": [
+            "weak_point",
+            "manual"
+          ]
+        },
+        "sourceValue": {
+          "type": "string"
+        },
+        "cards": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "front": {
+                "type": "string"
+              },
+              "back": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "PracticeSession": {
+      "title": "Saved practice session",
+      "x-title-vi": "Phiên luyện tập đã lưu",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string"
+        },
+        "concept": {
+          "type": "string"
+        },
+        "questions": {
+          "type": "array"
+        },
+        "userAnswers": {
+          "type": "array"
+        },
+        "score": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "ForumPost": {
+      "title": "Forum post",
+      "x-title-vi": "Bài Forum",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "subject": {
+          "type": "string"
+        },
+        "authorId": {
+          "type": "string"
+        },
+        "authorName": {
+          "type": "string"
+        },
+        "authorPhoto": {
+          "type": "string"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/FirestoreTimestamp"
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/FirestoreTimestamp"
+        },
+        "likesCount": {
+          "type": "integer"
+        },
+        "likedBy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "commentsCount": {
+          "type": "integer"
+        }
+      },
+      "description": "Post deletion currently does not cascade to comments (D07); this map does not impose a new retention policy.",
+      "x-description-vi": "Xóa bài hiện không cascade comment (D07); sơ đồ này không áp dụng chính sách retention mới."
+    },
+    "ForumComment": {
+      "title": "Forum comment",
+      "x-title-vi": "Bình luận Forum",
+      "type": "object",
+      "properties": {
+        "postId": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "authorId": {
+          "type": "string"
+        },
+        "authorName": {
+          "type": "string"
+        },
+        "authorPhoto": {
+          "type": "string"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/FirestoreTimestamp"
+        },
+        "updatedAt": {
+          "$ref": "#/$defs/FirestoreTimestamp"
+        },
+        "likesCount": {
+          "type": "integer"
+        },
+        "likedBy": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
     },
     "ArenaExam": {
-      "title": "Arena Exam",
-      "description": "An exam created by a user for the Arena.",
+      "title": "Arena exam",
+      "x-title-vi": "Đề Arena",
       "type": "object",
       "properties": {
-        "title": { "type": "string" },
-        "config": { "type": "object" },
-        "questions": { "type": "array" },
-        "authorId": { "type": "string" },
-        "authorName": { "type": "string" },
-        "authorPhoto": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" },
-        "totalAttempts": { "type": "number" }
+        "title": {
+          "type": "string"
+        },
+        "config": {
+          "type": "object"
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/QuizQuestion"
+          }
+        },
+        "authorId": {
+          "type": "string"
+        },
+        "authorName": {
+          "type": "string"
+        },
+        "authorPhoto": {
+          "type": "string"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/FirestoreTimestamp"
+        },
+        "totalAttempts": {
+          "type": "integer"
+        }
       },
-      "required": ["title", "config", "authorId", "createdAt", "questions"]
+      "description": "Questions are unattempted questions, not learner results. No assertion is made that legacy documents satisfy this shape; see F02 and runtime scoring guards.",
+      "x-description-vi": "Câu hỏi chưa có kết quả người học. Không khẳng định document legacy đúng shape này; xem F02 và scoring guards."
     },
     "ArenaAttempt": {
-      "title": "Arena Attempt",
-      "description": "A user's attempt at an arena exam.",
+      "title": "Arena attempt",
+      "x-title-vi": "Lượt làm Arena",
       "type": "object",
       "properties": {
-        "examId": { "type": "string" },
-        "userId": { "type": "string" },
-        "userName": { "type": "string" },
-        "userPhoto": { "type": "string" },
-        "score": { "type": "number" },
-        "duration": { "type": "number" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "examId": {
+          "type": "string"
+        },
+        "userId": {
+          "type": "string"
+        },
+        "userName": {
+          "type": "string"
+        },
+        "userPhoto": {
+          "type": "string"
+        },
+        "score": {
+          "type": "number"
+        },
+        "duration": {
+          "type": "number"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/FirestoreTimestamp"
+        }
+      }
+    },
+    "RequestReceipt": {
+      "title": "Idempotency receipt",
+      "x-title-vi": "Biên nhận idempotency",
+      "type": "object",
+      "properties": {
+        "fingerprint": {
+          "type": "string"
+        },
+        "result": {
+          "type": "object"
+        },
+        "createdAt": {
+          "$ref": "#/$defs/FirestoreTimestamp"
+        }
       },
-      "required": ["examId", "userId", "score", "duration", "createdAt"]
+      "description": "Server hashes scope/UID/requestId to form the document ID. Date written by Admin is stored as Timestamp. No TTL policy is configured.",
+      "x-description-vi": "Server hash scope/UID/requestId thành ID. Date do Admin ghi được lưu thành Timestamp. Chưa có policy TTL."
     }
   },
   "auth": {
-    "providers": ["google.com"]
+    "providers": [
+      "google.com"
+    ]
   },
   "firestore": {
-    "/users/{userId}": {
+    "/users/{uid}": {
       "schema": "UserProfile",
-      "description": "User profile documents."
+      "description": "Profiles; authenticated reads, owner writes subject to Rules; coin changes use Admin.",
+      "x-description-vi": "Hồ sơ; người đăng nhập đọc, owner ghi theo Rules; coins qua Admin."
+    },
+    "/users/{uid}/history/{id}": {
+      "schema": "QuizHistory",
+      "description": "Private history.",
+      "x-description-vi": "Lịch sử riêng tư."
+    },
+    "/users/{uid}/notes/main": {
+      "schema": "UserNotes",
+      "description": "Private notes, one main document.",
+      "x-description-vi": "Ghi chú riêng tư, một document main."
+    },
+    "/users/{uid}/activity/main": {
+      "schema": "UserActivity",
+      "description": "Private active-day map read/written by useUserActivity.",
+      "x-description-vi": "Bản đồ ngày hoạt động riêng tư do useUserActivity đọc/ghi."
+    },
+    "/users/{uid}/flashcards/{id}": {
+      "schema": "FlashcardSession",
+      "description": "Private saved flashcards.",
+      "x-description-vi": "Flashcard riêng tư đã lưu."
+    },
+    "/users/{uid}/practice/{id}": {
+      "schema": "PracticeSession",
+      "description": "Private saved practice.",
+      "x-description-vi": "Luyện tập riêng tư đã lưu."
+    },
+    "/posts/{postId}": {
+      "schema": "ForumPost",
+      "description": "Public feed; client mutations governed by Rules.",
+      "x-description-vi": "Feed công khai; client mutations theo Rules."
+    },
+    "/posts/{postId}/comments/{commentId}": {
+      "schema": "ForumComment",
+      "description": "Public comments; creation/deletion through Admin API, updates governed by Rules.",
+      "x-description-vi": "Comment công khai; tạo/xóa qua Admin API, sửa theo Rules."
     },
     "/arenaExams/{examId}": {
       "schema": "ArenaExam",
-      "description": "Arena exams collection."
+      "description": "Public exams; client writes governed by Rules.",
+      "x-description-vi": "Đề công khai; client ghi theo Rules."
     },
     "/arenaExams/{examId}/attempts/{attemptId}": {
       "schema": "ArenaAttempt",
-      "description": "Attempts and leaderboard for an exam."
+      "description": "Public leaderboard attempts; server-created.",
+      "x-description-vi": "Lượt làm trên leaderboard công khai; server tạo."
+    },
+    "/_requestReceipts/{hash}": {
+      "schema": "RequestReceipt",
+      "description": "Admin-only receipts, no client Rule grant.",
+      "x-description-vi": "Receipt chỉ Admin, không có Rule cấp quyền client."
     }
+  },
+  "x-derived-data": {
+    "description": "Calendar month grouping derives from users/{uid}/activity/main.activeDays. Roadmap checks and language/theme use localStorage, not these collections.",
+    "x-description-vi": "Nhóm tháng trên lịch lấy từ users/{uid}/activity/main.activeDays. Checklist roadmap và ngôn ngữ/theme nằm ở localStorage, không phải các collection này."
   }
 }

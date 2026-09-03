@@ -1,11 +1,11 @@
 
 'use client';
 
-import React, { createContext, useContext } from 'react';
-import { FirebaseApp } from 'firebase/app';
-import { Firestore } from 'firebase/firestore';
-import { Auth } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
+import { FirebaseApp } from 'firebase/app';
+import { Auth,onAuthStateChanged,type User } from 'firebase/auth';
+import { Firestore } from 'firebase/firestore';
+import React,{ createContext,useContext,useEffect,useMemo,useState } from 'react';
 
 interface FirebaseContextProps {
   firebaseApp: FirebaseApp;
@@ -14,6 +14,8 @@ interface FirebaseContextProps {
 }
 
 const FirebaseContext = createContext<FirebaseContextProps | undefined>(undefined);
+const AuthStateContext = createContext<{ user: User | null; loading: boolean }>({ user: null, loading: true });
+export const useAuthState = () => useContext(AuthStateContext);
 
 export const FirebaseProvider: React.FC<{
   firebaseApp: FirebaseApp;
@@ -21,10 +23,15 @@ export const FirebaseProvider: React.FC<{
   auth: Auth;
   children: React.ReactNode;
 }> = ({ firebaseApp, firestore, auth, children }) => {
+  const [state, setState] = useState<{ user: User | null; loading: boolean }>({ user: null, loading: true });
+  useEffect(() => onAuthStateChanged(auth, user => setState({ user, loading: false }), () => setState({ user: null, loading: false })), [auth]);
+  const services = useMemo(() => ({ firebaseApp, firestore, auth }), [firebaseApp, firestore, auth]);
   return (
-    <FirebaseContext.Provider value={{ firebaseApp, firestore, auth }}>
+    <FirebaseContext.Provider value={services}>
+      <AuthStateContext.Provider value={state}>
       <FirebaseErrorListener />
-      {children}
+      <React.Fragment key={state.user?.uid ?? 'anonymous'}>{children}</React.Fragment>
+      </AuthStateContext.Provider>
     </FirebaseContext.Provider>
   );
 };

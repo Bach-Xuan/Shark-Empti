@@ -1,139 +1,353 @@
-> English below.
+# Tài liệu kỹ thuật · Shark Empti v1.15.1
 
-# Shark Empti - Technical Documentation (v1.15.1)
+English below. Tài liệu này mô tả kiến trúc, hợp đồng kỹ thuật, cấu hình và cách bảo trì ứng dụng.
 
-## 1. Tổng Quan Dự Án (Project Overview)
-**Shark Empti** là một nền tảng học tập thông minh tích hợp AI (Cognitive Learning Platform), lấy cảm hứng từ phong cách thiết kế của Duolingo (Neo-brutalism). Ứng dụng không chỉ dừng lại ở việc tạo câu hỏi mà còn tập trung vào việc **phân tích tư duy**, **giám sát sự tập trung** và **cá nhân hóa lộ trình ôn tập** dựa trên dữ liệu lịch sử của người dùng.
+## 1. Phạm vi và baseline
 
-### 1.1. Mục tiêu & Vấn đề giải quyết
-*   **Vấn đề**: Người học thường gặp khó khăn trong việc xác định mình yếu ở đâu (hổng kiến thức hay do bất cẩn) và thiếu sự giám sát khi tự học tại nhà.
-*   **Giải pháp**: 
-    *   Sử dụng AI (Shark Guru) để phân tích lỗi sai thành 4 danh mục (Hiểu sai đề, Lỗi khái niệm, Lỗi tư duy, Lỗi bất cẩn).
-    *   Tích hợp "Lá chắn tập trung" (Focus Shield) sử dụng Computer Vision để cảnh báo khi người dùng xao nhãng.
-    *   Tự động hóa việc tạo Flashcards và bài tập bổ trợ từ chính những lỗi sai trong quá khứ.
+Đợt thứ hai bắt đầu trên worktree đã có thay đổi chưa commit từ đợt trước. Không dùng git diff tổng để quy toàn bộ thay đổi cho đợt này. Baseline gồm API Admin Forum/Arena, cấu hình model, cải thiện prompt, next/font và chỉnh docs/lint trước đó. Đợt mới thêm transport fetch/Zod, nâng dependency, provider chung, reducer, idempotency, Rules hardening, test/CI và sửa song ngữ. Giữ version1.15.1, URL và dữ liệu; không migration production hoặc failover model.
 
-### 1.2. Đối tượng người dùng
-*   Học sinh bậc phổ thông (Lớp 6 - 12) chuẩn bị cho các kỳ thi.
-*   Sinh viên và người tự học các bộ môn khoa học (Toán, Lý, Hóa, Sinh, Anh).
+## 2. Kiến trúc và ownership
+
+App Router server layout cung cấp font/CSS, AppPreferencesProvider và FirebaseClientProvider. Provider preference sở hữu lang/theme, validate storage, cập nhật html.lang/dark và nhận storage event từ tab khác. Các hooks useLanguageState/useThemeState không tự tạo state riêng. Root error UI không phụ thuộc Firebase.
+
+FirebaseProvider sở hữu một onAuthStateChanged. useUser chỉ đọc context; key UID ở subtree riêng tư làm reset component state khi đổi tài khoản/logout. Preference provider nằm ngoài subtree nên lựa chọn VI/EN/theme không mất. Không đặt dialog/input/tooltip vào global state.
+
+Home sở hữu navigation/view, learningSessionReducer, history subscription và notes hook. Reducer mô hình hóa setup/loading/quiz/result/error nhưng Home chưa dispatch fail/reset; Quiz vẫn sở hữu loading/error, câu trả lời, timer và pending flags. UI language thay đổi không sinh bộ câu hỏi mới. Các luồng Quiz/Playground bỏ qua response sau unmount; các callback bất đồng bộ khác phải áp dụng cùng nguyên tắc kiểm tra vòng đời. Kết quả Arena chưa lưu được giữ trong ref, retry giữ cùng payload/request ID và không phân tích lại. Auth dùng key UID để cách ly state; thao tác riêng tư chỉ nên bắt đầu khi trạng thái xác thực đã ổn định.
+
+History được tính thống kê một lần tại Home qua memo và truyền Dashboard. Dashboard/playground dùng dynamic import. Nhãn dịch hiện vẫn tham gia một phần phép tính thống kê: chưa được tách hoàn toàn khỏi dữ liệu số. Không tuyên bố mọi phép tính không chạy lại khi đổi locale.
+
+## 3. Data flow và dữ liệu tương thích
+
+Quiz: Setup → academic validation → generateQuestions → trả lời/timer → feedback → result → users/{uid}/history → dashboard. Short Answer thường dùng AI; numeric Arena dùng đáp án số chuẩn. Không sửa nội dung lịch sử khi đổi VI/EN.
+
+Firestore chính:
+
+- users/{uid}: profile và sharkCoins; coins chỉ Admin cập nhật.
+- users/{uid}/history/{id}: config, quizResults, totalTime, analysis?, date ISO, lang; ID từ document.
+- users/{uid}/notes/main: content và updatedAt.
+- users/{uid}/activity/main: activeDays map YYYY-MM-DD → boolean và updatedAt; calendar gọi trackToday khi sẵn sàng, không phải chứng nhận đã hoàn tất quiz.
+- users/{uid}/flashcards/{id}: userId/sourceType/sourceValue/cards/createdAt ISO; users/{uid}/practice/{id}: userId/concept/questions/userAnswers/score/createdAt ISO.
+- posts/{id}: title/content/subject/author, createdAt, likesCount, likedBy, commentsCount; comments nằm ở subcollection.
+- arenaExams/{id}: title/config/questions/author, totalAttempts; attempts lưu score/duration/user.
+- _requestReceipts/{hash}: fingerprint, result, createdAt; chỉ Admin.
+
+Dữ liệu cũ thiếu analysis/nhãn topic được hiển thị bằng fallback hiện có. Legacy Arena không có đáp án numeric đáng tin bị từ chối chấm bằng contract hiện tại. Không backfill lịch sử. History được đọc qua Zod với default cho trường legacy thiếu; core record hỏng được bỏ khỏi phần hiển thị và phát mã APP-DATA-INVALID, không sửa/xóa bản lưu. Một số boundary profile/Forum/Arena vẫn còn cast cần tiếp tục schema hóa.
+
+Notes hook trả Promise<boolean>; chỉ báo lưu thành công sau setDoc resolve. Document không tồn tại trả chuỗi rỗng. Subscription cleanup bỏ snapshot muộn. QuickNotes giữ draft khi ghi lỗi và không áp snapshot đè draft dirty. Khi đổi UID, private subtree bị remount, không giữ draft của tài khoản cũ.
+
+Roadmap mới lưu ở localStorage `shark_roadmap_checks:{uid}` và validate bản đồ boolean trước khi đọc. Khóa legacy `shark_roadmap_checks` không có UID: giữ nguyên nhưng không tự nhập vào tài khoản hiện tại, vì không xác định được chủ sở hữu. Người dùng có thể thấy checklist mới trống; dữ liệu cũ không bị xóa. Khôi phục/import legacy cần xác nhận đúng tài khoản trước khi gán. Ngôn ngữ/theme tiếp tục dùng khóa cũ `shark_lang`/`shark_theme`.
+
+Test `ui-copy.test.ts` duyệt AST của TSX để chặn text JSX và title/placeholder/aria-label/alt tĩnh ngoài ngoại lệ: thương hiệu/version, SHARK COINS, English, Tiếng Việt và UID. Đây không phải bằng chứng mọi chuỗi động đều đã dịch; chuỗi tạo trong event handler/prompt/export vẫn cần kiểm tra riêng.
+
+## 4. API, authentication và idempotency
+
+src/lib/server-api.ts gom Bearer token verification, ApiError, apiFailure và transaction receipt. Route handler phải parse payload và kiểm tra ownership sau auth; Admin bypass Rules.
+
+Arena POST /api/arena/{examId}/submit nhận answers:string[], duration? và requestId?:UUID. Comment POST /api/forum/{postId}/comments nhận content và requestId?:UUID. Comment DELETE /api/forum/{postId}/comments?commentId={commentId} kiểm tra quyền. Response thành công giữ contract trước; lỗi luôn có error:string, code:string, values:object để client dịch. Không đưa exception/stack/token upstream vào response.
+
+Receipt key = SHA256(scope, UID, requestId); fingerprint từ payload đã parse. Cùng ID/cùng payload trả kết quả cũ; khác payload trả409 APP-REQUEST-CONFLICT. Transaction gồm đọc receipt, business writes/counter/coin và tạo receipt, chống race giữa hai request đồng thời. requestId còn optional cho client cũ; client mới luôn gửi. Không có receipt khi client cũ bỏ ID. Receipt chưa có TTL, cần chính sách retention riêng, không tự xóa.
+
+Contract yêu cầu UI khóa submit đồng thời, thao tác mới có ID mới và retry sau response mất giữ payload cũ kể cả duration. Mọi đường bắt đầu hoặc làm lại phải duy trì phân biệt này. Idempotency không chống gian lận toàn Arena: nghiệp vụ vẫn cho làm lại có điểm/thưởng; không có trusted exam timer hay secrecy của đáp án.
+
+## 5. Rules và xử lý lỗi
+
+Post create yêu cầu author self, counters0 và likedBy rỗng. Author update chỉ title/content/subject/updatedAt; comment update chỉ content/updatedAt. Like chỉ cho phép delta đúng theo UID và không trùng likedBy. Tác giả không được bypass counter/like checks. Comment create/delete và Arena attempts dùng Admin API. Arena create totalAttempts0; update chỉ title/config/questions.
+
+Wildcard users/{uid}/{collection}/{document=**} chỉ áp dụng subcollection; không dùng users/{uid}/{document=**} vì Rulesv2 có thể match zero segments và vô tình cho đổi coins tại profile. Test Emulator phải giữ regression này.
+
+Route error.tsx và global-error.tsx dùng retry của Next16. ErrorBoundary riêng bọc Focus và Dashboard; lỗi render không kéo toàn app xuống. Global fallback có HTML/body và không cần Firebase/context bắt buộc. Lỗi event/request/camera/clipboard/subscription phải catch tại nguồn, không trông chờ boundary.
+
+Mã an toàn qua i18n/errors và error-toast. Chẩn đoán toast chỉ allowlist httpStatus/providerCode/retryAfterSeconds/operation. FirestorePermissionError là tên export tương thích; nội bộ phân loại permission/unavailable/auth/not-found/generic bằng cause, không tự coi mọi lỗi là permission. Callsite chưa truyền cause sẽ hiện lỗi chung.
+
+## 6. AI transport, prompt và Focus Shield
+
+Bảy public flow giữ tên hàm/input/output/AppResult: academic-validation, generate-questions, generate-flashcards, generate-practice, short-answer-analysis, personalized-quiz-feedback, ai-coaching-chatbot. Input được Zod parse; adapter chuyển output schema sang JSON Schema, gọi một model rồi validate response. Không có framework thay Genkit hoặc key rotation.
+
+Base prompt chỉ dùng vai trò Shark Guru, phong cách, locale và LaTeX. Luật số câu, loại câu, rubric feedback và numeric Arena nằm trong flow. JSON dữ liệu người dùng được đánh dấu là task data, không instruction override; đây là giảm nhập nhằng, không bảo đảm miễn nhiễm prompt injection. Chat history model được map assistant; toàn bộ context review được đưa vào prompt.
+
+Timeout/retry và env được mô tả trong CONFIGURATION.md. Unit fixtures không gọi mạng ngoài; live smoke là kiểm tra riêng, không coi HTTP200 là thành công nếu body error/schema sai.
+
+Focus Shield import type TensorFlow ở đầu file; import() runtime chỉ trong loadModel sau thao tác bật. Turbopack dev có thể gửi manifest async-loader nhỏ trước đó; manifest không phải runtime/model. generationRef chặn model/stream đến muộn; startingRef khóa khởi tạo đồng thời. Stop/unmount dispose model, dừng track và cancelAnimationFrame. tf.tidy dọn tensors; inference throttle800ms. Kiểm tra camera thật, quyền bị từ chối, model load lỗi và cleanup phải được ghi kết quả riêng.
+
+## 7. Song ngữ và bảo trì
+
+translations.ts giữ catalog nghiệp vụ; i18n/common.ts và errors.ts bổ sung UI/error dùng chung; UiText truy cập catalog common có kiểu. i18n/ui.ts gom 89 vị trí chuỗi UI trước đây inline, với key có prefix chức năng; i18n/index.ts cung cấp messages/uiMessage. Snippet LaTeX dùng catalog riêng. Kiểm tra JSX text tĩnh không thay thế rà nội dung động. Test parity so key và interpolation ở cả VI/EN. Thương hiệu Shark Empti/Shark Guru, mã lỗi, tên model, ký hiệu khoa học/LaTeX và nội dung người dùng là ngoại lệ không dịch tự động. Đổi locale không gọi AI để dịch lịch sử.
+
+Thêm translation: khai báo cả en/vi, giữ placeholder trùng, dùng API catalog trong UI, thêm test hai locale và kiểm tra mobile với tiếng Việt dài.
+Thêm flow: schema input/output, prompt riêng + base rules, AppResult, fixtures success/error, timeout/retry test tại adapter; không import secret module vào client.
+Thêm API: auth trước business logic, Zod input, stable code/error string, quyền tác giả và transaction, requestId nếu ghi có thể retry; test missing/invalid token/payload, concurrency và conflict.
+Thêm subscription: một owner, reset khi key đổi, unsubscribe và bỏ response cũ, error cause an toàn; test account switch.
+Thêm test: unit/component vào tests, integration Node vào tests/integration; Rules chỉ chạy qua Emulator. E2E dùng demo project và localhost AI fixture; không thêm credential production.
+Nâng dependency: xem engines/peers, nâng theo nhóm, cài không force, chạy suite liên quan; cập nhật cả lockfile và bảng bên dưới. ESLint set-state-in-effect hiện tắt để cho phép khởi tạo browser state/subscriptions; purity/static-components/exhaustive-deps vẫn bật.
+
+## 8. Danh mục dependency trực tiếp
+
+Baseline là range trong manifest, không giả lập phiên bản đã cài trước đó. Đích là resolution chính xác trong lockfile đợt này.
+
+| Package | Baseline manifest | Đích đã khóa | Nơi dùng / lý do / kiểm tra |
+|---|---|---|---|
+| @firebase/rules-unit-testing | ^4.0.1 | 5.0.2 | Emulator rules tests; migration5; test:rules |
+| @playwright/test | — | 1.62.1 | Browser fixtures desktop/mobile; E2E + screenshot |
+| @radix-ui/react-alert-dialog | ^1.1.6 | 1.1.23 | src/components/ui; giữ primitive accessible; kiểm tra keyboard/dialog/E2E |
+| @radix-ui/react-avatar | ^1.1.3 | 1.2.6 | src/components/ui; giữ primitive accessible; kiểm tra keyboard/dialog/E2E |
+| @radix-ui/react-checkbox | ^1.1.4 | 1.3.11 | src/components/ui; giữ primitive accessible; kiểm tra keyboard/dialog/E2E |
+| @radix-ui/react-dialog | ^1.1.6 | 1.1.23 | src/components/ui; giữ primitive accessible; kiểm tra keyboard/dialog/E2E |
+| @radix-ui/react-dropdown-menu | ^2.1.6 | 2.1.24 | src/components/ui; giữ primitive accessible; kiểm tra keyboard/dialog/E2E |
+| @radix-ui/react-label | ^2.1.2 | 2.1.15 | src/components/ui; giữ primitive accessible; kiểm tra keyboard/dialog/E2E |
+| @radix-ui/react-progress | ^1.1.2 | 1.1.16 | src/components/ui; giữ primitive accessible; kiểm tra keyboard/dialog/E2E |
+| @radix-ui/react-radio-group | ^1.2.3 | 1.4.7 | src/components/ui; giữ primitive accessible; kiểm tra keyboard/dialog/E2E |
+| @radix-ui/react-scroll-area | ^1.2.3 | 1.2.18 | src/components/ui; giữ primitive accessible; kiểm tra keyboard/dialog/E2E |
+| @radix-ui/react-select | ^2.1.6 | 2.3.7 | src/components/ui; giữ primitive accessible; kiểm tra keyboard/dialog/E2E |
+| @radix-ui/react-slot | ^1.2.3 | 1.3.3 | src/components/ui; giữ primitive accessible; kiểm tra keyboard/dialog/E2E |
+| @radix-ui/react-switch | ^1.1.3 | 1.3.7 | src/components/ui; giữ primitive accessible; kiểm tra keyboard/dialog/E2E |
+| @radix-ui/react-tabs | ^1.1.3 | 1.1.21 | src/components/ui; giữ primitive accessible; kiểm tra keyboard/dialog/E2E |
+| @radix-ui/react-toast | ^1.2.6 | 1.2.23 | src/components/ui; giữ primitive accessible; kiểm tra keyboard/dialog/E2E |
+| @radix-ui/react-tooltip | ^1.1.8 | 1.2.16 | src/components/ui; giữ primitive accessible; kiểm tra keyboard/dialog/E2E |
+| @tailwindcss/postcss | — | 4.3.3 | PostCSS4 integration mới; thay plugin3; build |
+| @tensorflow/tfjs | ^4.22.0 | 4.22.0 | FocusTrackerWidget; dynamic import, CPU/WebGL; camera tests |
+| @testing-library/react | ^16.3.0 | 16.3.3 | Component hành vi; Vitest |
+| @testing-library/user-event | ^14.6.1 | 14.6.7 | Tương tác component; Vitest |
+| @types/katex | ^0.16.7 | 0.16.8 | Kiểu parser KaTeX; typecheck |
+| @types/node | ^20.19.43 | 24.13.3 | Theo Node24, không chạy theo latest major; typecheck |
+| @types/react | ^19.2.1 | 19.2.18 | Theo React19; typecheck |
+| @types/react-dom | ^19.2.1 | 19.2.6 | Theo React DOM19; typecheck |
+| @vitest/coverage-v8 | ^3.2.4 | 4.1.11 | Đồng bộ Vitest; báo coverage V8 |
+| class-variance-authority | ^0.7.1 | 0.7.1 | UI variants; giữ kiểu variants; typecheck |
+| clsx | ^2.1.1 | 2.1.1 | lib/utils; class điều kiện; UI |
+| eslint | ^9.39.5 | 9.39.5 | 9.39.5 thay vì10: react/jsx-a11y peers chỉ đến9; lint |
+| eslint-config-next | ^15.5.9 | 16.3.4 | Flat config đồng bộ Next16; lint |
+| firebase | ^11.9.1 | 12.18.0 | src/firebase và client data; Auth/Firestore; Emulator + E2E |
+| firebase-admin | ^13.10.0 | 14.3.0 | server API/token/transaction; giữ server-only; API integration |
+| firebase-tools | ^15.1.0 | 15.29.0 | CLI emulator/CI; dev-only; integration + E2E |
+| jsdom | ^26.1.0 | 30.0.1 | Unit DOM; migration30; component tests |
+| katex | ^0.16.11 | 0.18.5 | LatexText; giữ parser phức tạp; công thức và ảnh |
+| lucide-react | ^0.475.0 | 1.40.0 | Icon UI; migration1; typecheck + ảnh |
+| next | 15.5.9 | 16.3.4 | App Router/server actions; migration16; build + E2E |
+| postcss | ^8 | 8.5.27 | CSS pipeline; Tailwind4 plugin; build |
+| react | ^19.2.1 | 19.2.8 | Provider/hooks; cập nhật19; component + E2E |
+| react-dom | ^19.2.1 | 19.2.8 | Hydration/portal; đồng bộ React; component + E2E |
+| recharts | ^2.15.1 | 3.10.1 | Dashboard trực tiếp; migration3, bỏ wrapper vô chủ; ảnh/chart |
+| server-only | — | 0.0.1 | Chặn import server secret vào client; build |
+| tailwind-merge | ^3.0.1 | 3.6.0 | lib/utils; giữ giải quyết xung đột class; unit/UI |
+| tailwindcss | ^3.4.1 | 4.3.3 | globals.css/config.mts; migration4; build + visual QA |
+| tailwindcss-animate | ^1.0.7 | 1.0.7 | Config plugin; giữ animations; build/ảnh |
+| tsx | — | 4.23.13 | Node scripts TypeScript; ai:health/ai:smoke |
+| typescript | ^5 | 6.0.3 | 6.0.3 thay vì7: typescript-eslint yêu cầu <6.1; typecheck |
+| vitest | ^3.2.4 | 4.1.11 | Unit và integration configs .mts; OXC JSX automatic; tests |
+| zod | ^3.24.2 | 4.5.4 | src/ai và API; schema4/JSON Schema; flow + API fixtures |
+
+### Dependency trực tiếp đã bỏ
+
+| Package | Baseline | Lý do / kiểm tra |
+|---|---|---|
+| @genkit-ai/compat-oai | ^1.37.0 | Thay stack AI bằng fetch/Zod; flow fixtures |
+| @opentelemetry/exporter-jaeger | 1.25.1 | Thay stack AI bằng fetch/Zod; flow fixtures |
+| @radix-ui/react-accordion | ^1.2.3 | Không còn consumer từ route roots; xóa wrapper kèm; build/E2E |
+| @radix-ui/react-collapsible | ^1.1.11 | Không còn consumer từ route roots; xóa wrapper kèm; build/E2E |
+| @radix-ui/react-menubar | ^1.1.6 | Không còn consumer từ route roots; xóa wrapper kèm; build/E2E |
+| @radix-ui/react-popover | ^1.1.6 | Không còn consumer từ route roots; xóa wrapper kèm; build/E2E |
+| @radix-ui/react-separator | ^1.1.2 | Không còn consumer từ route roots; xóa wrapper kèm; build/E2E |
+| @radix-ui/react-slider | ^1.2.3 | Không còn consumer từ route roots; xóa wrapper kèm; build/E2E |
+| @tensorflow/tfjs-backend-webgl | ^4.22.0 | Đã có qua tfjs; bỏ khai báo trực tiếp trùng |
+| date-fns | ^3.6.0 | Intl; kiểm tra locale |
+| dotenv | ^16.5.0 | Node env-file; kiểm tra scripts |
+| embla-carousel-react | ^8.6.0 | Không còn consumer từ route roots; xóa wrapper kèm; build/E2E |
+| genkit | ^1.28.0 | Thay stack AI bằng fetch/Zod; flow fixtures |
+| react-day-picker | ^9.11.3 | Không còn consumer từ route roots; xóa wrapper kèm; build/E2E |
+| react-hook-form | ^7.54.2 | Không còn consumer từ route roots; xóa wrapper kèm; build/E2E |
+| genkit-cli | ^1.28.0 | Thay stack AI bằng fetch/Zod; flow fixtures |
+
+## 9. Kiểm thử, số đo và giới hạn
+
+Unit/component tách khỏi integration Node/Emulator. Regression đã thêm cho adapter, bảy flow, preferences, reducer, boundary và catalog parity; integration kiểm tra API concurrent/idempotency/auth/legacy cùng Rules. Playwright chạy app thật với Auth popup giả lập và AI fixture. Xem output chạy thực tế để biết pass/fail; file test tồn tại không chứng minh acceptance đã đầy đủ.
+
+Không có bộ ảnh trước migration được chụp đầy đủ ở cùng điều kiện. Không thể dùng ảnh sau hoặc báo cáo First Load JS Next15 để khẳng định phần trăm tăng tốc Next16. Cần đo cold load, bytes script, tương tác dashboard/quiz và snapshot light/dark ở cùng máy/browser. Camera thật và Safari/Firefox vẫn cần kiểm chứng riêng. E2E thêm lỗi có kiểm soát tại matchMedia của dashboard: fallback hiện, navigation còn hoạt động và Retry khôi phục nội dung, không thêm cổng gây lỗi vào mã production.
+
+Kiểm tra dependency trước release bằng `npm audit --json`, sau đó đánh giá đường phụ thuộc, mức áp dụng thực tế và peer dependencies trước khi nâng, override hoặc hạ phiên bản. Không dùng `--force` hay `--legacy-peer-deps` để che xung đột. CLI và Emulator chỉ dùng endpoint local/demo trong kiểm thử.
+
+TypeScript6.0.3 và ESLint9.39.5 giữ dưới latest vì peer compatibility; @types/node24 cố ý theo runtime. Không tự viết lại accessibility/schema/LaTeX/chart chỉ để giảm package. Tailwind4 đổi pipeline; cần kiểm tra riêng border/shadow/ring/dark/animation trước release. Không cam kết “không có bug”.
+
+
+### Ghi chú migration CSS và live AI
+
+Đã ánh xạ shadow-sm → shadow-xs, blur-sm → blur-xs và outline-none → outline-hidden theo [hướng dẫn Tailwind](https://tailwindcss.com/docs/upgrade-guide); giữ border-radius tùy chỉnh thay vì thay toàn bộ class. Nút làm lại bài xếp dọc ở mobile để không tràn ngang. Có ảnh sau migration; không có bộ ảnh trước tương ứng để tính pixel diff đáng tin.
+
+Live smoke từng trả AI-INVALID-RESPONSE, sau đó quiz/chat riêng và smoke tổng đều qua. Đây là bằng chứng phản hồi model có thể không ổn định; giữ một model, không retry schema sai hoặc che lỗi. Không đưa nội dung upstream vào báo cáo.
 
 ---
 
-## 2. Kiến Trúc Hệ Thống (System Architecture)
+# Technical documentation · Shark Empti v1.15.1
 
-### 2.1. Tech Stack & Dependencies
-*   **Frontend**: Next.js 15 (App Router), React 19, Tailwind CSS.
-*   **UI Components**: ShadCN UI (Radix Primitives) được tinh chỉnh theo style "Duo" (border dày, shadow cứng).
-*   **Backend as a Service**: Firebase (Authentication, Firestore).
-*   **Generative AI**: Firebase Genkit v1.37 phối hợp với OpenRouter. Model được chọn bằng `OPENROUTER_MODEL` (mặc định: `liquid/lfm-2.5-2.6b:free`), không tự động failover.
-*   **Trusted Arena backend**: Next.js Node Route Handler trên Vercel dùng Firebase Admin để xác thực token, tự chấm điểm, lưu attempt và cộng Shark Coins trong transaction.
-*   **On-device AI**: TensorFlow.js (xử lý Focus Tracking trực tiếp trên trình duyệt để bảo mật và tiết kiệm tài nguyên server).
-*   **Math Rendering**: KaTeX (hiển thị công thức Toán/Hóa chuyên nghiệp).
+English below. This document describes the application architecture, technical contracts, configuration and maintenance practices.
 
-### 2.2. Sơ đồ luồng dữ liệu (Data Flow)
-1.  **Client**: Người dùng thiết lập Topic -> Gọi Server Action (Genkit Flow).
-2.  **AI Layer**: Genkit gọi OpenRouter API -> Trả về cấu trúc JSON câu hỏi -> Client hiển thị.
-3.  **Persistence**: Kết quả bài làm được lưu vào Firestore (`users/{uid}/history`).
-4.  **Analytics**: Dashboard component fetch dữ liệu lịch sử -> Chuyển qua `stats-utils.ts` -> Hiển thị biểu đồ Radar và Bar Chart (Recharts).
-5.  **Arena**: Client gửi đáp án và duration tới endpoint đã xác thực; server đọc đề gốc và tính score, không tin score hoặc coin từ trình duyệt.
+## 1. Scope and baseline
 
----
+The second pass starts from a worktree containing uncommitted first-pass changes. Do not attribute the entire git diff to this pass. Baseline includes Admin Forum/Arena APIs, model configuration, prompt improvements, next/font and earlier docs/lint changes. New work adds fetch/Zod transport, dependency upgrades, shared providers, reducer, idempotency, Rules hardening, tests/CI and bilingual fixes. Version1.15.1, URLs and data are retained; no production migration or model failover.
 
-## 3. Chi Tiết Kỹ Thuật (Technical Deep Dive)
+## 2. Architecture and ownership
 
-### 3.1. Hệ thống AI (Genkit & OpenRouter)
-Dự án sử dụng một cơ chế đặc biệt để vượt qua giới hạn của môi trường đám mây:
-*   **Fallback Mechanism (`src/ai/lib/fallback.ts`)**: Hiện xác thực và cung cấp một API key. Cơ chế xoay vòng nhiều key chưa được triển khai.
-*   **Cấu hình Plugin (`src/ai/genkit.ts`)**: Sử dụng `openAICompatible` để kết nối với OpenRouter. Định danh plugin là `openai`, khớp với model ref `openai/<OPENROUTER_MODEL>`.
-*   **Ổn định kết nối**: Adapter được cấu hình dùng `globalThis.fetch` (native `fetch` của Node) thay cho HTTP transport mặc định từng gây lỗi `Premature close` khi đọc response từ OpenRouter. Mỗi request có timeout 60 giây; nếu request bị lỗi transport tạm thời, OpenAI-compatible client tự thử lại tối đa 2 lần. Retry không che giấu lỗi API key, model không tồn tại hoặc response sai schema; các lỗi đó vẫn được trả về để UI báo đúng nguyên nhân.
-*   **Prompt Engineering**: Sử dụng Handlebars để chèn ngữ cảnh học tập (khối lớp, độ khó) vào System Prompt của Shark Guru.
+The App Router server layout supplies fonts/CSS, AppPreferencesProvider and FirebaseClientProvider. Preferences own lang/theme, validate storage, update html.lang/dark and receive cross-tab storage events. useLanguageState/useThemeState read shared state. Root error UI does not require Firebase.
 
-### 3.2. Lá Chắn Tập Trung (Focus Shield)
-*   **Mô hình**: Sử dụng mô hình MobileNet/Face-Landmark đã được convert sang định dạng `model.json` của TensorFlow.js.
-*   **Cơ chế**: Thử nạp `LayersModel` trước, nếu thất bại (do định dạng graph) sẽ tự động chuyển sang `loadGraphModel`. 
-*   **Hiệu năng**: Chạy `requestAnimationFrame` với chu kỳ xử lý 800ms/frame để không làm nóng máy người dùng.
-*   **Ổn định (v1.15.1)**: Khắc phục lỗi ngắt vòng lặp khi thu nhỏ widget và đảm bảo webcam hiển thị mượt mà.
+FirebaseProvider owns one onAuthStateChanged subscription. useUser only reads context; the UID-keyed private subtree resets component state on account changes/logout. Preferences remain outside that subtree. Dialog/input/tooltip state stays local.
 
-### 3.3. Schema Dữ liệu (Firestore)
-*   `/users/{userId}`: Thông tin profile, Shark Coins.
-*   `/users/{userId}/history/{sessionId}`: Chứa kết quả bài thi chi tiết và phân tích AI đi kèm.
-*   `/posts/{postId}`: Bài viết diễn đàn (hỗ trợ LaTeX).
-*   `/arenaExams/{examId}`: Bài thi vĩnh viễn do cộng đồng tạo.
+Home owns navigation/view, learningSessionReducer, history subscription and notes hook. The reducer models setup/loading/quiz/result/error but Home does not dispatch fail/reset; Quiz still owns loading/error, answers, timer and pending flags. UI language changes do not generate a new quiz. Quiz/Playground paths reject responses after unmount; other asynchronous callbacks must follow the same lifecycle rule. Unsaved Arena results are retained in a ref; retry keeps the same payload/request ID without repeating analysis. UID keys isolate auth state; private interactions should begin only after authentication has stabilized.
 
----
+Home memoizes history statistics and passes them to Dashboard. Dashboard/playground use dynamic imports. Translated labels still participate in part of statistics computation: numeric data is not fully separated yet. Do not claim locale changes never recompute statistics.
 
-## 4. Các Module & Component Chính
+## 3. Data flow and compatible data
 
-### 4.1. `QuizView`
-*   **Logic**: Xử lý đếm ngược thời gian, chấm điểm tự động (AI hỗ trợ chấm "Trả lời ngắn").
-*   **Hydration Error Handling**: Sử dụng `useEffect` để khởi tạo timer, tránh lệch múi giờ giữa Server và Client.
+Quiz: Setup → academic validation → generateQuestions → answers/timer → feedback → result → users/{uid}/history → dashboard. Ordinary Short Answer uses AI; numeric Arena uses normalized numeric answers. Changing VI/EN does not rewrite history.
 
-### 4.2. `DashboardView`
-*   **Business Logic**: Tính toán "Kỹ năng nhận thức" (Cognitive Metrics).
-*   **Assumption**: Giả định rằng nếu người dùng trả lời sai trong < 5 giây thì đó là "Lỗi bất cẩn" (Careless Mistake).
+Main Firestore data:
 
----
+- users/{uid}: profile and sharkCoins; coins are Admin-managed.
+- users/{uid}/history/{id}: config, quizResults, totalTime, optional analysis, ISO date, lang; ID from document.
+- users/{uid}/notes/main: content and updatedAt.
+- users/{uid}/activity/main: activeDays map YYYY-MM-DD → boolean and updatedAt; calendar calls trackToday when ready, not as proof of quiz completion.
+- users/{uid}/flashcards/{id}: userId/sourceType/sourceValue/cards/ISO createdAt; users/{uid}/practice/{id}: userId/concept/questions/userAnswers/score/ISO createdAt.
+- posts/{id}: title/content/subject/author, createdAt, likesCount, likedBy, commentsCount; comments in subcollection.
+- arenaExams/{id}: title/config/questions/author, totalAttempts; attempts contain score/duration/user.
+- _requestReceipts/{hash}: fingerprint, result, createdAt; Admin-only.
 
-## 5. Trạng Thái Hiện Tại & Technical Debt
+Historical records missing analysis/topic labels use existing display fallbacks. Legacy Arena without trustworthy numeric answers is rejected by the current grading contract. History is not backfilled. History is read through Zod with defaults for legacy omissions; corrupt core records are omitted from display with APP-DATA-INVALID without modifying/deleting stored data. Some profile/Forum/Arena boundaries still use casts and need further schema work.
 
-### 5.1. Phần đã hoàn thành (Done)
-*   [x] Hệ thống Quiz đa ngôn ngữ (Vi/En).
-*   [x] Phân tích hiệu suất bằng AI.
-*   [x] Diễn đàn thảo luận hỗ trợ LaTeX.
-*   [x] Focus Shield ổn định (v1.15.1).
-*   [x] Playground (Flashcards 3D & Luyện lỗi sai).
-*   [x] Cấu hình Genkit v1.x ổn định với OpenRouter.
+The notes hook returns Promise<boolean>; success is reported only after setDoc resolves. Missing documents return an empty string. Subscription cleanup ignores late snapshots. QuickNotes retains drafts on failed writes and does not overwrite dirty drafts from snapshots. UID changes remount the private subtree, discarding the previous account draft.
 
-### 5.2. Phần đang phát triển (WIP)
-*   **Sàn Đấu (Arena)**: Hiện tại bài thi đã được tạo nhưng hệ thống "Đối đầu trực tiếp" vẫn đang là giả định (Assumption: Sẽ dùng Firebase Realtime Database để đồng bộ).
-*   **Hệ thống Đổi quà**: Nút đổi Shark Coins hiện mới chỉ là giao diện demo.
+New roadmap checks use localStorage `shark_roadmap_checks:{uid}` and validate the boolean map before reading it. The legacy `shark_roadmap_checks` key has no UID: it is retained but not automatically imported into the current account because ownership is unknown. Users may see an empty new checklist; old data is not deleted. Restoring/importing legacy checks requires confirming the correct account first. Language/theme retain the existing `shark_lang`/`shark_theme` keys.
 
-### 5.3. Technical Debt (Nợ kỹ thuật)
-*   **State Management**: Hiện đang sử dụng Prop Drilling khá nhiều ở trang chủ. Cần chuyển sang React Context hoặc Zustand nếu mở rộng thêm.
-*   **Images**: Vẫn sử dụng Placeholder (Picsum/Unsplash) trong file `placeholder-images.json`. Cần upload ảnh thật của Shark Guru.
-*   **Legacy Arena**: Đề cũ có đáp án tự luận tự do được giữ để xem nhưng không thể thi. Đề mới chỉ hỗ trợ short answer dạng số, chuẩn hoá `,`/`.` và tolerance `1e-6` để server chấm xác định.
+The `ui-copy.test.ts` AST check rejects static JSX text and title/placeholder/aria-label/alt outside explicit exceptions: brand/version, SHARK COINS, English, Tiếng Việt and UID. This does not prove all dynamic copy is translated; strings constructed in event handlers/prompts/exports still need separate review.
 
----
+## 4. API, authentication and idempotency
 
-## 6. Hướng dẫn cho Developer mới (Onboarding)
+src/lib/server-api.ts centralizes Bearer verification, ApiError, apiFailure and receipt transactions. Route handlers parse payloads and enforce ownership after authentication; Admin bypasses Rules.
 
-### 6.1. Biến môi trường
-Cần cấu hình `OPENROUTER_API_KEY` và sáu biến `NEXT_PUBLIC_FIREBASE_*` trong `.env`. `OPENROUTER_MODEL` là tùy chọn. Xem hướng dẫn đầy đủ tại [CONFIGURATION.md](CONFIGURATION.md).
+Arena POST /api/arena/{examId}/submit accepts answers:string[], optional duration and requestId:UUID. Comment POST /api/forum/{postId}/comments accepts content and optional requestId:UUID. Comment DELETE /api/forum/{postId}/comments?commentId={commentId} enforces ownership. Success responses preserve prior contracts; errors always include error:string, code:string, values:object for client translation. Exceptions, stacks and upstream tokens never enter responses.
 
-### 6.2. Cấu trúc thư mục
-*   `src/ai/flows`: Nơi định nghĩa logic của AI (Input/Output schemas).
-*   `src/components/ui`: ShadCN components (Đừng sửa trực tiếp ở đây, hãy override qua className).
-*   `src/lib/translations.ts`: Nơi quản lý toàn bộ text của ứng dụng. Để thêm ngôn ngữ mới, hãy copy cấu trúc của `vi`.
+Receipt key = SHA256(scope, UID, requestId); fingerprint uses the parsed payload. Same ID/payload returns the saved result; different payload returns409 APP-REQUEST-CONFLICT. Receipt reads, business writes/counter/coin updates and receipt creation share one transaction to handle concurrent requests. requestId remains optional for old clients; new clients send it. Old requests without IDs have no receipt. Receipts currently have no TTL; retention needs a separate policy, not automatic deletion.
 
-### 6.3. Chiến lược Kiểm thử (Test Strategy)
-*   **Manual**: Test các trường hợp nhập Topic không hợp lệ (Ví dụ: "Ăn gì hôm nay") để kiểm tra `academic-validation-flow`.
-*   **Edge Case**: Tắt mạng khi đang làm bài để kiểm tra tính năng lưu tạm (Optimistic UI).
+The contract locks duplicate submissions, creates a new ID for a new operation and reuses the original payload, including duration, after a lost response. Every start or retake path must preserve that distinction. Idempotency is not comprehensive Arena anti-cheat: business rules still allow rewarded retakes; there is no trusted exam timer or answer secrecy.
 
----
+## 5. Rules and error handling
 
-# Shark Empti - Technical Documentation (English)
+Post creation requires self author, zero counters and empty likedBy. Author updates allow only title/content/subject/updatedAt; comment updates only content/updatedAt. Likes enforce the correct UID delta and no duplicate likedBy entries. Authors cannot bypass counter/like checks. Comment create/delete and Arena attempts use Admin APIs. Arena creation requires totalAttempts0; updates allow only title/config/questions.
 
-## 1. Project overview
+The users/{uid}/{collection}/{document=**} wildcard applies only to subcollections; do not use users/{uid}/{document=**}, because Rulesv2 can match zero segments and accidentally permit profile coin changes. Keep this Emulator regression test.
 
-Shark Empti is a Duolingo-inspired cognitive learning platform. It creates quizzes, classifies mistakes, tracks focus, and personalizes revision through history-based Flashcards and practice.
+Route error.tsx and global-error.tsx use Next16 retry. Local ErrorBoundary wraps Focus and Dashboard, isolating render failures. Global fallback owns HTML/body without mandatory Firebase/context. Event/request/camera/clipboard/subscription errors must be caught at their source, not delegated to render boundaries.
 
-## 2. Architecture
+Safe codes are translated through i18n/errors and error-toast. Toast diagnostics allow only httpStatus/providerCode/retryAfterSeconds/operation. FirestorePermissionError remains a compatibility export; internally cause distinguishes permission/unavailable/auth/not-found/generic instead of treating everything as permission. Call sites without cause receive a generic error.
 
-The stack is Next.js 15 App Router, React 19, Tailwind/ShadCN UI, Firebase Authentication/Firestore, Genkit 1.37 with OpenRouter, TensorFlow.js Focus Shield, and KaTeX. The client sends quiz configuration to server AI flows; results are stored under `users/{uid}/history` and rendered by the dashboard.
+## 6. AI transport, prompts and Focus Shield
 
-Arena submission uses a Next.js Node Route Handler on Vercel with Firebase Admin. The browser submits answers and duration only; the server verifies the Firebase token, reads the stored exam, calculates score, records the attempt, increments the counter, and awards coins transactionally.
+Seven public flows preserve function names, input/output and AppResult: academic-validation, generate-questions, generate-flashcards, generate-practice, short-answer-analysis, personalized-quiz-feedback, ai-coaching-chatbot. Zod parses inputs; the adapter converts output schema to JSON Schema, calls one model and validates the response. There is no replacement framework or key rotation.
 
-## 3. AI layer
+The base prompt carries only Shark Guru role, style, locale and LaTeX. Counts, question types, feedback rubric and numeric Arena rules belong to flows. User JSON is marked as task data rather than overriding instructions; this reduces ambiguity, not a guarantee against prompt injection. Chat model roles map to assistant; complete review context enters the prompt.
 
-The default model is `liquid/lfm-2.5-2.6b:free`; `OPENROUTER_MODEL` can override it, and the application intentionally uses one configured model without automatic failover. The OpenAI-compatible adapter uses native fetch, a 60-second timeout, and two transport retries. A provider response with HTTP 200 but an embedded `error` is detected before Genkit accesses `choices`, preventing the previous `undefined.length` crash.
+CONFIGURATION.md details timeout/retries/environment. Unit fixtures never call external networks; live smoke is separate. HTTP200 is not success when the body contains error or fails schema validation.
 
-Every AI flow returns a serializable success/error result. Safe error codes include `AI-CONFIG-MISSING`, `AI-UPSTREAM-502`, `AI-RATE-LIMIT-429`, `AI-TRANSPORT`, `AI-TIMEOUT`, and `AI-INVALID-RESPONSE`. Toasts expose only safe diagnostic values.
+Focus Shield imports TensorFlow types at module scope; runtime import() occurs only in loadModel after enabling. Turbopack dev may send a small async-loader manifest earlier; it is not the runtime/model. generationRef rejects late models/streams; startingRef prevents concurrent initialization. Stop/unmount disposes the model, stops tracks and cancels animation frames. tf.tidy releases tensors; inference is throttled800ms. Real camera, denied permission, model failure and cleanup need separately recorded validation.
 
-## 4. Data and security
+## 7. Bilingual content and maintenance
 
-User profiles are readable by signed-in users for profile search. Histories, notes, activity, Flashcard sessions, and practice sessions are owner-only. Forum posts/comments and Arena exams are publicly readable; authenticated authors may create and edit only their own content. These rules are represented in `firestore.rules` and tested with the Firebase Emulator.
+translations.ts retains domain catalogs; i18n/common.ts and errors.ts add shared UI/error catalogs, accessed through typed UiText for common content. i18n/ui.ts centralizes 89 previously inline UI message locations with feature-prefixed keys; i18n/index.ts exposes messages/uiMessage. LaTeX snippets use their own catalog. Static JSX text checks do not replace dynamic-content review. Parity tests compare keys and interpolation in VI/EN. Shark Empti/Shark Guru brands, error codes, model names, scientific/LaTeX notation and user content are not automatically translated. Locale changes do not call AI to translate history.
 
-## 5. Testing and onboarding
+Add translation: define en/vi with identical placeholders, consume the catalog API, test both locales and long Vietnamese mobile text.
+Add flow: input/output schemas, flow prompt plus base rules, AppResult, success/error fixtures and adapter timeout/retry tests; never import secret modules into clients.
+Add API: authenticate before business logic, Zod input, stable code/error string, ownership and transactions, requestId for retryable writes; test missing/invalid tokens/payloads, concurrency and conflict.
+Add subscription: one owner, reset on key changes, unsubscribe and reject stale responses, safe error cause; test account switching.
+Add test: unit/components in tests, Node integration in tests/integration; Rules only through Emulator. E2E uses demo project and localhost AI fixtures, never production credentials.
+Upgrade dependency: inspect engines/peers, upgrade by group, install without force, run relevant suites and update lockfile plus inventory below. ESLint set-state-in-effect is currently disabled for browser-state/subscription initialization; purity/static-components/exhaustive-deps stay enabled.
 
-Use `npm test` for unit/component tests, `npm run test:rules` for emulator rules, `npm run typecheck` for TypeScript, `npm run build` for production compilation, `npm run ai:health` for model capability, and `npm run ai:smoke` for quiz/chat structured-output contracts. The test suite covers authentication/profile, setup, every quiz mode, scoring/results, chatbot, dashboard, notes/activity, Flashcards, practice, Arena, forum, and Focus Shield failure paths.
+## 8. Direct dependency inventory
 
-New Arena short answers are numeric only. The scorer accepts decimal commas or periods and compares within `1e-6`; legacy free-text Arena exams remain readable but cannot be submitted securely.
+Baseline values are manifest ranges, not reconstructed installed versions. Targets are exact lockfile resolutions for this pass.
+
+| Package | Baseline manifest | Locked target | Usage / rationale / validation |
+|---|---|---|---|
+| @firebase/rules-unit-testing | ^4.0.1 | 5.0.2 | Emulator rules tests; v5 migration; test:rules |
+| @playwright/test | — | 1.62.1 | Desktop/mobile browser fixtures; E2E + screenshots |
+| @radix-ui/react-alert-dialog | ^1.1.6 | 1.1.23 | src/components/ui; retain accessible primitives; keyboard/dialog/E2E checks |
+| @radix-ui/react-avatar | ^1.1.3 | 1.2.6 | src/components/ui; retain accessible primitives; keyboard/dialog/E2E checks |
+| @radix-ui/react-checkbox | ^1.1.4 | 1.3.11 | src/components/ui; retain accessible primitives; keyboard/dialog/E2E checks |
+| @radix-ui/react-dialog | ^1.1.6 | 1.1.23 | src/components/ui; retain accessible primitives; keyboard/dialog/E2E checks |
+| @radix-ui/react-dropdown-menu | ^2.1.6 | 2.1.24 | src/components/ui; retain accessible primitives; keyboard/dialog/E2E checks |
+| @radix-ui/react-label | ^2.1.2 | 2.1.15 | src/components/ui; retain accessible primitives; keyboard/dialog/E2E checks |
+| @radix-ui/react-progress | ^1.1.2 | 1.1.16 | src/components/ui; retain accessible primitives; keyboard/dialog/E2E checks |
+| @radix-ui/react-radio-group | ^1.2.3 | 1.4.7 | src/components/ui; retain accessible primitives; keyboard/dialog/E2E checks |
+| @radix-ui/react-scroll-area | ^1.2.3 | 1.2.18 | src/components/ui; retain accessible primitives; keyboard/dialog/E2E checks |
+| @radix-ui/react-select | ^2.1.6 | 2.3.7 | src/components/ui; retain accessible primitives; keyboard/dialog/E2E checks |
+| @radix-ui/react-slot | ^1.2.3 | 1.3.3 | src/components/ui; retain accessible primitives; keyboard/dialog/E2E checks |
+| @radix-ui/react-switch | ^1.1.3 | 1.3.7 | src/components/ui; retain accessible primitives; keyboard/dialog/E2E checks |
+| @radix-ui/react-tabs | ^1.1.3 | 1.1.21 | src/components/ui; retain accessible primitives; keyboard/dialog/E2E checks |
+| @radix-ui/react-toast | ^1.2.6 | 1.2.23 | src/components/ui; retain accessible primitives; keyboard/dialog/E2E checks |
+| @radix-ui/react-tooltip | ^1.1.8 | 1.2.16 | src/components/ui; retain accessible primitives; keyboard/dialog/E2E checks |
+| @tailwindcss/postcss | — | 4.3.3 | New PostCSS4 integration; replace v3 plugin; build |
+| @tensorflow/tfjs | ^4.22.0 | 4.22.0 | FocusTrackerWidget; dynamic import, CPU/WebGL; camera tests |
+| @testing-library/react | ^16.3.0 | 16.3.3 | Component behavior; Vitest |
+| @testing-library/user-event | ^14.6.1 | 14.6.7 | Component interactions; Vitest |
+| @types/katex | ^0.16.7 | 0.16.8 | KaTeX parser types; typecheck |
+| @types/node | ^20.19.43 | 24.13.3 | Follow Node24, not newest major; typecheck |
+| @types/react | ^19.2.1 | 19.2.18 | Follow React19; typecheck |
+| @types/react-dom | ^19.2.1 | 19.2.6 | Follow React DOM19; typecheck |
+| @vitest/coverage-v8 | ^3.2.4 | 4.1.11 | Align Vitest; V8 coverage reporting |
+| class-variance-authority | ^0.7.1 | 0.7.1 | UI variants; retain typed variants; typecheck |
+| clsx | ^2.1.1 | 2.1.1 | lib/utils; conditional classes; UI |
+| eslint | ^9.39.5 | 9.39.5 | 9.39.5 instead of10: react/jsx-a11y peers support up to9; lint |
+| eslint-config-next | ^15.5.9 | 16.3.4 | Flat config aligned with Next16; lint |
+| firebase | ^11.9.1 | 12.18.0 | src/firebase and client data; Auth/Firestore; Emulator + E2E |
+| firebase-admin | ^13.10.0 | 14.3.0 | Server API/token/transactions; server-only; API integration |
+| firebase-tools | ^15.1.0 | 15.29.0 | Emulator/CI CLI; dev-only; integration + E2E |
+| jsdom | ^26.1.0 | 30.0.1 | Unit DOM; v30 migration; component tests |
+| katex | ^0.16.11 | 0.18.5 | LatexText; retain complex parser; equations/screenshots |
+| lucide-react | ^0.475.0 | 1.40.0 | UI icons; v1 migration; typecheck + screenshots |
+| next | 15.5.9 | 16.3.4 | App Router/server actions; v16 migration; build + E2E |
+| postcss | ^8 | 8.5.27 | CSS pipeline; Tailwind4 plugin; build |
+| react | ^19.2.1 | 19.2.8 | Providers/hooks; update19; component + E2E |
+| react-dom | ^19.2.1 | 19.2.8 | Hydration/portals; align React; component + E2E |
+| recharts | ^2.15.1 | 3.10.1 | Dashboard directly; v3 migration, remove unused wrapper; chart/screenshots |
+| server-only | — | 0.0.1 | Prevent client imports of secret modules; build |
+| tailwind-merge | ^3.0.1 | 3.6.0 | lib/utils; retain class conflict handling; unit/UI |
+| tailwindcss | ^3.4.1 | 4.3.3 | globals.css/config.mts; v4 migration; build + visual QA |
+| tailwindcss-animate | ^1.0.7 | 1.0.7 | Config plugin; retain animations; build/screenshots |
+| tsx | — | 4.23.13 | Node TypeScript scripts; ai:health/ai:smoke |
+| typescript | ^5 | 6.0.3 | 6.0.3 instead of7: typescript-eslint requires <6.1; typecheck |
+| vitest | ^3.2.4 | 4.1.11 | Unit/integration .mts configs; automatic OXC JSX; tests |
+| zod | ^3.24.2 | 4.5.4 | src/ai and API; v4/JSON Schema; flow + API fixtures |
+
+### Removed direct dependencies
+
+| Package | Baseline | Reason / validation |
+|---|---|---|
+| @genkit-ai/compat-oai | ^1.37.0 | Replaced AI stack with fetch/Zod; flow fixtures |
+| @opentelemetry/exporter-jaeger | 1.25.1 | Replaced AI stack with fetch/Zod; flow fixtures |
+| @radix-ui/react-accordion | ^1.2.3 | No consumers reachable from route roots; removed wrappers; build/E2E |
+| @radix-ui/react-collapsible | ^1.1.11 | No consumers reachable from route roots; removed wrappers; build/E2E |
+| @radix-ui/react-menubar | ^1.1.6 | No consumers reachable from route roots; removed wrappers; build/E2E |
+| @radix-ui/react-popover | ^1.1.6 | No consumers reachable from route roots; removed wrappers; build/E2E |
+| @radix-ui/react-separator | ^1.1.2 | No consumers reachable from route roots; removed wrappers; build/E2E |
+| @radix-ui/react-slider | ^1.2.3 | No consumers reachable from route roots; removed wrappers; build/E2E |
+| @tensorflow/tfjs-backend-webgl | ^4.22.0 | Already included through tfjs; remove duplicate direct declaration |
+| date-fns | ^3.6.0 | Intl; locale checks |
+| dotenv | ^16.5.0 | Node env-file; script checks |
+| embla-carousel-react | ^8.6.0 | No consumers reachable from route roots; removed wrappers; build/E2E |
+| genkit | ^1.28.0 | Replaced AI stack with fetch/Zod; flow fixtures |
+| react-day-picker | ^9.11.3 | No consumers reachable from route roots; removed wrappers; build/E2E |
+| react-hook-form | ^7.54.2 | No consumers reachable from route roots; removed wrappers; build/E2E |
+| genkit-cli | ^1.28.0 | Replaced AI stack with fetch/Zod; flow fixtures |
+
+## 9. Tests, measurements and limitations
+
+Unit/components are separate from Node/Emulator integration. Added regressions cover the adapter, seven flows, preferences, reducer, boundary and catalog parity; integration covers concurrent/idempotent APIs, auth/legacy and Rules. Playwright runs the real app with an emulated Auth popup and AI fixture. Actual execution output determines pass/fail; test files alone do not prove complete acceptance.
+
+No complete pre-migration screenshot set exists under identical conditions. Post-migration images or Next15 First Load JS cannot establish a Next16 speedup percentage. Measure cold load, script bytes, dashboard/quiz interaction and light/dark snapshots on the same machine/browser. Real camera and Safari/Firefox still require separate evidence. E2E adds a controlled dashboard matchMedia failure: the fallback appears, navigation remains available and Retry restores content, without introducing a fault-injection endpoint into production code.
+
+Before release, run `npm audit --json`, then assess the dependency path, practical applicability and peer dependencies before upgrading, overriding or downgrading. Do not use `--force` or `--legacy-peer-deps` to conceal conflicts. The CLI and Emulator use local/demo endpoints for tests.
+
+TypeScript6.0.3 and ESLint9.39.5 remain below latest for peer compatibility; @types/node24 deliberately matches runtime. Accessibility/schema/LaTeX/chart libraries are not rewritten just to reduce packages. Tailwind4 changes the pipeline; independently verify border/shadow/ring/dark/animation before release. No “bug-free” guarantee is made.
+
+
+### CSS migration and live AI notes
+
+Mapped shadow-sm → shadow-xs, blur-sm → blur-xs and outline-none → outline-hidden following the [Tailwind guide](https://tailwindcss.com/docs/upgrade-guide); retained custom border-radius definitions. Retake buttons stack on mobile to prevent overflow. Post-migration screenshots exist, without matching pre-migration images for reliable pixel diffs.
+
+One live smoke returned AI-INVALID-RESPONSE; subsequent separate quiz/chat checks and the full smoke passed. This demonstrates potentially inconsistent model output; one model is retained, without retrying invalid schemas or hiding failures. Upstream content is not included in reports.

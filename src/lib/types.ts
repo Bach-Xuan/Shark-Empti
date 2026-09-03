@@ -3,6 +3,7 @@
  * @fileOverview Centralized type definitions for the application.
  */
 
+import type { StoredDate } from './date-format';
 import { TranslationSet } from './translations';
 
 export type Language = 'en' | 'vi';
@@ -11,13 +12,13 @@ export interface QuizConfig {
   subject: string;
   grade: string;
   topic: string;
-  topicEn?: string; 
-  topicVi?: string; 
+  topicEn?: string;
+  topicVi?: string;
   type: string;
   difficulty: string;
   numQuestions: string;
-  timeLimit?: string; 
-  excludeNotes?: string; 
+  timeLimit?: string;
+  excludeNotes?: string;
 }
 
 export interface CognitiveMetrics {
@@ -64,7 +65,7 @@ export interface QuizHistoryItem {
   config: QuizConfig;
   analysis?: QuizAnalysis;
   date: string;
-  lang: Language; 
+  lang: Language;
 }
 
 export type AppView = 'setup' | 'quiz' | 'result' | 'dashboard' | 'profile' | 'forum' | 'playground' | 'arena';
@@ -81,7 +82,7 @@ export interface ArenaExam {
   authorId: string;
   authorName: string;
   authorPhoto: string;
-  createdAt: any;
+  createdAt: StoredDate;
   totalAttempts: number;
   questions: QuizResultItem[];
 }
@@ -107,8 +108,8 @@ export interface ForumPost {
   authorId: string;
   authorName: string;
   authorPhoto: string;
-  createdAt: any;
-  updatedAt?: any;
+  createdAt: StoredDate;
+  updatedAt?: StoredDate;
   likesCount: number;
   commentsCount: number;
   likedBy?: string[];
@@ -120,8 +121,8 @@ export interface ForumComment {
   authorId: string;
   authorName: string;
   authorPhoto: string;
-  createdAt: any;
-  updatedAt?: any;
+  createdAt: StoredDate;
+  updatedAt?: StoredDate;
   likesCount: number;
   likedBy?: string[];
 }
@@ -134,5 +135,5 @@ export interface ArenaAttempt {
   userPhoto: string;
   score: number;
   duration: number;
-  createdAt: any;
+  createdAt: StoredDate;
 }

@@ -1,6 +1,9 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+@config '../../tailwind.config.mts';
+
+@layer base {
+  button:not(:disabled), [role='button']:not(:disabled) { cursor: pointer; }
+}
 
 @layer base {
   :root {
@@ -180,7 +183,7 @@
 
 /* Ensure Katex math doesn't break layout */
 .katex-display {
-  @apply overflow-x-auto overflow-y-hidden py-2 custom-scrollbar;
+  @apply overflow-x-auto overflow-y-hidden py-2;
 }
 .katex {
   @apply text-sm md:text-base;

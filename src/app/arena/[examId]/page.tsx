@@ -1,67 +1,66 @@
 "use client";
+import { useLanguageState,useThemeState } from '@/components/app-preferences';
+import { uiMessage } from '@/lib/i18n';
+import { quizLabel } from '@/lib/quiz-labels';
+import { showUnexpectedErrorToast } from '@/lib/error-toast';
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { 
-  collection, 
-  query, 
-  orderBy, 
-  onSnapshot, 
-  doc,
-  limit
-} from 'firebase/firestore';
-import { useUser, useFirestore } from '@/firebase';
-import { translations, TranslationSet } from '@/lib/translations';
-import { Language, ArenaExam, ArenaAttempt } from '@/lib/types';
 import Navigation from '@/components/navigation';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { 
-  Trophy, 
-  ArrowLeft, 
-  Loader2, 
-  Target, 
-  Clock, 
-  Sparkles, 
-  Coins,
-  Medal,
-  Users,
-  PlayCircle,
-  Layers
-} from 'lucide-react';
-import { Badge } from "@/components/ui/badge";
-import { cn } from '@/lib/utils';
-import { useToast } from '@/hooks/use-toast';
 import QuizView from '@/components/quiz-view';
 import ResultView from '@/components/result-view';
+import { Avatar,AvatarFallback,AvatarImage } from '@/components/ui/avatar';
+import { Badge } from "@/components/ui/badge";
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { useFirestore,useUser } from '@/firebase';
+import { useToast } from '@/hooks/use-toast';
 import { isTrustedArenaExam } from '@/lib/arena-scoring';
+import { translations,TranslationSet } from '@/lib/translations';
+import { ArenaAttempt,ArenaExam,QuizHistoryItem,QuizAnalysis } from '@/lib/types';
+import { cn } from '@/lib/utils';
+import {
+collection,
+doc,
+limit,
+onSnapshot,
+orderBy,
+query
+} from 'firebase/firestore';
+import {
+ArrowLeft,
+Clock,
+Coins,
+Layers,
+Loader2,
+Medal,
+PlayCircle,
+Sparkles,
+Target,
+Users
+} from 'lucide-react';
+import { useParams,useRouter } from 'next/navigation';
+import React,{ useEffect,useRef,useState } from 'react';
 
 export default function ArenaDetailPage() {
-  const { user } = useUser();
+  const { user, loading: authLoading } = useUser();
   const db = useFirestore();
   const router = useRouter();
   const params = useParams();
   const examId = params.examId as string;
   const { toast } = useToast();
-  
-  const [lang, setLang] = useState<Language>('en');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  const [lang, setLang] = useLanguageState();
+  const currentLanguage = useRef(lang);
+  useEffect(() => { currentLanguage.current = lang; }, [lang]);
+  const [theme, setTheme] = useThemeState();
   const [exam, setExam] = useState<ArenaExam | null>(null);
   const [leaderboard, setLeaderboard] = useState<ArenaAttempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'details' | 'quiz' | 'result'>('details');
-  const [lastResults, setLastResults] = useState<any>(null);
+  const [lastResults, setLastResults] = useState<Omit<QuizHistoryItem, 'date' | 'lang'> | null>(null);
   const [earnedCoins, setEarnedCoins] = useState(0);
+  const submissionId = useRef<string | null>(null);
+  const submitting = useRef(false);
 
-  useEffect(() => {
-    const savedLang = localStorage.getItem('shark_lang') as Language;
-    const savedTheme = localStorage.getItem('shark_theme') as 'light' | 'dark';
-    if (savedLang) setLang(savedLang);
-    let initialTheme: 'light' | 'dark' = savedTheme || (typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-    setTheme(initialTheme);
-    document.documentElement.classList.toggle('dark', initialTheme === 'dark');
-  }, []);
 
   useEffect(() => {
     if (!examId || !db) return;
@@ -71,7 +70,7 @@ export default function ArenaDetailPage() {
       if (snapshot.exists()) {
         setExam({ id: snapshot.id, ...snapshot.data() } as ArenaExam);
       } else {
-        toast({ variant: "destructive", title: "Exam not found" });
+        toast({ variant: "destructive", title: uiMessage(currentLanguage.current, 'arena.exam_not_found') });
         router.push('/arena');
       }
       setLoading(false);
@@ -95,8 +94,14 @@ export default function ArenaDetailPage() {
 
   const t: TranslationSet = translations[lang];
 
-  const handleFinishQuiz = async (results: any) => {
-    if (!user || !db || !exam) return;
+  const handleFinishQuiz = async (results: Omit<QuizHistoryItem, 'date' | 'lang'>, analysis?: QuizAnalysis) => {
+    if (!user) {
+      showUnexpectedErrorToast('AUTH-REQUIRED', '', {}, lang);
+      return false;
+    }
+    if (!db || !exam || submitting.current) return false;
+    submitting.current = true;
+    submissionId.current ??= crypto.randomUUID();
 
     try {
       const token = await user.getIdToken();
@@ -106,6 +111,7 @@ export default function ArenaDetailPage() {
         body: JSON.stringify({
           answers: results.quizResults.map((result: { userAnswer: string }) => result.userAnswer),
           duration: results.totalTime,
+          requestId: submissionId.current,
         }),
       });
       const submission = await response.json() as { score?: number; coinsAwarded?: number; isFirstAttempt?: boolean; error?: string };
@@ -114,10 +120,13 @@ export default function ArenaDetailPage() {
       setEarnedCoins(submission.coinsAwarded);
       if (submission.isFirstAttempt) toast({ title: t.firstAttemptBonus.toUpperCase() });
 
-      setLastResults(results);
+      setLastResults(analysis ? { ...results, analysis } : results);
       setView('result');
     } catch (e) {
-      toast({ variant: "destructive", title: "Failed to save attempt" });
+      toast({ variant: "destructive", title: uiMessage(lang, "arena.could_not_save_attempt_please_retry") });
+      return false;
+    } finally {
+      submitting.current = false;
     }
   };
 
@@ -127,15 +136,15 @@ export default function ArenaDetailPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background transition-colors duration-500">
-      <Navigation 
-        view="arena" setView={() => {}} lang={lang} 
-        changeLang={(l) => { setLang(l); localStorage.setItem('shark_lang', l); }} 
+      <Navigation
+        view="arena" setView={() => {}} lang={lang}
+        changeLang={(l) => { setLang(l);  }}
         theme={theme} onThemeChange={(isDark) => {
           const nt = isDark ? 'dark' : 'light';
           setTheme(nt);
-          localStorage.setItem('shark_theme', nt);
-          document.documentElement.classList.toggle('dark', isDark);
-        }} t={t} 
+
+
+        }} t={t}
       />
 
       <main className="flex-1 main-container pt-24 md:pt-36 space-y-10 pb-20">
@@ -148,11 +157,11 @@ export default function ArenaDetailPage() {
 
               <Card className="card-duo p-8 md:p-16 bg-card border-primary/20 shadow-2xl relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl pointer-events-none" />
-                
+
                 <div className="space-y-10 relative z-10">
                   <div className="space-y-4">
                     <Badge className="bg-primary text-white font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-xl">
-                      {exam.config.subject.toUpperCase()}
+                      {quizLabel('subject', exam.config.subject, t).toUpperCase()}
                     </Badge>
                     <h1 className="text-3xl md:text-6xl font-headline font-black text-foreground uppercase tracking-tight leading-tight">
                       {exam.title}
@@ -160,24 +169,24 @@ export default function ArenaDetailPage() {
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 md:gap-6">
-                    <DetailItem icon={<Target className="text-blue-500" />} label={t.difficulty} value={exam.config.difficulty} />
-                    <DetailItem icon={<Layers className="text-purple-500" />} label={t.questionType} value={exam.config.type} />
+                    <DetailItem icon={<Target className="text-blue-500" />} label={t.difficulty} value={quizLabel('difficulty', exam.config.difficulty, t)} />
+                    <DetailItem icon={<Layers className="text-purple-500" />} label={t.questionType} value={quizLabel('type', exam.config.type, t)} />
                     <DetailItem icon={<Sparkles className="text-orange-500" />} label={t.numQuestions} value={exam.config.numQuestions} />
                     <DetailItem icon={<Clock className="text-green-500" />} label={t.timer} value={exam.config.timeLimit ? `${exam.config.timeLimit} ${t.minShort}` : t.none} />
                   </div>
 
                   <div className="pt-10 flex flex-col md:flex-row items-center gap-6">
-                    <Button 
-                      onClick={() => setView('quiz')}
-                      disabled={isLegacyExam}
+                    <Button
+                      onClick={() => { if (!user) { router.push('/login'); return; } submissionId.current = null; setView('quiz'); }}
+                      disabled={isLegacyExam || authLoading}
                       className="w-full md:w-auto h-16 md:h-24 px-12 md:px-20 rounded-[1.5rem] md:rounded-[3rem] btn-duo bg-primary text-white font-headline font-black text-xl md:text-3xl uppercase tracking-widest border-4 border-white/20 gap-4"
                     >
-                      <PlayCircle className="w-8 h-8 md:w-12 md:h-12" /> {isLegacyExam ? (lang === 'vi' ? 'ĐỀ CŨ KHÔNG THỂ THI' : 'LEGACY EXAM UNAVAILABLE') : t.takeExam}
+                      <PlayCircle className="w-8 h-8 md:w-12 md:h-12" /> {isLegacyExam ? uiMessage(lang, "arena.legacy_exam_unavailable") : !user ? uiMessage(lang, 'arena.sign_in_to_start') : t.takeExam}
                     </Button>
-                    {isLegacyExam && <p className="text-xs font-bold text-destructive max-w-md">{lang === 'vi' ? 'Đề này có câu trả lời tự luận cũ nên không thể chấm và trao thưởng một cách an toàn.' : 'This exam contains legacy free-text answers and cannot be graded securely.'}</p>}
+                    {isLegacyExam && <p className="text-xs font-bold text-destructive max-w-md">{uiMessage(lang, "arena.this_exam_contains_legacy_free_text_answers")}</p>}
                     <div className="flex items-center gap-4 text-muted-foreground bg-muted/30 px-6 py-3 rounded-2xl border-2 border-border">
                        <Users className="w-6 h-6" />
-                       <span className="font-black text-lg">{exam.totalAttempts} {lang === 'vi' ? 'Học viên đã thi' : 'Learners challenged'}</span>
+                       <span className="font-black text-lg">{exam.totalAttempts} {uiMessage(lang, "arena.learners_challenged")}</span>
                     </div>
                   </div>
                 </div>
@@ -196,11 +205,11 @@ export default function ArenaDetailPage() {
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <Card className="p-6 rounded-2xl border-2 bg-card flex items-center gap-4">
                        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-primary font-black">100</div>
-                       <p className="text-xs font-bold leading-relaxed">{lang === 'vi' ? 'Nhận số lượng Shark Coin tương ứng với điểm số đạt được (0-100).' : 'Earn Shark Coins equal to your final score (0-100).'}</p>
+                       <p className="text-xs font-bold leading-relaxed">{uiMessage(lang, "arena.earn_shark_coins_equal_to_your_final")}</p>
                     </Card>
                     <Card className="p-6 rounded-2xl border-2 bg-card flex items-center gap-4">
                        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-black">+50</div>
-                       <p className="text-xs font-bold leading-relaxed">{lang === 'vi' ? 'Người tiên phong hoàn thành bài thi sớm nhất nhận thêm 50 Shark Coin.' : 'Be the first one to finish the exam and get a +50 Shark Coin bonus.'}</p>
+                       <p className="text-xs font-bold leading-relaxed">{uiMessage(lang, "arena.be_the_first_one_to_finish_the")}</p>
                     </Card>
                  </div>
               </Card>
@@ -211,7 +220,7 @@ export default function ArenaDetailPage() {
                 <Medal className="w-6 h-6 md:w-10 md:h-10 text-primary" />
                 <h2 className="text-xl md:text-4xl font-headline font-black text-foreground uppercase tracking-tight">{t.leaderboard}</h2>
               </div>
-              
+
               <Card className="card-duo overflow-hidden border-border bg-card">
                  <div className="p-6 border-b-4 border-border/30 bg-muted/20">
                     <div className="grid grid-cols-12 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
@@ -223,12 +232,12 @@ export default function ArenaDetailPage() {
                  </div>
                  <div className="divide-y-2 divide-border/20">
                     {leaderboard.length === 0 ? (
-                      <div className="p-12 text-center text-muted-foreground italic font-black uppercase text-xs opacity-50">{lang === 'vi' ? 'CHƯA CÓ KẾT QUẢ' : 'NO RESULTS YET'}</div>
+                      <div className="p-12 text-center text-muted-foreground italic font-black uppercase text-xs opacity-50">{uiMessage(lang, "arena.no_results_yet")}</div>
                     ) : leaderboard.map((item, idx) => (
                       <div key={item.id} className={cn("p-4 md:p-6 grid grid-cols-12 items-center gap-2 md:gap-4 transition-all hover:bg-primary/5", item.userId === user?.uid && "bg-primary/10 border-y-2 border-primary/20")}>
                          <div className="col-span-2 flex justify-center">
                             {idx < 3 ? (
-                              <div className={cn("w-6 h-6 md:w-10 md:h-10 rounded-lg flex items-center justify-center font-black text-xs md:text-xl", 
+                              <div className={cn("w-6 h-6 md:w-10 md:h-10 rounded-lg flex items-center justify-center font-black text-xs md:text-xl",
                                 idx === 0 ? "bg-yellow-400 text-yellow-900 shadow-[0_4px_0_0_#ca8a04]" :
                                 idx === 1 ? "bg-slate-300 text-slate-700 shadow-[0_4px_0_0_#94a3b8]" :
                                 "bg-amber-600 text-amber-100 shadow-[0_4px_0_0_#78350f]"
@@ -257,11 +266,11 @@ export default function ArenaDetailPage() {
         )}
 
         {view === 'quiz' && (
-          <QuizView 
-            t={t} lang={lang} config={exam.config} 
-            initialQuestions={exam.questions} 
-            onFinish={handleFinishQuiz} 
-            onAskGuru={(msg) => console.log(msg)} 
+          <QuizView
+            t={t} lang={lang} config={exam.config}
+            initialQuestions={exam.questions}
+            onFinish={handleFinishQuiz}
+            onAskGuru={(msg) => console.log(msg)}
             numericShortAnswers
           />
         )}
@@ -275,9 +284,9 @@ export default function ArenaDetailPage() {
                  <h2 className="text-2xl md:text-4xl font-headline font-black uppercase tracking-tight">{t.youEarned}</h2>
                  <p className="text-4xl md:text-7xl font-black">{earnedCoins} SHARK COINS</p>
               </Card>
-              <ResultView 
-                t={t} lang={lang} results={lastResults} 
-                onViewDashboard={() => router.push('/arena')} 
+              <ResultView
+                t={t} lang={lang} results={lastResults}
+                onViewDashboard={() => router.push('/arena')}
                 onRetakeSame={() => setView('quiz')}
                 onRetakeNew={() => setView('quiz')}
                 isArena={true}

@@ -1,86 +1,92 @@
 
 'use client';
+import { useLanguageState,useThemeState } from '@/components/app-preferences';
+import { uiMessage } from '@/lib/i18n';
+import { copyTextToClipboard } from '@/lib/clipboard';
+import { formatStoredDate } from '@/lib/date-format';
+import { showUnexpectedErrorToast } from '@/lib/error-toast';
+import { readLearnerProfile, type LearnerProfile } from '@/lib/profile-schema';
 
-import React, { useEffect, useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
-import { signOut } from 'firebase/auth';
-import { 
-  doc, 
-  updateDoc, 
-  serverTimestamp, 
-  getDoc,
-  collection,
-  query,
-  orderBy,
-  onSnapshot 
-} from 'firebase/firestore';
-import { useUser, useDoc, useAuth, useFirestore } from '@/firebase';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { 
-  Loader2, 
-  LogOut, 
-  Mail, 
-  Save, 
-  Sparkles, 
-  Fingerprint, 
-  Copy, 
-  Check, 
-  Search,
-  User as UserIcon,
-  X,
-  CalendarDays,
-  FileText,
-  Printer,
-  CheckCircle2,
-  Circle,
-  BrainCircuit,
-  AlertCircle,
-  Download,
-  Filter,
-  SortAsc,
-  Clock,
-  ChevronDown,
-  ArrowRight
-} from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Checkbox } from '@/components/ui/checkbox';
+import { LatexText } from '@/components/latex-text';
 import Navigation from '@/components/navigation';
-import { translations, TranslationSet } from '@/lib/translations';
-import { useToast } from '@/hooks/use-toast';
+import { Avatar,AvatarFallback,AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Card,CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+Dialog,
+DialogContent,
+DialogHeader,
+DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from '@/components/ui/textarea';
+import { useAuth,useDoc,useFirestore,useUser } from '@/firebase';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { QuizHistoryItem, Language } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
+import { readHistoryItem } from '@/lib/history-schema';
+import { readRoadmapChecks } from '@/lib/roadmap-storage';
 import { calculateDashboardStats } from '@/lib/stats-utils';
-import { LatexText } from '@/components/latex-text';
+import { translations,TranslationSet } from '@/lib/translations';
+import { QuizHistoryItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { signOut } from 'firebase/auth';
+import {
+collection,
+doc,
+getDoc,
+onSnapshot,
+orderBy,
+query,
+serverTimestamp,
+updateDoc
+} from 'firebase/firestore';
+import {
+AlertCircle,
+ArrowRight,
+BrainCircuit,
+CalendarDays,
+Check,
+CheckCircle2,
+Circle,
+Clock,
+Copy,
+Download,
+FileText,
+Filter,
+Fingerprint,
+Loader2,
+LogOut,
+Mail,
+Save,
+Search,
+Sparkles,
+User as UserIcon,
+X
+} from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { useEffect,useMemo,useRef,useState } from 'react';
 
 export default function ProfilePage() {
   const { user, loading: authLoading } = useUser();
-  const { data: profile, loading: profileLoading } = useDoc(user ? `users/${user.uid}` : null);
+  const { data: profileData, loading: profileLoading } = useDoc(user ? `users/${user.uid}` : null);
+  const profile = useMemo(() => readLearnerProfile(profileData), [profileData]);
   const auth = useAuth();
   const firestore = useFirestore();
   const router = useRouter();
   const { toast } = useToast();
-  
-  const [lang, setLang] = useState<Language>('en');
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  const [lang, setLang] = useLanguageState();
+  const [theme, setTheme] = useThemeState();
   const [bio, setBio] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
@@ -88,7 +94,9 @@ export default function ProfilePage() {
   // Search States
   const [searchUid, setSearchUid] = useState('');
   const [isSearching, setIsSearching] = useState(false);
-  const [searchResult, setSearchResult] = useState<any>(null);
+  const [searchResult, setSearchResult] = useState<LearnerProfile | null>(null);
+  const searching = useRef(false);
+  const savingBio = useRef(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
 
   // Report States
@@ -97,30 +105,16 @@ export default function ProfilePage() {
   const [isReportViewOpen, setIsReportViewOpen] = useState(false);
   const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
   const [roadmapStatus, setRoadmapStatus] = useState<Record<string, Record<number, boolean>>>({});
-  
+
   // Report Filter States
   const [reportSearchQuery, setReportSearchQuery] = useState('');
   const [reportSortOrder, setReportSortOrder] = useState<'recent' | 'alphabetical'>('recent');
 
   useEffect(() => {
-    const savedLang = localStorage.getItem('shark_lang') as Language;
-    const savedTheme = localStorage.getItem('shark_theme') as 'light' | 'dark';
-    
-    if (savedLang) setLang(savedLang);
-    
-    let initialTheme: 'light' | 'dark' = 'light';
-    if (savedTheme) {
-      initialTheme = savedTheme;
-    } else {
-      initialTheme = typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    setTheme(initialTheme);
-    document.documentElement.classList.toggle('dark', initialTheme === 'dark');
-    
-    if (!authLoading && !user) {
+if (!authLoading && !user) {
       router.push('/login');
     }
-  }, [user, authLoading, router]);
+  }, [user, authLoading, router, setLang, setTheme]);
 
   useEffect(() => {
     if (profile?.bio) {
@@ -134,25 +128,19 @@ export default function ProfilePage() {
     const historyRef = collection(firestore, 'users', user.uid, 'history');
     const q = query(historyRef, orderBy('date', 'desc'));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+      const data = snapshot.docs.map(doc => readHistoryItem(doc.id, doc.data())).filter((item): item is QuizHistoryItem => item !== null);
+      if (data.length !== snapshot.docs.length) errorEmitter.emit('permission-error', new FirestorePermissionError({ path: historyRef.path, operation: 'list' }, { code: 'data-loss' }));
       setHistory(data);
     }, (error) => {
-      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `users/${user.uid}/history`, operation: 'list' }));
+      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `users/${user.uid}/history`, operation: 'list' }, error));
     });
     return () => unsubscribe();
   }, [user, firestore]);
 
   // Load Roadmap Status
   useEffect(() => {
-    const saved = localStorage.getItem('shark_roadmap_checks');
-    if (saved) {
-      try {
-        setRoadmapStatus(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to parse roadmap checks", e);
-      }
-    }
-  }, [isReportSelectOpen]);
+    setRoadmapStatus(readRoadmapChecks(user?.uid));
+  }, [isReportSelectOpen, user?.uid]);
 
   const t: TranslationSet = translations[lang];
 
@@ -191,15 +179,16 @@ export default function ProfilePage() {
     try {
       await signOut(auth);
       router.push('/login');
-    } catch (error) {
-      // Handled silently
+    } catch {
+      showUnexpectedErrorToast('APP-AUTH-SIGNOUT-FAILED', 'Sign out failed.', {}, lang);
     }
   };
 
   const handleSaveBio = async () => {
-    if (!user) return;
+    if (!user || savingBio.current) return;
+    savingBio.current = true;
     setIsSaving(true);
-    
+
     const userRef = doc(firestore, 'users', user.uid);
     updateDoc(userRef, {
       bio,
@@ -207,8 +196,8 @@ export default function ProfilePage() {
     })
     .then(() => {
       toast({
-        title: lang === 'vi' ? 'ĐÃ CẬP NHẬT!' : 'UPDATED!',
-        description: lang === 'vi' ? 'Hồ sơ của bạn đã được lưu thành công.' : 'Your profile has been saved successfully.',
+        title: uiMessage(lang, "profile.updated"),
+        description: uiMessage(lang, "profile.your_profile_has_been_saved_successfully"),
       });
     })
     .catch(async (error) => {
@@ -216,60 +205,54 @@ export default function ProfilePage() {
         path: userRef.path,
         operation: 'update',
         requestResourceData: { bio },
-      }));
+      }, error));
     })
     .finally(() => {
+      savingBio.current = false;
       setIsSaving(false);
     });
   };
 
   const handleSearchUser = async () => {
+    if (searching.current) return;
     const targetUid = searchUid.trim();
     if (!targetUid) {
       toast({
         variant: "destructive",
-        title: lang === 'vi' ? 'THIẾU UID' : 'UID MISSING',
-        description: lang === 'vi' ? 'Vui lòng nhập UID để tìm kiếm.' : 'Please enter a UID to search.',
+        title: uiMessage(lang, "profile.uid_missing"),
+        description: uiMessage(lang, "profile.please_enter_a_uid_to_search"),
       });
       return;
     }
 
+    searching.current = true;
+    setSearchResult(null);
     setIsSearching(true);
     try {
       const userDocRef = doc(firestore, 'users', targetUid);
       const userDoc = await getDoc(userDocRef);
       if (userDoc.exists()) {
-        setSearchResult(userDoc.data());
+        setSearchResult(readLearnerProfile(userDoc.data()));
         setIsSearchModalOpen(true);
       } else {
         toast({
           variant: "destructive",
-          title: lang === 'vi' ? 'KHÔNG TÌM THẤY' : 'NOT FOUND',
-          description: lang === 'vi' ? 'Không tìm thấy người dùng với UID này.' : 'No user found with this UID.',
+          title: uiMessage(lang, "profile.not_found"),
+          description: uiMessage(lang, "profile.no_user_found_with_this_uid"),
         });
       }
-    } catch (error: any) {
-      if (error.code === 'permission-denied') {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: `users/${targetUid}`,
-          operation: 'get',
-        }));
-        return;
-      }
-
-      let errorMessage = lang === 'vi' ? 'Đã xảy ra lỗi khi tìm kiếm.' : 'An error occurred during search.';
-      toast({
-        variant: "destructive",
-        title: lang === 'vi' ? 'LỖI TÌM KIẾM' : 'SEARCH ERROR',
-        description: errorMessage,
-      });
+    } catch (error) {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({
+        path: `users/${targetUid}`, operation: 'get',
+      }, error));
     } finally {
+      searching.current = false;
       setIsSearching(false);
     }
   };
 
   const toggleSessionSelection = (sessionId: string) => {
-    setSelectedSessionIds(prev => 
+    setSelectedSessionIds(prev =>
       prev.includes(sessionId) ? prev.filter(id => id !== sessionId) : [...prev, sessionId]
     );
   };
@@ -290,23 +273,26 @@ export default function ProfilePage() {
     window.print();
   };
 
-  const copyReportToClipboard = () => {
+  const copyReportToClipboard = async () => {
     const reportEl = document.getElementById('report-content');
     if (reportEl) {
       const text = reportEl.innerText;
-      navigator.clipboard.writeText(text).then(() => {
+      if (await copyTextToClipboard(text)) {
         toast({ title: t.copied });
-      });
+      } else toast({ variant: 'destructive', title: uiMessage(lang, 'quicknotes.could_not_copy_please_try_again') });
     }
   };
 
-  const copyToClipboard = () => {
+  const copyToClipboard = async () => {
     if (user?.uid) {
-      navigator.clipboard.writeText(user.uid);
+      if (!await copyTextToClipboard(user.uid)) {
+        toast({ variant: 'destructive', title: uiMessage(lang, 'quicknotes.could_not_copy_please_try_again') });
+        return;
+      }
       setIsCopied(true);
       toast({
-        title: lang === 'vi' ? 'ĐÃ SAO CHÉP!' : 'COPIED!',
-        description: lang === 'vi' ? 'UID đã được lưu vào bộ nhớ tạm.' : 'UID has been saved to clipboard.',
+        title: uiMessage(lang, "profile.copied"),
+        description: uiMessage(lang, "profile.uid_has_been_saved_to_clipboard"),
       });
       setTimeout(() => setIsCopied(false), 2000);
     }
@@ -315,11 +301,11 @@ export default function ProfilePage() {
   const onThemeChange = (isDark: boolean) => {
     const newTheme = isDark ? 'dark' : 'light';
     setTheme(newTheme);
-    localStorage.setItem('shark_theme', newTheme);
-    document.documentElement.classList.toggle('dark', newTheme === 'dark');
+
+
   };
 
-  const creationDate = user?.metadata.creationTime 
+  const creationDate = user?.metadata.creationTime
     ? new Date(user.metadata.creationTime).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })
     : '---';
 
@@ -333,11 +319,8 @@ export default function ProfilePage() {
     });
   };
 
-  const searchMemberSince = searchResult?.createdAt?.toDate 
-    ? new Date(searchResult.createdAt.toDate()).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })
-    : searchResult?.createdAt 
-    ? new Date(searchResult.createdAt).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })
-    : '---';
+  const searchMemberSince = searchResult?.createdAt
+    ? formatStoredDate(searchResult.createdAt, lang, { day: 'numeric', month: 'long', year: 'numeric' }) : '---';
 
   if (authLoading || profileLoading) {
     return (
@@ -361,7 +344,7 @@ export default function ProfilePage() {
         lang={lang}
         changeLang={(l) => {
           setLang(l);
-          localStorage.setItem('shark_lang', l);
+
         }}
         theme={theme}
         onThemeChange={(isDark) => onThemeChange(isDark)}
@@ -371,7 +354,7 @@ export default function ProfilePage() {
       <main className="flex-1 main-container pt-24 md:pt-36 space-y-8 pb-20">
         <div className="text-center mb-8">
           <h1 className="text-4xl md:text-6xl font-headline font-black text-primary uppercase tracking-tighter">
-            {lang === 'en' ? 'Academic Profile' : 'Hồ Sơ Học Tập'}
+            {uiMessage(lang, "profile.academic_profile")}
           </h1>
         </div>
 
@@ -385,32 +368,32 @@ export default function ProfilePage() {
                 </AvatarFallback>
               </Avatar>
             </div>
-            
+
             <div className="text-center space-y-4">
               <h2 className="text-3xl md:text-4xl font-headline font-black text-foreground uppercase tracking-tight">
                 {user.displayName}
               </h2>
               <div className="flex flex-col items-center gap-3">
                 <div className="flex flex-wrap items-center justify-center gap-3">
-                  <div className="flex items-center gap-2 bg-muted/50 px-4 py-1.5 rounded-full border-2 border-border/50 shadow-sm">
+                  <div className="flex items-center gap-2 bg-muted/50 px-4 py-1.5 rounded-full border-2 border-border/50 shadow-xs">
                     <Mail className="w-4 h-4 text-primary" />
                     <span className="text-xs md:sm font-bold text-muted-foreground">{user.email}</span>
                   </div>
-                  
-                  <div className="flex items-center gap-2 bg-muted/30 px-4 py-1.5 rounded-full border-2 border-border/50 shadow-sm">
+
+                  <div className="flex items-center gap-2 bg-muted/30 px-4 py-1.5 rounded-full border-2 border-border/50 shadow-xs">
                     <CalendarDays className="w-4 h-4 text-primary" />
                     <span className="text-xs md:sm font-bold text-muted-foreground">{t.memberSince}: {creationDate}</span>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-2 bg-card px-4 py-2 rounded-2xl border-4 border-border shadow-duo group transition-all hover:border-primary/50 active:translate-y-1 active:shadow-none">
                   <Fingerprint className="w-4 h-4 text-primary opacity-70" />
                   <span className="text-[10px] md:xs font-black text-muted-foreground tracking-widest uppercase truncate max-w-[150px] md:max-w-none">
                     UID: {user.uid}
                   </span>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={copyToClipboard}
                     className="h-8 w-8 rounded-xl hover:bg-muted text-primary transition-all active:scale-90"
                     title={t.copyUid}
@@ -427,22 +410,22 @@ export default function ProfilePage() {
               <div className="space-y-4">
                 <label className="text-[10px] md:xs font-black uppercase text-muted-foreground flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-primary" />
-                  {lang === 'en' ? 'MY BIO / NOTES' : 'TIỂU SỬ / GHI CHÚ CỦA TÔI'}
+                  {uiMessage(lang, "profile.my_bio_notes")}
                 </label>
-                <Textarea 
+                <Textarea
                   className="min-h-[120px] rounded-2xl border-4 border-border bg-muted/20 font-bold p-6 focus:ring-8 focus:ring-primary/10 focus:border-primary transition-all shadow-inner text-base"
-                  placeholder={lang === 'en' ? 'Tell Shark Guru about yourself...' : 'Hãy kể cho Shark Guru nghe về bạn...'}
+                  placeholder={uiMessage(lang, "profile.tell_shark_guru_about_yourself")}
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
                 />
-                
+
                 <Button
                   onClick={handleSaveBio}
                   disabled={isSaving}
                   className="w-full h-14 rounded-2xl btn-duo bg-primary text-white font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 border-4 border-primary/20"
                 >
                   {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                  {lang === 'en' ? 'Save Bio' : 'Lưu tiểu sử'}
+                  {uiMessage(lang, "profile.save_bio")}
                 </Button>
               </div>
 
@@ -469,11 +452,11 @@ export default function ProfilePage() {
           <div className="space-y-4">
             <label className="text-[10px] md:xs font-black uppercase text-muted-foreground flex items-center gap-3 tracking-[0.2em]">
               <Search className="w-5 h-5 text-primary" />
-              {lang === 'en' ? 'SEARCH LEARNER BY UID' : 'TÌM KIẾM HỌC VIÊN QUA UID'}
+              {uiMessage(lang, "profile.search_learner_by_uid")}
             </label>
             <div className="flex flex-col md:flex-row gap-4">
-              <Input 
-                placeholder={lang === 'en' ? 'Enter User UID...' : 'Nhập UID người dùng...'}
+              <Input
+                placeholder={uiMessage(lang, "profile.enter_user_uid")}
                 value={searchUid}
                 onChange={(e) => setSearchUid(e.target.value)}
                 className="h-14 rounded-2xl border-4 border-border bg-muted/20 font-bold px-6 focus:ring-8 focus:ring-primary/10 focus:border-primary transition-all shadow-inner text-base flex-1"
@@ -485,7 +468,7 @@ export default function ProfilePage() {
                 className="h-14 rounded-2xl btn-duo bg-card text-foreground font-black text-xs uppercase tracking-widest px-8 border-4 border-border flex items-center gap-3 shrink-0"
               >
                 {isSearching ? <Loader2 className="w-5 h-5 animate-spin" /> : <Search className="w-5 h-5" />}
-                {lang === 'en' ? 'Find' : 'Tìm kiếm'}
+                {uiMessage(lang, "profile.find")}
               </Button>
             </div>
           </div>
@@ -498,7 +481,7 @@ export default function ProfilePage() {
             className="h-16 rounded-2xl btn-duo border-4 border-destructive/20 text-destructive font-black text-base md:lg uppercase tracking-wider flex items-center justify-center gap-3 px-12 hover:bg-destructive/5"
           >
             <LogOut className="w-6 h-6" />
-            {lang === 'en' ? 'Sign Out' : 'Đăng xuất'}
+            {uiMessage(lang, "profile.sign_out")}
           </Button>
         </div>
       </main>
@@ -517,7 +500,7 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
               <div className="relative group">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                <Input 
+                <Input
                   placeholder={t.searchSessions}
                   value={reportSearchQuery}
                   onChange={(e) => setReportSearchQuery(e.target.value)}
@@ -526,7 +509,7 @@ export default function ProfilePage() {
               </div>
               <div className="flex items-center gap-3">
                 <Filter className="w-4 h-4 text-primary shrink-0" />
-                <Select value={reportSortOrder} onValueChange={(v: any) => setReportSortOrder(v)}>
+                <Select value={reportSortOrder} onValueChange={value => { if (value === 'recent' || value === 'alphabetical') setReportSortOrder(value); }}>
                   <SelectTrigger className="h-12 rounded-xl border-2 border-border font-black text-[10px] md:text-xs uppercase tracking-widest bg-muted/10">
                     <SelectValue placeholder={t.sortBy} />
                   </SelectTrigger>
@@ -545,16 +528,16 @@ export default function ProfilePage() {
                   const isSelected = selectedSessionIds.includes(item.id!);
 
                   return (
-                    <div 
-                      key={item.id} 
+                    <div
+                      key={item.id}
                       className={cn(
                         "flex items-center gap-4 p-4 md:p-6 rounded-2xl border-2 transition-all cursor-pointer group/item",
-                        isSelected ? "bg-primary/10 border-primary shadow-sm translate-x-1" : "bg-card border-border/50 hover:border-primary/30 hover:translate-x-0.5"
+                        isSelected ? "bg-primary/10 border-primary shadow-xs translate-x-1" : "bg-card border-border/50 hover:border-primary/30 hover:translate-x-0.5"
                       )}
                       onClick={() => toggleSessionSelection(item.id!)}
                     >
                       <div className="shrink-0">
-                        <Checkbox 
+                        <Checkbox
                           checked={isSelected}
                           onCheckedChange={() => toggleSessionSelection(item.id!)}
                           className="w-6 h-6 border-2"
@@ -586,14 +569,14 @@ export default function ProfilePage() {
                 )}
               </div>
             </ScrollArea>
-            
+
             <div className="flex flex-col sm:flex-row gap-4 pt-4 shrink-0">
               <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/80 px-2 flex-1">
-                {selectedSessionIds.length} {lang === 'vi' ? 'MỤC ĐƯỢC CHỌN' : 'ITEMS SELECTED'}
+                {selectedSessionIds.length} {uiMessage(lang, "profile.items_selected")}
               </div>
               <div className="flex gap-4">
                 <Button variant="ghost" onClick={() => setIsReportSelectOpen(false)} className="btn-duo h-14 px-8 rounded-xl font-black uppercase text-xs tracking-widest bg-card">{t.cancel}</Button>
-                <Button 
+                <Button
                   onClick={handleGenerateReport}
                   disabled={selectedSessionIds.length === 0}
                   className="btn-duo min-w-[200px] h-14 rounded-xl bg-primary text-white font-black uppercase text-xs tracking-widest border-4 border-primary/20 shadow-duo"
@@ -614,12 +597,12 @@ export default function ProfilePage() {
               <FileText className="w-8 h-8" /> {t.academicReport}
             </DialogTitle>
             <div className="flex gap-2 md:gap-4 no-print">
-              <Button variant="outline" size="icon" onClick={copyReportToClipboard} className="h-12 w-12 rounded-xl border-2 hover:bg-primary/10 hover:border-primary/30 transition-all"><Copy className="w-5 h-5 text-primary" /></Button>
-              <Button variant="outline" size="icon" onClick={handlePrintReport} className="h-12 w-12 rounded-xl border-2 hover:bg-primary/10 hover:border-primary/30 transition-all"><Download className="w-5 h-5 text-primary" /></Button>
-              <Button variant="ghost" size="icon" onClick={() => setIsReportViewOpen(false)} className="h-12 w-12 rounded-xl border-2"><X className="w-5 h-5" /></Button>
+              <Button variant="outline" size="icon" aria-label={t.copy} onClick={copyReportToClipboard} className="h-12 w-12 rounded-xl border-2 hover:bg-primary/10 hover:border-primary/30 transition-all"><Copy className="w-5 h-5 text-primary" /></Button>
+              <Button variant="outline" size="icon" aria-label={t.printReport} onClick={handlePrintReport} className="h-12 w-12 rounded-xl border-2 hover:bg-primary/10 hover:border-primary/30 transition-all"><Download className="w-5 h-5 text-primary" /></Button>
+              <Button variant="ghost" size="icon" aria-label={t.back} onClick={() => setIsReportViewOpen(false)} className="h-12 w-12 rounded-xl border-2"><X className="w-5 h-5" /></Button>
             </div>
           </div>
-          
+
           <ScrollArea className="h-[80vh] p-6 md:p-12" id="report-content">
             <div className="space-y-12 max-w-4xl mx-auto bg-white dark:bg-card p-6 md:p-16 rounded-[2rem] border-2 border-border shadow-inner">
               <div className="text-center space-y-6 border-b-4 border-primary/10 pb-10">
@@ -633,7 +616,7 @@ export default function ProfilePage() {
                     <span className="text-xl font-bold">{user.displayName}</span>
                   </div>
                   <div className="flex flex-col items-center">
-                    <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{lang === 'vi' ? 'NGÀY XUẤT' : 'DATE ISSUED'}</span>
+                    <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{uiMessage(lang, "profile.date_issued")}</span>
                     <span className="text-xl font-bold">{new Date().toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
                   </div>
                 </div>
@@ -684,7 +667,7 @@ export default function ProfilePage() {
                        <h4 className="text-sm md:lg font-black text-primary uppercase tracking-[0.2em] flex items-center gap-2 pl-2">
                          <BrainCircuit className="w-6 h-6" /> {t.recommendations}
                        </h4>
-                       
+
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                          <div className="space-y-3">
                             <span className="text-[10px] font-black uppercase text-green-600 tracking-widest px-2">{t.completedTasks}</span>
@@ -699,7 +682,7 @@ export default function ProfilePage() {
                          <div className="space-y-3">
                             <span className="text-[10px] font-black uppercase text-orange-600 tracking-widest px-2">{t.pendingTasks}</span>
                             {pendingRecs.length > 0 ? pendingRecs.map((r, idx) => (
-                              <div key={idx} className="flex items-start gap-3 p-4 rounded-xl bg-card border-2 border-orange-500/10 shadow-sm">
+                              <div key={idx} className="flex items-start gap-3 p-4 rounded-xl bg-card border-2 border-orange-500/10 shadow-xs">
                                 <Circle className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
                                 <p className="text-xs md:sm font-bold"><LatexText text={r} /></p>
                               </div>
@@ -724,7 +707,7 @@ export default function ProfilePage() {
         <DialogContent className="max-w-2xl w-[95vw] rounded-[2.5rem] border-[4px] border-border shadow-2xl p-0 overflow-hidden bg-background/80 backdrop-blur-2xl animate-in zoom-in-95 duration-300">
           <DialogHeader className="sr-only">
             <DialogTitle>
-              {lang === 'en' ? 'Learner Profile' : 'Hồ Sơ Học Viên'}
+              {uiMessage(lang, "profile.learner_profile")}
             </DialogTitle>
           </DialogHeader>
           <div className="relative">
@@ -739,11 +722,11 @@ export default function ProfilePage() {
 
               <div className="text-center space-y-2">
                 <h3 className="text-3xl md:text-5xl font-headline font-black text-primary uppercase tracking-tight">
-                  {searchResult?.displayName || 'Learner'}
+                  {searchResult?.displayName || uiMessage(lang, 'profile.learner')}
                 </h3>
                 <div className="flex flex-col items-center gap-2">
                   <p className="text-[10px] md:xs font-black text-muted-foreground uppercase tracking-widest">
-                    {lang === 'en' ? 'LEARNER' : 'HỌC VIÊN'}
+                    {uiMessage(lang, "profile.learner")}
                   </p>
                   <div className="flex items-center gap-2 bg-muted/40 px-3 py-1 rounded-full border border-border/50">
                     <CalendarDays className="w-3 h-3 text-primary/70" />
@@ -757,10 +740,10 @@ export default function ProfilePage() {
               <div className="w-full space-y-4">
                 <div className="flex items-center gap-3 text-[10px] md:xs font-black uppercase text-muted-foreground tracking-widest px-2">
                   <Sparkles className="w-5 h-5 text-primary" />
-                  {lang === 'en' ? 'LEARNER BIO' : 'TIỂU SỬ HỌC VIÊN'}
+                  {uiMessage(lang, "profile.learner_bio")}
                 </div>
                 <div className="min-h-[100px] p-8 rounded-3xl bg-muted/30 border-4 border-border font-bold text-lg italic leading-relaxed shadow-inner">
-                  {searchResult?.bio || (lang === 'en' ? 'This learner has not shared a bio yet.' : 'Học viên này chưa chia sẻ tiểu sử.')}
+                  {searchResult?.bio || (uiMessage(lang, "profile.this_learner_has_not_shared_a_bio"))}
                 </div>
               </div>
             </div>

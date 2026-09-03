@@ -1,54 +1,55 @@
 "use client";
+import { useLanguageState } from '@/components/app-preferences';
+import { UiText } from "@/components/ui-text";
+import { uiMessage } from '@/lib/i18n';
 
 /**
  * @fileOverview Tính năng Lá Chắn Tập Trung (Focus Shield) - v1.15.1
- * 
+ *
  * FIX v1.15.1 (khôi phục vòng lặp AI sau khi minimize):
  *   Bổ sung isOpen và isMinimized vào danh sách dependency của useEffect
- *   chạy startDetection. Điều này đảm bảo khi người dùng mở rộng widget 
+ *   chạy startDetection. Điều này đảm bảo khi người dùng mở rộng widget
  *   (thẻ video được mount lại), logic nhận diện sẽ tự động khởi động lại
  *   thay vì bị ngắt vĩnh viễn do ref bị null lúc thu nhỏ.
- * 
+ *
  * FIX trước đó:
  *   Sử dụng onloadedmetadata để gọi play() an toàn, tránh race condition.
  *   Chuẩn hóa pixel về [-1, 1] khớp MobileNetV2 preprocess_input.
  */
 
-import React, {
-  useState,
-  useEffect,
-  useRef,
-  useCallback,
-} from "react";
-import { usePathname } from "next/navigation";
-import * as tf from "@tensorflow/tfjs";
-import "@tensorflow/tfjs-backend-webgl";
+import type * as tf from "@tensorflow/tfjs";
 import {
-  ScanEye,
-  X,
-  Zap,
-  UserCheck,
-  UserX,
-  Eye,
-  EyeOff,
-  Loader2,
-  AlertTriangle,
-  Minus,
-  Camera,
+AlertTriangle,
+Camera,
+Eye,
+EyeOff,
+Loader2,
+Minus,
+ScanEye,
+UserCheck,
+UserX,
+X,
+Zap,
 } from "lucide-react";
+import { usePathname } from "next/navigation";
+import {
+useCallback,
+useEffect,
+useRef,
+useState,
+} from "react";
 
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
 import { Progress } from "@/components/ui/progress";
-import { cn } from "@/lib/utils";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import {
-  translations,
-  TranslationSet,
-} from "@/lib/translations";
-import { Language } from "@/lib/types";
 import { showUnexpectedErrorToast } from "@/lib/error-toast";
+import {
+translations,
+TranslationSet,
+} from "@/lib/translations";
+import { cn } from "@/lib/utils";
 
 const MODEL_URL = "/models/focus-model/model.json";
 const MODEL_INPUT_SIZE = 224;
@@ -67,7 +68,7 @@ export default function FocusTrackerWidget() {
     pathname === "/login" ||
     pathname === "/register";
 
-  const [lang, setLang] = useState<Language>("en");
+  const [lang, setLang] = useLanguageState();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isActive, setIsActive] = useState(false);
@@ -79,28 +80,21 @@ export default function FocusTrackerWidget() {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const modelRef = useRef<tf.LayersModel | tf.GraphModel | null>(null);
+  const runtimeRef = useRef<typeof import('@tensorflow/tfjs') | null>(null);
+  const generationRef = useRef(0);
+  const startingRef = useRef(false);
   const requestRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const lastProcessingTime = useRef(0);
 
   // Sync language
-  useEffect(() => {
-    const savedLanguage = localStorage.getItem("shark_lang") as Language;
-    if (savedLanguage) setLang(savedLanguage);
-
-    const handleLanguageChange = (event: CustomEvent) => {
-      if (event.detail) setLang(event.detail);
-    };
-
-    window.addEventListener("shark-lang-changed", handleLanguageChange as EventListener);
-    return () => {
-      window.removeEventListener("shark-lang-changed", handleLanguageChange as EventListener);
-    };
-  }, []);
 
   const t: TranslationSet = translations[lang];
 
   const stopResources = useCallback(() => {
+    generationRef.current++;
+    modelRef.current?.dispose();
+    modelRef.current = null;
     if (requestRef.current !== null) {
       cancelAnimationFrame(requestRef.current);
       requestRef.current = null;
@@ -117,6 +111,8 @@ export default function FocusTrackerWidget() {
     }
   }, []);
 
+  useEffect(() => () => stopResources(), [stopResources]);
+
   // Auto stop on auth pages
   useEffect(() => {
     if (isAuthPage) {
@@ -128,11 +124,14 @@ export default function FocusTrackerWidget() {
 
   const loadModel = async () => {
     if (modelRef.current) return modelRef.current;
+    const generation = generationRef.current;
 
     setIsModelLoading(true);
     setModelError(null);
 
     try {
+      const tf = await import('@tensorflow/tfjs');
+      runtimeRef.current = tf;
       await tf.ready();
       try {
         await tf.setBackend('webgl');
@@ -151,6 +150,7 @@ export default function FocusTrackerWidget() {
       }
 
       if (!model) throw new Error("Mô hình không thể khởi tạo");
+      if (generation !== generationRef.current) { model.dispose(); return null; }
       modelRef.current = model;
 
       // Warm up model
@@ -164,7 +164,8 @@ export default function FocusTrackerWidget() {
       });
 
       return model;
-    } catch (error: any) {
+    } catch (error) {
+      if (generation !== generationRef.current) return null;
       console.error("Focus model error:", error);
       showUnexpectedErrorToast(
         "FOCUS-MODEL-LOAD-FAILED",
@@ -172,9 +173,7 @@ export default function FocusTrackerWidget() {
         { model: MODEL_URL },
         lang
       );
-      setModelError(lang === "vi" 
-        ? "Lỗi mô hình AI (model.json). Vui lòng kiểm tra file." 
-        : "AI model error (model.json). Please check files.");
+      setModelError(uiMessage(lang, "focus.ai_model_error_model_json_please_check"));
       return null;
     } finally {
       setIsModelLoading(false);
@@ -183,6 +182,8 @@ export default function FocusTrackerWidget() {
 
   const startDetection = useCallback(() => {
     const processFrame = async (timestamp: number) => {
+      const tf = runtimeRef.current;
+      if (!tf) return;
       if (!isActive || !videoRef.current || !modelRef.current) return;
 
       // Throttle to 800ms
@@ -239,9 +240,12 @@ export default function FocusTrackerWidget() {
   }, [isActive]);
 
   const toggleTracking = async () => {
+    if (startingRef.current) { stopResources(); return; }
     if (!isActive) {
+      startingRef.current = true;
+      const generation = generationRef.current;
       const model = await loadModel();
-      if (!model) return;
+      if (!model) { startingRef.current = false; return; }
 
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
@@ -252,17 +256,21 @@ export default function FocusTrackerWidget() {
           },
         });
 
+        if (generation !== generationRef.current) { stream.getTracks().forEach(track => track.stop()); return; }
         streamRef.current = stream;
         setIsActive(true);
         setIsOpen(true);
         setIsMinimized(false);
       } catch (err) {
+        stopResources();
         console.error("Camera access failed:", err);
         toast({
           variant: "destructive",
           title: t.cameraErrorTitle,
           description: t.cameraErrorDesc,
         });
+      } finally {
+        startingRef.current = false;
       }
     } else {
       setIsActive(false);
@@ -305,8 +313,8 @@ export default function FocusTrackerWidget() {
   return (
     <div className={cn(
       "fixed z-[200] flex flex-col gap-4 pointer-events-none transition-all duration-500",
-      isOpen && isMinimized 
-        ? "bottom-24 left-4 md:bottom-32 md:left-6 items-start" 
+      isOpen && isMinimized
+        ? "bottom-24 left-4 md:bottom-32 md:left-6 items-start"
         : "bottom-24 right-4 md:bottom-32 md:right-6 items-end"
     )}>
       {isOpen && !isMinimized && (
@@ -317,22 +325,22 @@ export default function FocusTrackerWidget() {
               <span className="font-headline font-black uppercase text-sm tracking-widest">{t.focusShield}</span>
             </div>
             <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" onClick={() => setIsMinimized(true)} className="h-8 w-8 rounded-lg hover:bg-white/20 text-white"><Minus className="w-5 h-5" /></Button>
-              <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="h-8 w-8 rounded-lg hover:bg-white/20 text-white"><X className="w-5 h-5" /></Button>
+              <Button variant="ghost" size="icon" aria-label={uiMessage(lang, 'focus.minimize')} onClick={() => setIsMinimized(true)} className="h-8 w-8 rounded-lg hover:bg-white/20 text-white"><Minus className="w-5 h-5" /></Button>
+              <Button variant="ghost" size="icon" aria-label={uiMessage(lang, "focus.stop_camera_and_close")} onClick={() => { setIsOpen(false); setIsActive(false); stopResources(); }} className="h-8 w-8 rounded-lg hover:bg-white/20 text-white"><X className="w-5 h-5" /></Button>
             </div>
           </div>
 
           <div className="p-5 space-y-6">
             <div className={cn("relative aspect-video bg-muted rounded-2xl border-4 border-border overflow-hidden transition-all duration-500", !showPreview && "h-0 opacity-0 mb-[-1.5rem]")}>
-              <video 
-                ref={videoRef} 
-                autoPlay 
-                playsInline 
-                muted 
-                className="w-full h-full object-cover transform -scale-x-100" 
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                muted
+                className="w-full h-full object-cover transform -scale-x-100"
               />
               {!isActive && !modelError && !isModelLoading && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm text-white text-center p-4">
+                <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 backdrop-blur-xs text-white text-center p-4">
                   <Camera className="w-8 h-8 mb-2 opacity-50" />
                   <p className="text-[10px] font-black uppercase tracking-widest opacity-80 leading-relaxed">{t.systemReady}</p>
                 </div>
@@ -341,7 +349,7 @@ export default function FocusTrackerWidget() {
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-destructive/10 backdrop-blur-md text-destructive p-6 text-center">
                   <AlertTriangle className="w-10 h-10 mb-2 animate-bounce" />
                   <p className="text-[10px] font-black uppercase tracking-widest leading-relaxed">{modelError}</p>
-                  <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4 h-8 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 border-destructive/20 text-destructive bg-white">RELOAD</Button>
+                  <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4 h-8 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 border-destructive/20 text-destructive bg-white"><UiText id="reload" /></Button>
                 </div>
               )}
               {isModelLoading && (
@@ -357,7 +365,7 @@ export default function FocusTrackerWidget() {
                   <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{t.trackingMode}</span>
                   <span className="text-xs font-bold">{isActive ? t.aiMonitorActive : t.systemPaused}</span>
                 </div>
-                <Switch checked={isActive} onCheckedChange={toggleTracking} disabled={isModelLoading} />
+                <Switch aria-label={t.trackingMode} checked={isActive} onCheckedChange={toggleTracking} disabled={isModelLoading} />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -373,7 +381,7 @@ export default function FocusTrackerWidget() {
 
               <div className="space-y-2">
                 <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                  <span>FOCUS INDEX</span>
+                  <span><UiText id="focusIndex" /></span>
                   <span className="text-primary">{focusScore}%</span>
                 </div>
                 <Progress value={focusScore} className="h-3 border-2" />
@@ -389,13 +397,14 @@ export default function FocusTrackerWidget() {
       )}
 
       {(!isOpen || isMinimized) && (
-        <Button 
+        <Button
+          aria-label={t.focusShield}
           onClick={() => {
             setIsOpen(true);
             setIsMinimized(false);
-          }} 
+          }}
           className={cn(
-            "h-14 w-14 md:h-20 md:w-20 rounded-2xl md:rounded-[2rem] shadow-duo btn-duo pointer-events-auto transition-all bg-card border-[3px] border-border group", 
+            "h-14 w-14 md:h-20 md:w-20 rounded-2xl md:rounded-[2rem] shadow-duo btn-duo pointer-events-auto transition-all bg-card border-[3px] border-border group",
             isActive && status === 'focused' ? "border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]" : isActive ? "border-amber-500" : ""
           )}
         >

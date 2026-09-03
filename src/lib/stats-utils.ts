@@ -5,12 +5,13 @@ import {
 } from "./types";
 
 import { TranslationSet } from "./translations";
+import { uiMessage } from './i18n';
 
 export interface DashboardStats {
   totalAttempts: number;
   totalErrors: number;
   mostFrequentError: string;
-  radarData: Array<{ subject: string; A: number }>;
+  radarData: Array<{ subject: string; A: number | null }>;
   barData: Array<{ name: string; count: number }>;
   processedGroupedInsights: Array<{
     topic: string;
@@ -28,6 +29,7 @@ const ERROR_TYPES = [
   "Reasoning Error",
   "Careless Mistake",
   "Misinterpretation",
+  "Time Expired",
 ] as const;
 
 type ErrorType = (typeof ERROR_TYPES)[number];
@@ -85,12 +87,13 @@ export function calculateDashboardStats(
         acc[type] = 0;
         return acc;
       },
-      {} as Record<ErrorType, number>
+      Object.create(null) as Record<ErrorType, number>
     );
 
   const cumulativeMetrics = createEmptyMetrics();
+  const metricCounts = createEmptyMetrics();
 
-  const topicInsights: Record<string, TopicInsight> = {};
+  const topicInsights = new Map<string, TopicInsight>();
 
   history.forEach(session => {
     const topic =
@@ -98,8 +101,8 @@ export function calculateDashboardStats(
         ? session.config.topicVi || session.config.topic
         : session.config.topicEn || session.config.topic;
 
-    const currentTopic =
-      topicInsights[topic] ?? (topicInsights[topic] = createEmptyTopicInsight());
+    const currentTopic = topicInsights.get(topic) ?? createEmptyTopicInsight();
+    topicInsights.set(topic, currentTopic);
 
     currentTopic.totalQuestions += session.quizResults.length;
 
@@ -120,7 +123,11 @@ export function calculateDashboardStats(
 
     if (metrics) {
       (Object.keys(cumulativeMetrics) as Array<keyof CognitiveMetrics>).forEach(key => {
-        cumulativeMetrics[key] += metrics[key] || 0;
+        const value = metrics[key];
+        if (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100) {
+          cumulativeMetrics[key] += value;
+          metricCounts[key]++;
+        }
       });
     }
 
@@ -133,15 +140,15 @@ export function calculateDashboardStats(
     currentTopic.recommendations.push(...(analysis.recommendations || []));
   });
 
-  const averageMetrics = {
+  const averageMetrics: Record<keyof CognitiveMetrics, number | null> = {
     ...cumulativeMetrics,
   };
 
   (Object.keys(averageMetrics) as Array<keyof CognitiveMetrics>).forEach(key => {
-    averageMetrics[key] = Math.min(100, averageMetrics[key] / totalAttempts);
+    averageMetrics[key] = metricCounts[key] ? cumulativeMetrics[key] / metricCounts[key] : null;
   });
 
-  const processedGroupedInsights = Object.entries(topicInsights)
+  const processedGroupedInsights = Array.from(topicInsights.entries())
     .map(([topic, data]) => ({
       topic,
       strengths: [...new Set(data.strengths)].slice(-3).reverse(),
@@ -164,6 +171,7 @@ export function calculateDashboardStats(
     "Reasoning Error": t.reasoningError,
     "Careless Mistake": t.carelessMistake,
     Misinterpretation: t.misinterpretation,
+    'Time Expired': uiMessage(currentLang, 'quiz.time_expired'),
   };
 
   const dominantError = Object.entries(errorFrequency).reduce((prev, current) =>

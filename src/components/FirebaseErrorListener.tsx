@@ -1,10 +1,11 @@
 
 'use client';
 
-import { useEffect } from 'react';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { showErrorToast } from '@/lib/error-toast';
+import { useEffect } from 'react';
+import { useAppPreferences } from './app-preferences';
 
 /**
  * Turns Firebase failures into the application's standard toast notification.
@@ -12,24 +13,26 @@ import { showErrorToast } from '@/lib/error-toast';
  * the user-facing Next.js overlay.
  */
 export function FirebaseErrorListener() {
+  const { lang } = useAppPreferences();
   useEffect(() => {
     const unsubscribe = errorEmitter.on('permission-error', (error) => {
       const context = error instanceof FirestorePermissionError
         ? error.context
         : { path: 'unknown', operation: 'unknown' };
-      console.error('Firebase permission error', error);
+      const code = error instanceof FirestorePermissionError ? error.code : 'FIRESTORE-REQUEST-FAILED';
+      console.error('Firestore operation failed', code, context.operation);
       showErrorToast({
-        code: 'FIRESTORE-PERMISSION-DENIED',
-        message: 'Firebase denied this request.',
+        code,
+        message: 'The operation could not be completed.',
         values: {
           path: context.path || 'unknown',
           operation: context.operation || 'unknown',
         },
-      });
+      }, lang);
     });
 
     return unsubscribe;
-  }, []);
+  }, [lang]);
 
   return null;
 }

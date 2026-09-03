@@ -12,6 +12,7 @@ describe('error toast', () => {
     render(<Toaster />);
     showErrorToast({ code: 'AI-UPSTREAM-502', message: 'Request unavailable.', values: { provider: 'Nvidia', providerCode: '502' } });
     expect(await screen.findByText('Error code: AI-UPSTREAM-502')).toBeTruthy();
-    expect(screen.getByText(/provider: Nvidia/)).toBeTruthy();
+    expect(screen.getByText(/providerCode: 502/)).toBeTruthy();
+    expect(screen.queryByText(/Request unavailable/)).toBeNull();
   });
 });

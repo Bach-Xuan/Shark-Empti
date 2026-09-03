@@ -1,7 +1,7 @@
 
 'use client';
 
-type Callback = (data: any) => void;
+type Callback = (data: unknown) => void;
 
 class ErrorEmitter {
   private listeners: { [key: string]: Callback[] } = {};
@@ -14,7 +14,7 @@ class ErrorEmitter {
     };
   }
 
-  emit(event: string, data: any) {
+  emit(event: string, data: unknown) {
     if (this.listeners[event]) {
       this.listeners[event].forEach(cb => cb(data));
     }
