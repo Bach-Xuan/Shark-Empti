@@ -1,17 +1,17 @@
 # Shark Empti · v1.15.1
 
-English below. Đây là trang bắt đầu: phạm vi, lệnh phát triển và tài liệu kỹ thuật của ứng dụng.
+Đây là trang bắt đầu: phạm vi, lệnh phát triển và tài liệu kỹ thuật của ứng dụng.
 
-Nền tảng học tập với quiz AI, phân tích kết quả, flashcards, bài luyện tập, Forum, Arena và Focus Shield. Đợt tối ưu thứ hai giữ URL, dữ liệu lịch sử và quy tắc tính điểm; không deploy hoặc sửa dữ liệu production.
+Shark Empti là không gian học tập biến một chủ đề bạn tò mò thành tiến bộ có thể nhìn thấy. Bạn bắt đầu bằng một bài quiz, nhận phản hồi đúng lúc, quay lại đúng phần còn yếu và dần xây được nhịp học của riêng mình — trong một trải nghiệm gọn, rõ và có thể kiểm chứng. Đợt tối ưu thứ hai giữ URL, dữ liệu lịch sử và quy tắc tính điểm; không deploy hoặc sửa dữ liệu production.
 
 ## Học có định hướng, thấy rõ tiến bộ
 
-Shark Empti biến một chủ đề bạn muốn chinh phục thành hành trình học tập rõ ràng: tạo quiz theo môn, trình độ và độ khó; nhận phản hồi để hiểu điểm mạnh/yếu; rồi luyện lại bằng flashcards và bài thực hành. Dashboard biến lịch sử làm bài thành insight, còn Shark Guru sẵn sàng giải thích khi bạn cần một gợi ý.
+Mỗi lần học đều để lại một dấu mốc: câu hỏi cho biết bạn đang ở đâu, phản hồi chỉ ra vì sao bạn sai, còn lần luyện tiếp theo giúp bạn tiến thêm một bước. Dashboard nối các dấu mốc ấy thành bức tranh tiến bộ; Shark Guru ở bên khi bạn cần một lời giải thích vừa đủ để tự đi tiếp.
 
-- **Quiz AI và phản hồi cá nhân hóa:** tạo câu hỏi, chấm Short Answer, phân tích lỗi và đề xuất bước tiếp theo.
-- **Practice, Flashcards và Dashboard:** củng cố đúng điểm cần luyện, theo dõi hoạt động và tiến bộ qua thời gian.
-- **Arena và Forum:** tạo thử thách cộng đồng, bảng xếp hạng, thảo luận và tương tác học tập.
-- **Focus Shield:** hỗ trợ duy trì sự tập trung bằng camera chạy ngay trong trình duyệt khi bạn chủ động bật.
+- **Quiz AI và phản hồi cá nhân hóa:** biến mục tiêu học thành câu hỏi phù hợp, rồi biến lỗi sai thành hướng cải thiện cụ thể.
+- **Practice, Flashcards và Dashboard:** lặp lại đúng điều cần nhớ, đúng kỹ năng cần củng cố và đúng thời điểm cần nhìn lại.
+- **Arena và Forum:** học cùng cộng đồng qua thử thách, bảng xếp hạng và những cuộc trao đổi có ích.
+- **Focus Shield:** bảo vệ khoảng thời gian tập trung bằng camera chạy ngay trong trình duyệt khi bạn chủ động bật.
 
 AI luôn được kiểm tra schema ở server và dùng fallback OpenRouter để trải nghiệm không phụ thuộc vào một model duy nhất. Kết quả AI là hỗ trợ học tập, không thay thế việc tự kiểm chứng kiến thức.
 
@@ -73,18 +73,18 @@ English below
 
 # Shark Empti · v1.15.1
 
-English below. This is the starting page for the application scope, development commands and technical documentation.
+This is the starting page for the application scope, development commands and technical documentation.
 
-A learning platform with AI quizzes, performance feedback, flashcards, practice, Forum, Arena and Focus Shield. The second optimization pass preserves URLs, historical data and scoring rules; it does not deploy or modify production data.
+Shark Empti is a learning space that turns a topic you are curious about into progress you can see. Start with a quiz, get timely feedback, return to the gaps that matter and gradually build a rhythm that is your own—in an experience that stays clear, focused and verifiable. The second optimization pass preserves URLs, historical data and scoring rules; it does not deploy or modify production data.
 
 ## Learn with direction and see your progress
 
-Shark Empti turns a topic you want to master into a clear learning journey: create quizzes by subject, level and difficulty; use feedback to understand strengths and gaps; then reinforce them through flashcards and practice. The dashboard turns attempt history into insight, while Shark Guru is ready to explain when you need a hint.
+Every study session leaves a useful marker: questions show where you are, feedback explains why an answer missed, and the next practice round helps you move one step further. The dashboard connects those markers into a picture of progress; Shark Guru is there when you need just enough explanation to keep going on your own.
 
-- **AI quizzes and personalized feedback:** generate questions, assess short answers, analyse mistakes and suggest next steps.
-- **Practice, Flashcards and Dashboard:** reinforce the right skills and follow activity and progress over time.
-- **Arena and Forum:** create community challenges, follow leaderboards and discuss learning.
-- **Focus Shield:** supports concentration with an in-browser camera feature when you choose to enable it.
+- **AI quizzes and personalized feedback:** turn a learning goal into fitting questions, then turn mistakes into a concrete next step.
+- **Practice, Flashcards and Dashboard:** revisit what needs remembering, reinforce the skills that need work and see when to look back.
+- **Arena and Forum:** learn with a community through challenges, leaderboards and useful conversation.
+- **Focus Shield:** protect focused study time with an in-browser camera feature when you choose to enable it.
 
 AI responses are schema-validated on the server and use OpenRouter fallback, so the experience does not depend on one model alone. AI output supports learning; it does not replace checking your own understanding.
 
