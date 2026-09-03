@@ -26,8 +26,11 @@ Sao chép `.env.example` thành `.env`. Không commit `.env`.
 | `OPENROUTER_API_KEY` | API key phía server để gọi OpenRouter. |
 | `OPENROUTER_MODEL` | Tùy chọn; model OpenRouter không gồm tiền tố `openai/`. |
 | `NEXT_PUBLIC_FIREBASE_*` | Cấu hình Web App Firebase dùng ở trình duyệt. |
+| `FIREBASE_ADMIN_*` | Secret chỉ phía server Vercel để chấm và trao thưởng Arena an toàn. |
 
 `OPENROUTER_MODEL` mặc định là `liquid/lfm-2.5-2.6b:free`. Ứng dụng chỉ dùng model được cấu hình, không tự động chuyển model khi provider quá tải. Cấu hình Firebase Web App không phải secret, nhưng quyền truy cập dữ liệu phải được bảo vệ bằng Firebase Authentication và Security Rules.
+
+Arena chấm điểm ở server: câu trả lời ngắn của đề Arena mới chỉ là số (chấp nhận `,` hoặc `.` cho số thập phân). Vercel cần ba biến `FIREBASE_ADMIN_*` từ Firebase service account; không được đặt các biến này với tiền tố `NEXT_PUBLIC_`.
 
 ## Lệnh hữu ích
 
@@ -70,8 +73,11 @@ Copy `.env.example` to `.env`; never commit `.env`.
 | `OPENROUTER_API_KEY` | Server-side key for OpenRouter. |
 | `OPENROUTER_MODEL` | Optional OpenRouter model ID override. |
 | `NEXT_PUBLIC_FIREBASE_*` | Browser Firebase Web App configuration. |
+| `FIREBASE_ADMIN_*` | Vercel-only secrets for trusted Arena scoring and rewards. |
 
 The default model is `liquid/lfm-2.5-2.6b:free`. The app uses one configured model and does not automatically fail over to another model.
+
+Arena scoring runs on the server. New Arena short answers are numeric only and accept either `,` or `.` decimals. Configure the three `FIREBASE_ADMIN_*` service-account values in Vercel only; they must never use the `NEXT_PUBLIC_` prefix.
 
 ## Useful commands
 

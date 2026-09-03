@@ -25,6 +25,7 @@
 *   **UI Components**: ShadCN UI (Radix Primitives) được tinh chỉnh theo style "Duo" (border dày, shadow cứng).
 *   **Backend as a Service**: Firebase (Authentication, Firestore).
 *   **Generative AI**: Firebase Genkit v1.37 phối hợp với OpenRouter. Model được chọn bằng `OPENROUTER_MODEL` (mặc định: `liquid/lfm-2.5-2.6b:free`), không tự động failover.
+*   **Trusted Arena backend**: Next.js Node Route Handler trên Vercel dùng Firebase Admin để xác thực token, tự chấm điểm, lưu attempt và cộng Shark Coins trong transaction.
 *   **On-device AI**: TensorFlow.js (xử lý Focus Tracking trực tiếp trên trình duyệt để bảo mật và tiết kiệm tài nguyên server).
 *   **Math Rendering**: KaTeX (hiển thị công thức Toán/Hóa chuyên nghiệp).
 
@@ -33,6 +34,7 @@
 2.  **AI Layer**: Genkit gọi OpenRouter API -> Trả về cấu trúc JSON câu hỏi -> Client hiển thị.
 3.  **Persistence**: Kết quả bài làm được lưu vào Firestore (`users/{uid}/history`).
 4.  **Analytics**: Dashboard component fetch dữ liệu lịch sử -> Chuyển qua `stats-utils.ts` -> Hiển thị biểu đồ Radar và Bar Chart (Recharts).
+5.  **Arena**: Client gửi đáp án và duration tới endpoint đã xác thực; server đọc đề gốc và tính score, không tin score hoặc coin từ trình duyệt.
 
 ---
 
@@ -88,6 +90,7 @@ Dự án sử dụng một cơ chế đặc biệt để vượt qua giới hạ
 ### 5.3. Technical Debt (Nợ kỹ thuật)
 *   **State Management**: Hiện đang sử dụng Prop Drilling khá nhiều ở trang chủ. Cần chuyển sang React Context hoặc Zustand nếu mở rộng thêm.
 *   **Images**: Vẫn sử dụng Placeholder (Picsum/Unsplash) trong file `placeholder-images.json`. Cần upload ảnh thật của Shark Guru.
+*   **Legacy Arena**: Đề cũ có đáp án tự luận tự do được giữ để xem nhưng không thể thi. Đề mới chỉ hỗ trợ short answer dạng số, chuẩn hoá `,`/`.` và tolerance `1e-6` để server chấm xác định.
 
 ---
 
@@ -117,6 +120,8 @@ Shark Empti is a Duolingo-inspired cognitive learning platform. It creates quizz
 
 The stack is Next.js 15 App Router, React 19, Tailwind/ShadCN UI, Firebase Authentication/Firestore, Genkit 1.37 with OpenRouter, TensorFlow.js Focus Shield, and KaTeX. The client sends quiz configuration to server AI flows; results are stored under `users/{uid}/history` and rendered by the dashboard.
 
+Arena submission uses a Next.js Node Route Handler on Vercel with Firebase Admin. The browser submits answers and duration only; the server verifies the Firebase token, reads the stored exam, calculates score, records the attempt, increments the counter, and awards coins transactionally.
+
 ## 3. AI layer
 
 The default model is `liquid/lfm-2.5-2.6b:free`; `OPENROUTER_MODEL` can override it, and the application intentionally uses one configured model without automatic failover. The OpenAI-compatible adapter uses native fetch, a 60-second timeout, and two transport retries. A provider response with HTTP 200 but an embedded `error` is detected before Genkit accesses `choices`, preventing the previous `undefined.length` crash.
@@ -130,3 +135,5 @@ User profiles are readable by signed-in users for profile search. Histories, not
 ## 5. Testing and onboarding
 
 Use `npm test` for unit/component tests, `npm run test:rules` for emulator rules, `npm run typecheck` for TypeScript, `npm run build` for production compilation, `npm run ai:health` for model capability, and `npm run ai:smoke` for quiz/chat structured-output contracts. The test suite covers authentication/profile, setup, every quiz mode, scoring/results, chatbot, dashboard, notes/activity, Flashcards, practice, Arena, forum, and Focus Shield failure paths.
+
+New Arena short answers are numeric only. The scorer accepts decimal commas or periods and compares within `1e-6`; legacy free-text Arena exams remain readable but cannot be submitted securely.

@@ -3,10 +3,22 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
     function owner(userId) { return signedIn() && request.auth.uid == userId; }
+    function keepsAuthor() { return request.resource.data.authorId == resource.data.authorId; }
+    function validLikeUpdate() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let added = request.resource.data.likedBy.toSet().difference(resource.data.likedBy.toSet());
+      let removed = resource.data.likedBy.toSet().difference(request.resource.data.likedBy.toSet());
+      return changed.hasOnly(['likedBy', 'likesCount']) && (
+        (added.size() == 1 && added.hasOnly([request.auth.uid]) && removed.size() == 0 && request.resource.data.likesCount == resource.data.likesCount + 1) ||
+        (removed.size() == 1 && removed.hasOnly([request.auth.uid]) && added.size() == 0 && request.resource.data.likesCount == resource.data.likesCount - 1)
+      );
+    }
 
     match /users/{userId} {
       allow get, list: if signedIn();
-      allow create, update, delete: if owner(userId);
+      allow create: if owner(userId) && !request.resource.data.keys().hasAny(['sharkCoins']);
+      allow update: if owner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['sharkCoins']);
+      allow delete: if owner(userId);
       match /{document=**} {
         allow read, write: if owner(userId);
       }
@@ -15,21 +27,24 @@ service cloud.firestore {
     match /posts/{postId} {
       allow read: if true;
       allow create: if signedIn() && request.resource.data.authorId == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.authorId == request.auth.uid;
+      allow update: if signedIn() && (validLikeUpdate() || (resource.data.authorId == request.auth.uid && keepsAuthor()));
+      allow delete: if signedIn() && resource.data.authorId == request.auth.uid;
       match /comments/{commentId} {
         allow read: if true;
         allow create: if signedIn() && request.resource.data.authorId == request.auth.uid;
-        allow update, delete: if signedIn() && resource.data.authorId == request.auth.uid;
+        allow update: if signedIn() && (validLikeUpdate() || (resource.data.authorId == request.auth.uid && keepsAuthor()));
+        allow delete: if signedIn() && resource.data.authorId == request.auth.uid;
       }
     }
 
     match /arenaExams/{examId} {
       allow read: if true;
       allow create: if signedIn() && request.resource.data.authorId == request.auth.uid;
-      allow update, delete: if signedIn() && resource.data.authorId == request.auth.uid;
+      allow update: if signedIn() && resource.data.authorId == request.auth.uid && keepsAuthor() && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['totalAttempts']);
+      allow delete: if signedIn() && resource.data.authorId == request.auth.uid;
       match /attempts/{attemptId} {
         allow read: if true;
-        allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+        allow create: if false;
         allow update, delete: if false;
       }
     }

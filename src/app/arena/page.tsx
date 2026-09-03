@@ -100,6 +100,7 @@ export default function ArenaPage() {
         difficulty: config.difficulty,
         numQuestions: Math.min(parseInt(config.numQuestions) || 5, 50),
         language: lang as 'en' | 'vi',
+        arenaMode: true,
       });
 
       if (!result.ok) {

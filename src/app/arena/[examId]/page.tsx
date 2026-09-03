@@ -7,13 +7,7 @@ import {
   query, 
   orderBy, 
   onSnapshot, 
-  addDoc, 
-  serverTimestamp,
   doc,
-  updateDoc,
-  increment,
-  getDocs,
-  getDoc,
   limit
 } from 'firebase/firestore';
 import { useUser, useFirestore } from '@/firebase';
@@ -41,6 +35,7 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import QuizView from '@/components/quiz-view';
 import ResultView from '@/components/result-view';
+import { isTrustedArenaExam } from '@/lib/arena-scoring';
 
 export default function ArenaDetailPage() {
   const { user } = useUser();
@@ -103,35 +98,21 @@ export default function ArenaDetailPage() {
   const handleFinishQuiz = async (results: any) => {
     if (!user || !db || !exam) return;
 
-    const correctCount = results.quizResults.filter((r: any) => r.isCorrect).length;
-    const score = Math.round((correctCount / results.quizResults.length) * 100);
-    const duration = results.totalTime;
-
-    let coinsToEarn = score; 
-    const attemptsSnap = await getDocs(collection(db, 'arenaExams', examId, 'attempts'));
-    const isFirstAttempt = attemptsSnap.empty;
-    if (isFirstAttempt) {
-      coinsToEarn += 50;
-      toast({ title: t.firstAttemptBonus.toUpperCase() });
-    }
-    setEarnedCoins(coinsToEarn);
-
-    const attemptData = {
-      examId,
-      userId: user.uid,
-      userName: user.displayName || 'Learner',
-      userPhoto: user.photoURL || '',
-      score,
-      duration,
-      createdAt: serverTimestamp()
-    };
-
     try {
-      await addDoc(collection(db, 'arenaExams', examId, 'attempts'), attemptData);
-      await updateDoc(doc(db, 'arenaExams', examId), { totalAttempts: increment(1) });
-      
-      const userRef = doc(db, 'users', user.uid);
-      await updateDoc(userRef, { sharkCoins: increment(coinsToEarn) });
+      const token = await user.getIdToken();
+      const response = await fetch(`/api/arena/${encodeURIComponent(examId)}/submit`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          answers: results.quizResults.map((result: { userAnswer: string }) => result.userAnswer),
+          duration: results.totalTime,
+        }),
+      });
+      const submission = await response.json() as { score?: number; coinsAwarded?: number; isFirstAttempt?: boolean; error?: string };
+      if (!response.ok || typeof submission.coinsAwarded !== 'number') throw new Error(submission.error || 'Arena submission failed');
+
+      setEarnedCoins(submission.coinsAwarded);
+      if (submission.isFirstAttempt) toast({ title: t.firstAttemptBonus.toUpperCase() });
 
       setLastResults(results);
       setView('result');
@@ -142,6 +123,7 @@ export default function ArenaDetailPage() {
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-12 h-12 animate-spin text-primary" /></div>;
   if (!exam) return null;
+  const isLegacyExam = !isTrustedArenaExam(exam.questions || []);
 
   return (
     <div className="min-h-screen flex flex-col bg-background transition-colors duration-500">
@@ -187,10 +169,12 @@ export default function ArenaDetailPage() {
                   <div className="pt-10 flex flex-col md:flex-row items-center gap-6">
                     <Button 
                       onClick={() => setView('quiz')}
+                      disabled={isLegacyExam}
                       className="w-full md:w-auto h-16 md:h-24 px-12 md:px-20 rounded-[1.5rem] md:rounded-[3rem] btn-duo bg-primary text-white font-headline font-black text-xl md:text-3xl uppercase tracking-widest border-4 border-white/20 gap-4"
                     >
-                      <PlayCircle className="w-8 h-8 md:w-12 md:h-12" /> {t.takeExam}
+                      <PlayCircle className="w-8 h-8 md:w-12 md:h-12" /> {isLegacyExam ? (lang === 'vi' ? 'ĐỀ CŨ KHÔNG THỂ THI' : 'LEGACY EXAM UNAVAILABLE') : t.takeExam}
                     </Button>
+                    {isLegacyExam && <p className="text-xs font-bold text-destructive max-w-md">{lang === 'vi' ? 'Đề này có câu trả lời tự luận cũ nên không thể chấm và trao thưởng một cách an toàn.' : 'This exam contains legacy free-text answers and cannot be graded securely.'}</p>}
                     <div className="flex items-center gap-4 text-muted-foreground bg-muted/30 px-6 py-3 rounded-2xl border-2 border-border">
                        <Users className="w-6 h-6" />
                        <span className="font-black text-lg">{exam.totalAttempts} {lang === 'vi' ? 'Học viên đã thi' : 'Learners challenged'}</span>
@@ -278,6 +262,7 @@ export default function ArenaDetailPage() {
             initialQuestions={exam.questions} 
             onFinish={handleFinishQuiz} 
             onAskGuru={(msg) => console.log(msg)} 
+            numericShortAnswers
           />
         )}
 

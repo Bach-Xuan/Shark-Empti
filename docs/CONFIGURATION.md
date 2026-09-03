@@ -10,6 +10,7 @@ Sao chép `.env.example` thành `.env`, sau đó điền toàn bộ giá trị. 
 | --- | --- |
 | OpenRouter | `OPENROUTER_API_KEY` |
 | Firebase Web App | `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`, `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`, `NEXT_PUBLIC_FIREBASE_APP_ID` |
+| Vercel server (Arena) | `FIREBASE_ADMIN_PROJECT_ID`, `FIREBASE_ADMIN_CLIENT_EMAIL`, `FIREBASE_ADMIN_PRIVATE_KEY` |
 
 `OPENROUTER_MODEL` là tùy chọn. Giá trị phải là model ID của OpenRouter, ví dụ `provider/model-name`; mã tự thêm tiền tố Genkit `openai/`.
 
@@ -23,6 +24,10 @@ Sau khi thêm cấu hình, hãy bật các dịch vụ ứng dụng dùng:
 - Firestore Database: tạo database và thiết lập Security Rules cho các collection `users`, `posts`, `arenaExams`.
 
 Firebase Web API key xuất hiện ở client là thiết kế bình thường; không thay thế Authentication, Firestore Security Rules hoặc giới hạn API key trong Google Cloud Console.
+
+### Arena server secrets
+
+Arena xác minh Firebase ID token và tự chấm điểm ở Route Handler của Next.js, nên cần Firebase Admin service account trên Vercel. Đặt ba biến `FIREBASE_ADMIN_*` trong Vercel Project Settings; private key phải giữ dấu xuống dòng dưới dạng `\n`. Không đặt chúng vào `.env` client hoặc biến `NEXT_PUBLIC_*`.
 
 ## 3. OpenRouter và Genkit
 
@@ -82,6 +87,10 @@ The Emulator CLI requires Java 11 or newer on `PATH`.
 Copy `.env.example` to `.env` and fill every value. Next.js and the Genkit Developer UI load `.env`; this project does not use `.env.local`.
 
 Required groups are `OPENROUTER_API_KEY` and the six `NEXT_PUBLIC_FIREBASE_*` Web App values. `OPENROUTER_MODEL` is optional and must be a valid OpenRouter model ID without the `openai/` prefix. The default is `liquid/lfm-2.5-2.6b:free`; there is no automatic model failover.
+
+## Arena server secrets
+
+Trusted Arena submission runs in a Next.js Node Route Handler on Vercel. Configure `FIREBASE_ADMIN_PROJECT_ID`, `FIREBASE_ADMIN_CLIENT_EMAIL`, and `FIREBASE_ADMIN_PRIVATE_KEY` as Vercel-only service-account secrets. Preserve private-key newlines as `\n`; never expose these values through `NEXT_PUBLIC_*` variables.
 
 ## 2. Firebase
 

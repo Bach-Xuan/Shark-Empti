@@ -12,6 +12,7 @@ import {
   DEFAULT_GENERATION_CONFIG
 }
 from "@/ai/config/safety";
+import { LATEX_RULE, SHARK_GURU_ROLE, languageRule } from '@/ai/config/prompts';
 
 const GenerateQuestionsInputSchema = z.object({
   subject: z.string().optional(),
@@ -22,6 +23,7 @@ const GenerateQuestionsInputSchema = z.object({
   difficulty: z.string(),
   numQuestions: z.number(),
   language: z.enum(['en', 'vi']),
+  arenaMode: z.boolean().optional(),
 });
 export type GenerateQuestionsInput = z.infer<typeof GenerateQuestionsInputSchema>;
 
@@ -40,10 +42,10 @@ const GenerateQuestionsOutputSchema = z.object({
 });
 export type GenerateQuestionsOutput = z.infer<typeof GenerateQuestionsOutputSchema>;
 
-const SYSTEM_PROMPT = `You are an expert educator Shark Guru. Generate academic quiz questions strictly based on the provided configuration.
+const SYSTEM_PROMPT = `${SHARK_GURU_ROLE} Generate academic quiz questions strictly from the supplied configuration.
 
 Mandatory Rules:
-1. LaTeX Rendering: Use LaTeX for ALL mathematical expressions, chemical formulas, and scientific notation (e.g., $E=mc^2$, $H_2O$). Use $...$ for inline and $$...$$ for block math.
+1. ${LATEX_RULE}
 2. Chemistry Nomenclature: Use international IUPAC names (e.g., 'Aluminium', 'Sodium chloride') even in Vietnamese.
 3. Context: For Vietnamese Grade level, align with the official Vietnamese National Curriculum.
 4. Types: Ensure 'Multiple Choice' has 4 options, 'True/False' has exactly 2 options. 'Short Answer' has NO options.
@@ -52,7 +54,8 @@ Mandatory Rules:
 7. Uniqueness: Ensure all multiple-choice options for a single question are unique.
 8. Tone: Academic, clear, and encouraging.
 9. Exclusions: STRICTLY DO NOT generate questions related to any concepts or sub-topics mentioned in the "Exclude" list.
-10. Sections: For every question, identify the specific sub-topic or section it belongs to within the main topic. Be concise (max 3-4 words).`;
+10. Sections: For every question, identify the specific sub-topic or section it belongs to within the main topic. Be concise (max 3-4 words).
+11. Arena mode: when Arena Mode is true, every Short Answer must have one finite numeric answer only. The answer must use a dot decimal separator, contain no unit or prose, and the question must explicitly request only that number.`;
 
 export async function generateQuestions(input: GenerateQuestionsInput): Promise<AppResult<GenerateQuestionsOutput>> {
   return asAiResult(() => generateQuestionsFlow(input));
@@ -67,18 +70,17 @@ const generateQuestionsFlow = ai.defineFlow(
   async (input) => {
     return executeWithFallback(async (apiKey) => {
       const tempAi = getAiWithKey(apiKey);
-      const isVietnamese = input.language === 'vi';
-      
       const { output } = await tempAi.generate({
         system: SYSTEM_PROMPT,
-        prompt: `Language: ${isVietnamese ? 'Vietnamese' : 'English'}
+        prompt: `${languageRule(input.language)}
 Subject: ${input.subject || 'None'}
 Grade: ${input.grade || 'None'}
 Topic: ${input.topic}
 Exclude (DO NOT INCLUDE): ${input.excludeNotes || 'None'}
 Type: ${input.type}
 Difficulty: ${input.difficulty}
-Count: ${input.numQuestions}`,
+Count: ${input.numQuestions}
+Arena Mode: ${input.arenaMode ? 'true' : 'false'}`,
         output: { schema: GenerateQuestionsOutputSchema },
         config: DEFAULT_GENERATION_CONFIG
       });

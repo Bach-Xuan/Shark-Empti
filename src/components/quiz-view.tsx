@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import { getAiErrorMessage } from '@/lib/ai-error-message';
 import { showErrorToast, showUnexpectedErrorToast } from '@/lib/error-toast';
+import { answersMatch } from '@/lib/arena-scoring';
 
 interface QuizViewProps {
   t: TranslationSet;
@@ -23,9 +24,10 @@ interface QuizViewProps {
   initialQuestions: any[] | null;
   onFinish: (results: any, analysis?: any) => void;
   onAskGuru: (message: string) => void;
+  numericShortAnswers?: boolean;
 }
 
-export default function QuizView({ t, lang, config, initialQuestions, onFinish, onAskGuru }: QuizViewProps) {
+export default function QuizView({ t, lang, config, initialQuestions, onFinish, onAskGuru, numericShortAnswers = false }: QuizViewProps) {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [questions, setQuestions] = useState<any[]>(initialQuestions || []);
   const [answers, setAnswers] = useState<any[]>([]);
@@ -160,7 +162,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
     let isCorrect = false;
     let aiFeedback = null;
 
-    if (currentQ.type === 'Short Answer') {
+    if (currentQ.type === 'Short Answer' && !numericShortAnswers) {
       setIsAnalyzing(true);
       try {
         const result = await shortAnswerAnalysis({
@@ -181,7 +183,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
         setIsAnalyzing(false);
       }
     } else {
-      isCorrect = userAnswer.toLowerCase().trim() === currentQ.correct.toLowerCase().trim();
+      isCorrect = answersMatch(currentQ, userAnswer);
     }
 
     const errorCategory = !isCorrect ? (timeTaken < 5 ? "Careless Mistake" : "Concept Error") : null;
@@ -196,7 +198,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
     };
 
     setCurrentFeedback(result);
-  }, [questions, currentIdx, questionStartTime, isAnalyzing, currentFeedback, lang]);
+  }, [questions, currentIdx, questionStartTime, isAnalyzing, currentFeedback, lang, numericShortAnswers]);
 
   const handleNextAction = useCallback(async () => {
     const updatedAnswers = [...answers, currentFeedback];

@@ -12,6 +12,7 @@ import {
   DEFAULT_GENERATION_CONFIG
 }
 from "@/ai/config/safety";
+import { LATEX_RULE, SHARK_GURU_ROLE, languageRule } from '@/ai/config/prompts';
 
 const GenerateFlashcardsInputSchema = z.object({
   topic: z.string(),
@@ -30,11 +31,11 @@ const GenerateFlashcardsOutputSchema = z.object({
 });
 export type GenerateFlashcardsOutput = z.infer<typeof GenerateFlashcardsOutputSchema>;
 
-const SYSTEM_PROMPT = `You are an expert educator Shark Guru. Create high-quality, conceptual flashcards.
+const SYSTEM_PROMPT = `${SHARK_GURU_ROLE} Create high-quality conceptual flashcards.
 Rules:
 1. Focused: Each card must focus on ONE single idea or definition.
 2. Academic: Prioritize theory, rules, and core concepts over trivia.
-3. LaTeX: Use LaTeX ($...$ or $$...$$) for any mathematical or scientific notation.
+3. ${LATEX_RULE}
 4. Language: Strict compliance with the requested language.
 5. Clarity: The 'front' should be a provocative prompt or question. The 'back' should be a clear, definitive explanation.`;
 
@@ -55,7 +56,7 @@ const generateFlashcardsFlow = ai.defineFlow(
         system: SYSTEM_PROMPT,
         prompt: `Topic: "${input.topic}"
 Count: ${input.numCards}
-Language: ${input.language === 'vi' ? 'Vietnamese' : 'English'}`,
+${languageRule(input.language)}`,
         output: { schema: GenerateFlashcardsOutputSchema },
         config: DEFAULT_GENERATION_CONFIG
       });
