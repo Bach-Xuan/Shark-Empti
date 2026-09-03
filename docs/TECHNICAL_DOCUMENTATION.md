@@ -1,12 +1,12 @@
-# Tài liệu kỹ thuật · Shark Empti v1.15.1
+# 🛠️ Tài liệu kỹ thuật · Shark Empti v1.15.1
 
 English below. Tài liệu này mô tả kiến trúc, hợp đồng kỹ thuật, cấu hình và cách bảo trì ứng dụng.
 
-## 1. Phạm vi và baseline
+## 1. 🎯 Phạm vi và baseline
 
 Đợt thứ hai bắt đầu trên worktree đã có thay đổi chưa commit từ đợt trước. Không dùng git diff tổng để quy toàn bộ thay đổi cho đợt này. Baseline gồm API Admin Forum/Arena, cấu hình model, cải thiện prompt, next/font và chỉnh docs/lint trước đó. Đợt mới thêm transport fetch/Zod, nâng dependency, provider chung, reducer, idempotency, Rules hardening, test/CI và sửa song ngữ. Giữ version1.15.1, URL và dữ liệu; không migration production hoặc failover model.
 
-## 2. Kiến trúc và ownership
+## 2. 🏗️ Kiến trúc và ownership
 
 App Router server layout cung cấp font/CSS, AppPreferencesProvider và FirebaseClientProvider. Provider preference sở hữu lang/theme, validate storage, cập nhật html.lang/dark và nhận storage event từ tab khác. Các hooks useLanguageState/useThemeState không tự tạo state riêng. Root error UI không phụ thuộc Firebase.
 
@@ -16,7 +16,7 @@ Home sở hữu navigation/view, learningSessionReducer, history subscription v�
 
 History được tính thống kê một lần tại Home qua memo và truyền Dashboard. Dashboard/playground dùng dynamic import. Nhãn dịch hiện vẫn tham gia một phần phép tính thống kê: chưa được tách hoàn toàn khỏi dữ liệu số. Không tuyên bố mọi phép tính không chạy lại khi đổi locale.
 
-## 3. Data flow và dữ liệu tương thích
+## 3. 🔄 Data flow và dữ liệu tương thích
 
 Quiz: Setup → academic validation → generateQuestions → trả lời/timer → feedback → result → users/{uid}/history → dashboard. Short Answer thường dùng AI; numeric Arena dùng đáp án số chuẩn. Không sửa nội dung lịch sử khi đổi VI/EN.
 
@@ -39,7 +39,7 @@ Roadmap mới lưu ở localStorage `shark_roadmap_checks:{uid}` và validate b�
 
 Test `ui-copy.test.ts` duyệt AST của TSX để chặn text JSX và title/placeholder/aria-label/alt tĩnh ngoài ngoại lệ: thương hiệu/version, SHARK COINS, English, Tiếng Việt và UID. Đây không phải bằng chứng mọi chuỗi động đều đã dịch; chuỗi tạo trong event handler/prompt/export vẫn cần kiểm tra riêng.
 
-## 4. API, authentication và idempotency
+## 4. 🔐 API, authentication và idempotency
 
 src/lib/server-api.ts gom Bearer token verification, ApiError, apiFailure và transaction receipt. Route handler phải parse payload và kiểm tra ownership sau auth; Admin bypass Rules.
 
@@ -49,7 +49,7 @@ Receipt key = SHA256(scope, UID, requestId); fingerprint từ payload đã parse
 
 Contract yêu cầu UI khóa submit đồng thời, thao tác mới có ID mới và retry sau response mất giữ payload cũ kể cả duration. Mọi đường bắt đầu hoặc làm lại phải duy trì phân biệt này. Idempotency không chống gian lận toàn Arena: nghiệp vụ vẫn cho làm lại có điểm/thưởng; không có trusted exam timer hay secrecy của đáp án.
 
-## 5. Rules và xử lý lỗi
+## 5. 🛡️ Rules và xử lý lỗi
 
 Post create yêu cầu author self, counters0 và likedBy rỗng. Author update chỉ title/content/subject/updatedAt; comment update chỉ content/updatedAt. Like chỉ cho phép delta đúng theo UID và không trùng likedBy. Tác giả không được bypass counter/like checks. Comment create/delete và Arena attempts dùng Admin API. Arena create totalAttempts0; update chỉ title/config/questions.
 
@@ -59,7 +59,7 @@ Route error.tsx và global-error.tsx dùng retry của Next16. ErrorBoundary ri�
 
 Mã an toàn qua i18n/errors và error-toast. Chẩn đoán toast chỉ allowlist `httpStatus`, `providerCode`, `retryAfterSeconds`, `operation`, `attemptedModels` và `lastFailure`. Khi adapter cạn fallback, nó trả `AI-FALLBACK-EXHAUSTED` với số model đã thử và mã lỗi cuối; không trả tên model, raw provider payload, prompt, stack hoặc secret. FirestorePermissionError là tên export tương thích; nội bộ phân loại permission/unavailable/auth/not-found/generic bằng cause, không tự coi mọi lỗi là permission. Callsite chưa truyền cause sẽ hiện lỗi chung.
 
-## 6. AI transport, prompt và Focus Shield
+## 6. 🤖 AI transport, prompt và Focus Shield
 
 Bảy public flow giữ tên hàm/input/output/AppResult: academic-validation, generate-questions, generate-flashcards, generate-practice, short-answer-analysis, personalized-quiz-feedback, ai-coaching-chatbot. Input được Zod parse; adapter dùng fallback chung Inkling → Gemma → Nemotron và luôn validate response bằng Zod. Gemma nhận JSON Schema native; Inkling/Nemotron nhận JSON-only để tránh gửi `response_format` không được metadata của chúng quảng cáo. Không có framework thay Genkit hoặc key rotation.
 
@@ -69,7 +69,7 @@ Timeout/retry và env được mô tả trong CONFIGURATION.md. Unit fixtures kh
 
 Focus Shield import type TensorFlow ở đầu file; import() runtime chỉ trong loadModel sau thao tác bật. Turbopack dev có thể gửi manifest async-loader nhỏ trước đó; manifest không phải runtime/model. generationRef chặn model/stream đến muộn; startingRef khóa khởi tạo đồng thời. Stop/unmount dispose model, dừng track và cancelAnimationFrame. tf.tidy dọn tensors; inference throttle800ms. Kiểm tra camera thật, quyền bị từ chối, model load lỗi và cleanup phải được ghi kết quả riêng.
 
-## 7. Song ngữ và bảo trì
+## 7. 🌐 Song ngữ và bảo trì
 
 translations.ts giữ catalog nghiệp vụ; i18n/common.ts và errors.ts bổ sung UI/error dùng chung; UiText truy cập catalog common có kiểu. i18n/ui.ts gom 89 vị trí chuỗi UI trước đây inline, với key có prefix chức năng; i18n/index.ts cung cấp messages/uiMessage. Snippet LaTeX dùng catalog riêng. Kiểm tra JSX text tĩnh không thay thế rà nội dung động. Test parity so key và interpolation ở cả VI/EN. Thương hiệu Shark Empti/Shark Guru, mã lỗi, tên model, ký hiệu khoa học/LaTeX và nội dung người dùng là ngoại lệ không dịch tự động. Đổi locale không gọi AI để dịch lịch sử.
 
@@ -80,7 +80,7 @@ Thêm subscription: một owner, reset khi key đổi, unsubscribe và bỏ resp
 Thêm test: unit/component vào tests, integration Node vào tests/integration; Rules chỉ chạy qua Emulator. E2E dùng demo project và localhost AI fixture; không thêm credential production.
 Nâng dependency: xem engines/peers, nâng theo nhóm, cài không force, chạy suite liên quan; cập nhật cả lockfile và bảng bên dưới. ESLint set-state-in-effect hiện tắt để cho phép khởi tạo browser state/subscriptions; purity/static-components/exhaustive-deps vẫn bật.
 
-## 8. Danh mục dependency trực tiếp
+## 8. 📦 Danh mục dependency trực tiếp
 
 Baseline là range trong manifest, không giả lập phiên bản đã cài trước đó. Đích là resolution chính xác trong lockfile đợt này.
 
@@ -157,7 +157,7 @@ Baseline là range trong manifest, không giả lập phiên bản đã cài tr�
 | react-hook-form | ^7.54.2 | Không còn consumer từ route roots; xóa wrapper kèm; build/E2E |
 | genkit-cli | ^1.28.0 | Thay stack AI bằng fetch/Zod; flow fixtures |
 
-## 9. Kiểm thử, số đo và giới hạn
+## 9. ✅ Kiểm thử, số đo và giới hạn
 
 Unit/component tách khỏi integration Node/Emulator. Regression đã thêm cho adapter, bảy flow, preferences, reducer, boundary và catalog parity; integration kiểm tra API concurrent/idempotency/auth/legacy cùng Rules. Playwright chạy app thật với Auth popup giả lập và AI fixture. Xem output chạy thực tế để biết pass/fail; file test tồn tại không chứng minh acceptance đã đầy đủ.
 
@@ -176,15 +176,15 @@ Live smoke từng trả AI-INVALID-RESPONSE, sau đó quiz/chat riêng và smoke
 
 ---
 
-# Technical documentation · Shark Empti v1.15.1
+# 🛠️ Technical documentation · Shark Empti v1.15.1
 
 English below. This document describes the application architecture, technical contracts, configuration and maintenance practices.
 
-## 1. Scope and baseline
+## 1. 🎯 Scope and baseline
 
 The second pass starts from a worktree containing uncommitted first-pass changes. Do not attribute the entire git diff to this pass. Baseline includes Admin Forum/Arena APIs, model configuration, prompt improvements, next/font and earlier docs/lint changes. New work adds fetch/Zod transport, dependency upgrades, shared providers, reducer, idempotency, Rules hardening, tests/CI and bilingual fixes. Version1.15.1, URLs and data are retained; no production migration or model failover.
 
-## 2. Architecture and ownership
+## 2. 🏗️ Architecture and ownership
 
 The App Router server layout supplies fonts/CSS, AppPreferencesProvider and FirebaseClientProvider. Preferences own lang/theme, validate storage, update html.lang/dark and receive cross-tab storage events. useLanguageState/useThemeState read shared state. Root error UI does not require Firebase.
 
@@ -194,7 +194,7 @@ Home owns navigation/view, learningSessionReducer, history subscription and note
 
 Home memoizes history statistics and passes them to Dashboard. Dashboard/playground use dynamic imports. Translated labels still participate in part of statistics computation: numeric data is not fully separated yet. Do not claim locale changes never recompute statistics.
 
-## 3. Data flow and compatible data
+## 3. 🔄 Data flow and compatible data
 
 Quiz: Setup → academic validation → generateQuestions → answers/timer → feedback → result → users/{uid}/history → dashboard. Ordinary Short Answer uses AI; numeric Arena uses normalized numeric answers. Changing VI/EN does not rewrite history.
 
@@ -217,7 +217,7 @@ New roadmap checks use localStorage `shark_roadmap_checks:{uid}` and validate th
 
 The `ui-copy.test.ts` AST check rejects static JSX text and title/placeholder/aria-label/alt outside explicit exceptions: brand/version, SHARK COINS, English, Tiếng Việt and UID. This does not prove all dynamic copy is translated; strings constructed in event handlers/prompts/exports still need separate review.
 
-## 4. API, authentication and idempotency
+## 4. 🔐 API, authentication and idempotency
 
 src/lib/server-api.ts centralizes Bearer verification, ApiError, apiFailure and receipt transactions. Route handlers parse payloads and enforce ownership after authentication; Admin bypasses Rules.
 
@@ -227,7 +227,7 @@ Receipt key = SHA256(scope, UID, requestId); fingerprint uses the parsed payload
 
 The contract locks duplicate submissions, creates a new ID for a new operation and reuses the original payload, including duration, after a lost response. Every start or retake path must preserve that distinction. Idempotency is not comprehensive Arena anti-cheat: business rules still allow rewarded retakes; there is no trusted exam timer or answer secrecy.
 
-## 5. Rules and error handling
+## 5. 🛡️ Rules and error handling
 
 Post creation requires self author, zero counters and empty likedBy. Author updates allow only title/content/subject/updatedAt; comment updates only content/updatedAt. Likes enforce the correct UID delta and no duplicate likedBy entries. Authors cannot bypass counter/like checks. Comment create/delete and Arena attempts use Admin APIs. Arena creation requires totalAttempts0; updates allow only title/config/questions.
 
@@ -237,7 +237,7 @@ Route error.tsx and global-error.tsx use Next16 retry. Local ErrorBoundary wraps
 
 Safe codes are translated through i18n/errors and error-toast. Toast diagnostics allow only `httpStatus`, `providerCode`, `retryAfterSeconds`, `operation`, `attemptedModels` and `lastFailure`. When the adapter exhausts fallback, it returns `AI-FALLBACK-EXHAUSTED` with an attempted-model count and final failure code; it never returns a model name, raw provider payload, prompt, stack or secret. FirestorePermissionError remains a compatibility export; internally cause distinguishes permission/unavailable/auth/not-found/generic instead of treating everything as permission. Call sites without cause receive a generic error.
 
-## 6. AI transport, prompts and Focus Shield
+## 6. 🤖 AI transport, prompts and Focus Shield
 
 Seven public flows preserve function names, input/output and AppResult: academic-validation, generate-questions, generate-flashcards, generate-practice, short-answer-analysis, personalized-quiz-feedback, ai-coaching-chatbot. Zod parses inputs; the adapter shares the Inkling → Gemma → Nemotron fallback and always validates responses with Zod. Gemma receives native JSON Schema; Inkling/Nemotron receive a JSON-only contract so no unsupported `response_format` is sent according to their advertised metadata. There is no replacement framework or key rotation.
 
@@ -247,7 +247,7 @@ CONFIGURATION.md details timeout/retries/environment. Unit fixtures never call e
 
 Focus Shield imports TensorFlow types at module scope; runtime import() occurs only in loadModel after enabling. Turbopack dev may send a small async-loader manifest earlier; it is not the runtime/model. generationRef rejects late models/streams; startingRef prevents concurrent initialization. Stop/unmount disposes the model, stops tracks and cancels animation frames. tf.tidy releases tensors; inference is throttled800ms. Real camera, denied permission, model failure and cleanup need separately recorded validation.
 
-## 7. Bilingual content and maintenance
+## 7. 🌐 Bilingual content and maintenance
 
 translations.ts retains domain catalogs; i18n/common.ts and errors.ts add shared UI/error catalogs, accessed through typed UiText for common content. i18n/ui.ts centralizes 89 previously inline UI message locations with feature-prefixed keys; i18n/index.ts exposes messages/uiMessage. LaTeX snippets use their own catalog. Static JSX text checks do not replace dynamic-content review. Parity tests compare keys and interpolation in VI/EN. Shark Empti/Shark Guru brands, error codes, model names, scientific/LaTeX notation and user content are not automatically translated. Locale changes do not call AI to translate history.
 
@@ -258,7 +258,7 @@ Add subscription: one owner, reset on key changes, unsubscribe and reject stale 
 Add test: unit/components in tests, Node integration in tests/integration; Rules only through Emulator. E2E uses demo project and localhost AI fixtures, never production credentials.
 Upgrade dependency: inspect engines/peers, upgrade by group, install without force, run relevant suites and update lockfile plus inventory below. ESLint set-state-in-effect is currently disabled for browser-state/subscription initialization; purity/static-components/exhaustive-deps stay enabled.
 
-## 8. Direct dependency inventory
+## 8. 📦 Direct dependency inventory
 
 Baseline values are manifest ranges, not reconstructed installed versions. Targets are exact lockfile resolutions for this pass.
 
@@ -335,7 +335,7 @@ Baseline values are manifest ranges, not reconstructed installed versions. Targe
 | react-hook-form | ^7.54.2 | No consumers reachable from route roots; removed wrappers; build/E2E |
 | genkit-cli | ^1.28.0 | Replaced AI stack with fetch/Zod; flow fixtures |
 
-## 9. Tests, measurements and limitations
+## 9. ✅ Tests, measurements and limitations
 
 Unit/components are separate from Node/Emulator integration. Added regressions cover the adapter, seven flows, preferences, reducer, boundary and catalog parity; integration covers concurrent/idempotent APIs, auth/legacy and Rules. Playwright runs the real app with an emulated Auth popup and AI fixture. Actual execution output determines pass/fail; test files alone do not prove complete acceptance.
 
