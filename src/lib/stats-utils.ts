@@ -1,11 +1,11 @@
 import {
-  QuizHistoryItem,
-  CognitiveMetrics,
-  Language,
+CognitiveMetrics,
+Language,
+QuizHistoryItem,
 } from "./types";
 
-import { TranslationSet } from "./translations";
 import { uiMessage } from './i18n';
+import { TranslationSet } from "./translations";
 
 export interface DashboardStats {
   totalAttempts: number;

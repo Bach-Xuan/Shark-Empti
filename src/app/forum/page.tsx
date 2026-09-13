@@ -1,8 +1,12 @@
-"use client";
+'use client';
 import { useLanguageState,useThemeState } from '@/components/app-preferences';
+import { PageControls } from '@/components/page-controls';
 import { UiText } from "@/components/ui-text";
-import { formatStoredDate } from '@/lib/date-format';
+import { usePagedCollection } from '@/hooks/use-paged-collection';
+import { formatForumDate } from '@/lib/date-format';
 import { uiMessage } from '@/lib/i18n';
+import { subjectOptions } from '@/lib/subjects';
+import { useMemo as usePageMemo } from 'react';
 
 import ActivityCalendar from '@/components/activity-calendar';
 import FeatureHelp from '@/components/feature-help';
@@ -60,7 +64,6 @@ collection,
 deleteDoc,
 doc,
 increment,
-onSnapshot,
 orderBy,
 query,
 serverTimestamp,
@@ -82,20 +85,22 @@ Star,
 Trash2
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import React,{ useEffect,useMemo,useRef,useState } from 'react';
+import React,{ useMemo,useRef,useState } from 'react';
 
 import { LatexQuickToolbar } from '@/components/latex-toolbar';
+import { useMutation } from '@/hooks/use-mutation';
 
 export default function ForumPage() {
-  const { user } = useUser();
+  const { user, loading: authLoading } = useUser();
   const db = useFirestore();
+  const mutation = useMutation();
   const router = useRouter();
   const { toast } = useToast();
 
   const [lang, setLang] = useLanguageState();
   const [theme, setTheme] = useThemeState();
-  const [posts, setPosts] = useState<ForumPost[]>([]);
-  const [loading, setLoading] = useState(true);
+
+
   const [sortType, setSortType] = useState<'newest' | 'oldest' | 'mostLiked'>('newest');
   const [filterSubject, setFilterSubject] = useState<string>('all');
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -113,46 +118,13 @@ export default function ForumPage() {
   const { notes: personalNotes, updateNotes: onNotesChange } = useUserNotes();
 
 
-  useEffect(() => {
-    if (!db) return;
-    setLoading(true);
-    const postsRef = collection(db, 'posts');
-
-    let q;
-    if (sortType === 'newest') q = query(postsRef, orderBy('createdAt', 'desc'));
-    else if (sortType === 'oldest') q = query(postsRef, orderBy('createdAt', 'asc'));
-    else if (sortType === 'mostLiked') q = query(postsRef, orderBy('likesCount', 'desc'), orderBy('createdAt', 'desc'));
-    else q = query(postsRef, orderBy('createdAt', 'desc'));
-
-    const unsubscribe = onSnapshot(q,
-      (snapshot) => {
-        const postsData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as ForumPost[];
-        setPosts(postsData);
-        setLoading(false);
-      },
-      async () => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'posts', operation: 'list' }));
-        setLoading(false);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [db, sortType]);
+  const source = usePageMemo(() => db ? query(collection(db, 'posts'), ...(sortType === 'mostLiked' ? [orderBy('likesCount', 'desc'), orderBy('createdAt', 'desc')] : [orderBy('createdAt', sortType === 'oldest' ? 'asc' : 'desc')])) : null, [db, sortType]);
+  const page = usePagedCollection<ForumPost>(source, (id, data) => ({ ...data, id } as ForumPost));
+  const { items: posts, loading } = page;
 
   const t: TranslationSet = translations[lang];
 
-  const subjectsList = [
-    { id: 'literature', label: t.literature },
-    { id: 'math', label: t.math },
-    { id: 'physics', label: t.physics },
-    { id: 'chemistry', label: t.chemistry },
-    { id: 'biology', label: t.biology },
-    { id: 'english', label: t.english },
-    { id: 'other', label: t.other }
-  ];
+  const subjectsList = subjectOptions(t);
 
   const filteredPosts = useMemo(() => {
     let result = posts;
@@ -217,7 +189,7 @@ export default function ForumPage() {
     }
   };
 
-  const handleUpdatePost = () => {
+  const handleUpdatePost = async () => {
     if (!user || !db || !editingPost) return;
     if (!newTitle.trim() || !newContent.trim()) return;
 
@@ -229,32 +201,31 @@ export default function ForumPage() {
       updatedAt: serverTimestamp()
     };
 
-    setEditingPost(null);
-    updateDoc(postRef, updateData)
-      .then(() => {
+    const result = await mutation.run(() => updateDoc(postRef, updateData), cause => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'update', requestResourceData: updateData }, cause));
+    });
+    if (result.ok) { setEditingPost(null);
         toast({ title: uiMessage(lang, "forum.updated_successfully") });
         setNewTitle("");
         setNewContent("");
         setNewSubject("other");
-      })
-      .catch(async () => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'update', requestResourceData: updateData }));
-      });
+
+    }
+    return result;
   };
 
-  const handleDeletePost = () => {
+  const handleDeletePost = async () => {
     if (!user || !db || !postToDelete) return;
 
     const postRef = doc(db, 'posts', postToDelete.id);
-    setPostToDelete(null);
-
-    deleteDoc(postRef)
-      .then(() => {
+    const result = await mutation.run(() => deleteDoc(postRef), cause => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'delete' }, cause));
+    });
+    if (result.ok) { setPostToDelete(null);
         toast({ title: uiMessage(lang, "forum.post_deleted") });
-      })
-      .catch(async () => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'delete' }));
-      });
+
+    }
+    return result;
   };
 
   const insertLatex = (target: 'title' | 'content', type: 'inline' | 'block') => {
@@ -293,10 +264,7 @@ export default function ForumPage() {
     });
   };
 
-  const formatDate = (post: ForumPost) => {
-    const formatted = formatStoredDate(post.createdAt, lang);
-    return post.updatedAt ? `${formatted} (${t.edited})` : formatted;
-  };
+
 
   const getSortLabel = () => {
     if (sortType === 'newest') return t.newest;
@@ -348,6 +316,7 @@ export default function ForumPage() {
       </div>
 
       <main className="flex-1 main-container pt-24 md:pt-36 space-y-6 md:space-y-10 pb-20 px-2 sm:px-4">
+      <PageControls lang={lang} {...page} />
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6 border-b-[3px] md:border-b-[5px] border-border/30 pb-6 md:pb-8">
           <div className="space-y-1">
             <h1 className="text-2xl sm:text-4xl md:text-7xl font-headline font-black text-primary uppercase tracking-tighter flex items-center gap-2.5 md:gap-4">
@@ -405,10 +374,10 @@ export default function ForumPage() {
             </DropdownMenu>
 
             <Dialog open={isCreateDialogOpen} onOpenChange={open => { if (!publishing.current) setIsCreateDialogOpen(open); }}>
-              <Button onClick={() => setIsCreateDialogOpen(true)} className="btn-duo h-9 md:h-12 px-3 md:px-6 rounded-xl md:rounded-2xl bg-primary text-white border-[2px] md:border-[3px] border-primary/20 font-black uppercase text-[9px] md:text-xs tracking-widest gap-1.5">
+              <Button disabled={authLoading} onClick={() => setIsCreateDialogOpen(true)} className="btn-duo h-9 md:h-12 px-3 md:px-6 rounded-xl md:rounded-2xl bg-primary text-white border-[2px] md:border-[3px] border-primary/20 font-black uppercase text-[9px] md:text-xs tracking-widest gap-1.5">
                 <Plus className="w-3.5 h-3.5 md:w-5 md:h-5" /> {t.createPost}
               </Button>
-              <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto rounded-[1.5rem] md:rounded-[2.5rem] border-[3px] md:border-[4px] border-border shadow-2xl p-5 md:p-8 bg-card animate-in zoom-in-95 duration-300 custom-scrollbar">
+              <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto rounded-[1.5rem] md:rounded-[2.5rem] border-[3px] md:border-[4px] border-border shadow-2xl p-5 md:p-8 bg-card animate-in zoom-in-95 duration-300 custom-scrollbar"><fieldset disabled={mutation.pending} className="contents">
                 <DialogHeader>
                   <DialogTitle className="text-xl md:text-3xl font-headline font-black text-primary uppercase tracking-tight text-left">
                     {t.createPost.toUpperCase()}
@@ -480,7 +449,7 @@ export default function ForumPage() {
                     {t.publish}
                   </Button>
                 </fieldset>
-              </DialogContent>
+              </fieldset></DialogContent>
             </Dialog>
           </div>
         </div>
@@ -540,7 +509,7 @@ export default function ForumPage() {
                         onClick={(e) => e.stopPropagation()}
                       >
                         <span className="text-[6px] md:text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-0.5 md:gap-1">
-                          <Clock className="w-2 md:w-3 h-2 md:h-3" /> {formatDate(post)}
+                          <Clock className="w-2 md:w-3 h-2 md:h-3" /> {formatForumDate(post, lang, t.edited)}
                         </span>
                         {user?.uid === post.authorId && (
                           <DropdownMenu modal={false}>
@@ -611,8 +580,8 @@ export default function ForumPage() {
       </main>
 
       {/* Edit Dialog */}
-      <Dialog open={!!editingPost} onOpenChange={(open) => !open && setEditingPost(null)}>
-        <DialogContent className="max-w-4xl w-[95vw] rounded-[1.5rem] md:rounded-[2.5rem] border-[3px] md:border-[4px] shadow-2xl p-5 md:p-10 bg-card overflow-y-auto max-h-[90vh]">
+      <Dialog open={!!editingPost} onOpenChange={(open) => { if (!open && !mutation.isPending()) setEditingPost(null); }}>
+        <DialogContent className="max-w-4xl w-[95vw] rounded-[1.5rem] md:rounded-[2.5rem] border-[3px] md:border-[4px] shadow-2xl p-5 md:p-10 bg-card overflow-y-auto max-h-[90vh]"><fieldset disabled={mutation.pending} className="contents">
           <DialogHeader>
             <DialogTitle className="text-xl md:text-3xl font-headline font-black text-primary uppercase tracking-tight text-left">
               {t.edit.toUpperCase()}
@@ -673,14 +642,14 @@ export default function ForumPage() {
 
             <div className="flex gap-3 pt-4">
               <Button variant="ghost" onClick={() => setEditingPost(null)} className="btn-duo flex-1 h-12 md:h-14 rounded-xl font-black uppercase text-[10px] md:text-xs tracking-widest bg-card">{t.cancel}</Button>
-              <Button onClick={handleUpdatePost} className="btn-duo flex-1 h-12 md:h-14 rounded-xl bg-primary text-white font-black uppercase text-[10px] md:text-xs tracking-widest border-2 md:border-[3px] border-primary/20">{t.update}</Button>
+              <Button disabled={mutation.pending} onClick={handleUpdatePost} className="btn-duo flex-1 h-12 md:h-14 rounded-xl bg-primary text-white font-black uppercase text-[10px] md:text-xs tracking-widest border-2 md:border-[3px] border-primary/20">{t.update}</Button>
             </div>
           </div>
-        </DialogContent>
+        </fieldset></DialogContent>
       </Dialog>
 
       {/* Delete Alert Dialog */}
-      <AlertDialog open={!!postToDelete} onOpenChange={(open) => !open && setPostToDelete(null)}>
+      <AlertDialog open={!!postToDelete} onOpenChange={(open) => { if (!open && !mutation.isPending()) setPostToDelete(null); }}>
         <AlertDialogContent className="rounded-[1.5rem] md:rounded-[2rem] border-[3px] md:border-[4px] shadow-2xl p-6 md:p-8 max-w-[90vw] md:max-w-md bg-card">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl md:text-2xl font-headline font-black text-destructive uppercase tracking-tight">{t.delete.toUpperCase()}?</AlertDialogTitle>
@@ -688,7 +657,7 @@ export default function ForumPage() {
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-6 md:mt-8 flex flex-row gap-3">
             <AlertDialogCancel className="btn-duo flex-1 h-11 md:h-12 rounded-xl font-black uppercase text-[10px] md:text-xs tracking-widest m-0 bg-card">{t.cancel}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeletePost} className="btn-duo flex-1 h-11 md:h-12 rounded-xl bg-destructive text-white font-black uppercase text-[10px] md:text-xs tracking-widest border-2 md:border-[3px] border-destructive/20 m-0 min-w-[80px] flex items-center justify-center px-4 md:px-8">
+            <AlertDialogAction disabled={mutation.pending} onClick={handleDeletePost} className="btn-duo flex-1 h-11 md:h-12 rounded-xl bg-destructive text-white font-black uppercase text-[10px] md:text-xs tracking-widest border-2 md:border-[3px] border-destructive/20 m-0 min-w-[80px] flex items-center justify-center px-4 md:px-8">
               {t.delete.toUpperCase()}
             </AlertDialogAction>
           </AlertDialogFooter>

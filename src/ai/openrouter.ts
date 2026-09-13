@@ -1,7 +1,7 @@
+import { createAppError,getAiAppError,OpenRouterProviderError } from '@/lib/app-error';
 import 'server-only';
 import { z } from 'zod';
-import { createAppError, getAiAppError, OpenRouterProviderError } from '@/lib/app-error';
-import { LAST_RESORT_OPENROUTER_MODEL, modelsWithNativeStructuredOutput, OPENROUTER_MODEL_PRIORITY, type OpenRouterModel } from './config/model';
+import { LAST_RESORT_OPENROUTER_MODEL,modelsWithNativeStructuredOutput,OPENROUTER_MODEL_PRIORITY,type OpenRouterModel } from './config/model';
 
 type Message = { role: 'user' | 'assistant'; content: string };
 const pause = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));
@@ -56,7 +56,13 @@ async function requestStructured<T>(model: OpenRouterModel, { system, prompt, sc
   let endpoint = 'https://openrouter.ai/api/v1/chat/completions';
   if (process.env.OPENROUTER_TEST_URL) {
     const url = new URL(process.env.OPENROUTER_TEST_URL);
-    if (process.env.NODE_ENV === 'production' || !process.env.FIRESTORE_EMULATOR_HOST || !process.env.GCLOUD_PROJECT?.startsWith('demo-') || !['127.0.0.1', 'localhost'].includes(url.hostname)) throw failure('AI-CONFIG-MISSING');
+    const localHost = (value: string | undefined) => !!value && /^(?:127\.0\.0\.1|localhost):\d+$/.test(value);
+    const isolatedProductionTest = process.env.SHARK_EMULATOR_TEST_MODE === 'true'
+      && process.env.NEXT_PUBLIC_USE_EMULATORS === 'true' && apiKey === 'test-only'
+      && localHost(process.env.FIRESTORE_EMULATOR_HOST) && localHost(process.env.FIREBASE_AUTH_EMULATOR_HOST);
+    if ((process.env.NODE_ENV === 'production' && !isolatedProductionTest)
+      || !process.env.FIRESTORE_EMULATOR_HOST || !process.env.GCLOUD_PROJECT?.startsWith('demo-')
+      || !['127.0.0.1', 'localhost'].includes(url.hostname) || url.protocol !== 'http:' || url.username || url.password) throw failure('AI-CONFIG-MISSING');
     endpoint = url.toString();
   }
   const body = {

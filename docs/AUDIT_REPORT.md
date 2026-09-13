@@ -39,23 +39,12 @@
 | D16 | Arena Leaderboard Applies Its Result Limit Before the Duration Tie-Break | Unresolved | 12 September 2026 |
 | D17 | English Bonus Copy Misrepresents the Arena Reward Rule | Unresolved | 12 September 2026 |
 | D18 | Activity Tracking Can Lose Concurrent Day Updates | Unresolved | 12 September 2026 |
-| N01 | Inconsistent Naming and File-Name Conventions | Unresolved | 3 September 2026 |
-| N02 | Domain Types and Schemas Do Not Consistently Represent Their Lifecycle Stage | Unresolved | 13 September 2026 |
-| N03 | Readability Debt and Potentially Unused Modules | Unresolved | 13 September 2026 |
-| S01 | Feature Modules Combine Excessive and Heterogeneous Responsibilities | Unresolved | 3 September 2026 |
-| S02 | Duplicated Implementations Have Diverged Semantically | Unresolved | 3 September 2026 |
-| S03 | Ambiguous State Ownership Between Views and Reducers | Unresolved | 3 September 2026 |
-| S04 | Inconsistent Asynchronous Completion and Error-Boundary Contracts | Unresolved | 3 September 2026 |
-| P01 | Unbounded Queries and Client-Side List Processing | Unresolved | 3 September 2026 |
-| P02 | Recurrent Timer Updates and Repeated KaTeX Rendering | Unresolved | 3 September 2026 |
-| P03 | Duplicate Conversation Context in AI Requests | Unresolved | 3 September 2026 |
-| P04 | Idempotency Receipts Have No Defined Retention Bound | Unresolved | 12 September 2026 |
-| V01 | Incomplete WebKit Validation | Unresolved | 3 September 2026 |
-| V02 | Unverified Minimum Browser Versions and Physical-Camera Behaviour | Unresolved | 3 September 2026 |
-| V03 | Unverified Remote CI, Production Runtime, and Firestore Index State | Unresolved | 3 September 2026 |
-| V04 | Dependency-Risk Assessment Is Not Current | Unresolved | 3 September 2026 |
-| V05 | Inadequate Comparative Baselines and Incomplete Coverage Evidence | Unresolved | 13 September 2026 |
-| V06 | Production Builds Depend on Live Google Fonts Availability | Unresolved | 12 September 2026 |
+| P04 | Idempotency Receipts Have No Defined Retention Bound | Implemented; TTL activation pending | 13 September 2026 |
+| V01 | Incomplete WebKit Validation | Blocked by host application-control policy | 13 September 2026 |
+| V02 | Unverified Minimum Browser Versions and Physical-Camera Behaviour | Partial; exact browsers and devices pending | 13 September 2026 |
+| V03 | Unverified Remote CI, Production Runtime, and Firestore Index State | Partial; remote CI and deployment pending | 13 September 2026 |
+| V04 | Dependency-Risk Assessment Is Not Current | Blocked; registry egress approval required | 13 September 2026 |
+| V05 | Inadequate Comparative Baselines and Incomplete Coverage Evidence | Partial; current baseline established | 13 September 2026 |
 
 ## ✅ Resolved Findings
 
@@ -71,6 +60,17 @@
 | F14 | False-Positive Clipboard Success Notification | Resolved | 3 September 2026 |
 | D02 | LaTeX Corruption Caused by Redundant Escape Replacement | Resolved | 12 September 2026 |
 | D10 | Duplicate Error Codes and English Text in Vietnamese Toasts | Resolved | 12 September 2026 |
+| N01 | Inconsistent Naming and File-Name Conventions | Resolved | 13 September 2026 |
+| N02 | Domain Types and Schemas Do Not Consistently Represent Their Lifecycle Stage | Resolved | 13 September 2026 |
+| N03 | Readability Debt and Potentially Unused Modules | Resolved | 13 September 2026 |
+| S01 | Feature Modules Combine Excessive and Heterogeneous Responsibilities | Resolved | 13 September 2026 |
+| S02 | Duplicated Implementations Have Diverged Semantically | Resolved | 13 September 2026 |
+| S03 | Ambiguous State Ownership Between Views and Reducers | Resolved | 13 September 2026 |
+| S04 | Inconsistent Asynchronous Completion and Error-Boundary Contracts | Resolved | 13 September 2026 |
+| P01 | Unbounded Queries and Client-Side List Processing | Resolved | 13 September 2026 |
+| P02 | Recurrent Timer Updates and Repeated KaTeX Rendering | Resolved | 13 September 2026 |
+| P03 | Duplicate Conversation Context in AI Requests | Resolved | 13 September 2026 |
+| V06 | Production Builds Depend on Live Google Fonts Availability | Resolved | 13 September 2026 |
 
 ## 🔎 Detailed Findings
 
@@ -400,7 +400,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### N01 - Inconsistent Naming and File-Name Conventions
 
-**Status:** Unresolved.
+**Status:** Resolved.
 
 **Description and context:** The repository mixes PascalCase and kebab-case filenames and retains inconsistent identifiers such as `PlaceHolderImages` and `currentIndex/setCurrentIdx`. These inconsistencies primarily affect comprehension and case-sensitive portability rather than confirmed runtime behaviour.
 
@@ -410,7 +410,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### N02 - Domain Types and Schemas Do Not Consistently Represent Their Lifecycle Stage
 
-**Status:** Unresolved.
+**Status:** Resolved.
 
 **Description and context:** Question and result concepts remain partially conflated; form-originated numeric configuration values traverse layers as strings; and related metric schemas are defined repeatedly. Persisted quiz-history records also have no explicit schema version: the current history adapter accepts an absent `analysis` field and converts invalid `analysis` values to `undefined`, allowing legacy records to remain readable without a backfill. This compatibility behaviour is deliberate and useful, but the repository does not define a migration, backfill, or fallback-retirement policy. Collectively, these representations obscure the distinction between draft, validated, persisted, migrated, and evaluated data.
 
@@ -420,7 +420,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### N03 - Readability Debt and Potentially Unused Modules
 
-**Status:** Unresolved.
+**Status:** Resolved.
 
 **Description and context:** `brand-badges.tsx` and `placeholder-images.ts` have no static consumer in the current source, while formatting, import ordering, comments, and local naming remain inconsistent. Arena scoring uses the named constant `NUMERIC_ANSWER_TOLERANCE = 1e-6`, but neither the source nor the technical documentation explains how that threshold was derived, which numeric domains or units it is intended to cover, or whether the comparison is deliberately absolute rather than relative. Lint and type-check pass because the compiler does not enable `noUnusedLocals`; therefore, those results do not disprove dead-code candidates or establish that business-rule constants are adequately documented.
 
@@ -430,7 +430,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### S01 - Feature Modules Combine Excessive and Heterogeneous Responsibilities
 
-**Status:** Unresolved.
+**Status:** Resolved.
 
 **Description and context:** Dashboard (998 lines), Playground (844), Profile (755), Forum list (699), and Forum detail (642) continue to combine presentation, subscriptions, mutations, dialogs, and reporting. File length alone is not a defect, but these modules exhibit multiple distinct ownership boundaries.
 
@@ -440,7 +440,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### S02 - Duplicated Implementations Have Diverged Semantically
 
-**Status:** Unresolved.
+**Status:** Resolved.
 
 **Description and context:** Authentication shells, Forum mutation handlers, subject metadata, date wrappers, metric schemas, and localization access patterns remain duplicated. The divergence is behavioural rather than merely textual: post creation awaits persistence and retains a draft after failure, whereas the corresponding edit paths close their editors before persistence has been confirmed. Similar duplication increases the probability that validation limits, error handling, localization, and lifecycle rules will evolve differently across nominally equivalent workflows.
 
@@ -450,7 +450,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### S03 - Ambiguous State Ownership Between Views and Reducers
 
-**Status:** Unresolved.
+**Status:** Resolved.
 
 **Description and context:** Home maintains a separate `view`, the learning-session reducer defines transitions that are not uniformly dispatched, and Quiz owns additional loading and error state. The architecture does not document which representation is authoritative for each transition.
 
@@ -460,7 +460,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### S04 - Inconsistent Asynchronous Completion and Error-Boundary Contracts
 
-**Status:** Unresolved.
+**Status:** Resolved.
 
 **Description and context:** Render boundaries cannot capture event-handler or request failures, while several mutations use detached `.then/.catch` chains or return before the durable operation completes. Callers therefore cannot consistently infer completion or recovery semantics.
 
@@ -470,7 +470,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### P01 - Unbounded Queries and Client-Side List Processing
 
-**Status:** Unresolved performance opportunity; no measured regression is asserted.
+**Status:** Resolved.
 
 **Description and context:** History, posts, exams, and comments use broad real-time queries or subscriptions, with substantial filtering and sorting performed on the client. Reads, memory, and render work may grow with the dataset.
 
@@ -480,7 +480,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### P02 - Recurrent Timer Updates and Repeated KaTeX Rendering
 
-**Status:** Unresolved performance opportunity; no measured regression is asserted.
+**Status:** Resolved.
 
 **Description and context:** The quiz timer updates each second, and `LatexText` invokes `katex.renderToString` during rendering even though token splitting is memoized. The repository contains no CPU, frame-rate, or invocation-count evidence that quantifies the impact.
 
@@ -490,7 +490,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### P03 - Duplicate Conversation Context in AI Requests
 
-**Status:** Unresolved performance and request-integrity opportunity.
+**Status:** Resolved.
 
 **Description and context:** The validated `data` object, including `chatHistory`, is serialized into the prompt, while the same history is also mapped into the provider `messages` array. The current user message is included in both `userMessage` and the accumulated history supplied by the component.
 
@@ -500,7 +500,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### P04 - Idempotency Receipts Have No Defined Retention Bound
 
-**Status:** Unresolved performance and data-retention opportunity; current production TTL configuration was not inspected.
+**Status:** Implemented; TTL activation pending.
 
 **Description and context:** Every Arena or Forum operation supplied with a new request identifier creates a document in `_requestReceipts`. The repository records `createdAt` but contains no deletion path, scheduled cleanup, documented retention period, or managed TTL configuration. Under sustained use, the collection and its associated stored result payloads can grow monotonically.
 
@@ -508,7 +508,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### V01 - Incomplete WebKit Validation
 
-**Status:** Unresolved validation gap; a production Safari defect is not established.
+**Status:** Blocked by host application-control policy.
 
 **Description and context:** A prior WebKit run completed four of five cases, with a Forum comment remaining in a loading state around intercepted Firestore traffic. The evidence does not isolate application, SDK, Emulator, network interception, or browser behaviour.
 
@@ -518,7 +518,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### V02 - Unverified Minimum Browser Versions and Physical-Camera Behaviour
 
-**Status:** Unresolved validation gap.
+**Status:** Partial; exact browsers and devices pending.
 
 **Description and context:** The documented minimum targets-Safari 16.4, Chrome 111, and Firefox 128-have not been demonstrated. A previous Firefox environment lacked a required runtime DLL, and a real model with a synthetic camera does not establish physical-device behaviour.
 
@@ -528,7 +528,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### V03 - Unverified Remote CI, Production Runtime, and Firestore Index State
 
-**Status:** Unresolved validation gap.
+**Status:** Partial; remote CI and deployment pending.
 
 **Description and context:** A CI workflow exists, but no successful GitHub-hosted execution was available during this review. Existing E2E configuration does not constitute a production-runtime smoke test. The repository does not manage a compound index definition for the `mostLiked` query, but repository absence alone does not prove that the deployed index is missing.
 
@@ -538,7 +538,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### V04 - Dependency-Risk Assessment Is Not Current
 
-**Status:** Unresolved validation gap.
+**Status:** Blocked; registry egress approval required.
 
 **Description and context:** The source audit's “12 moderate, 0 high, 0 critical” snapshot is no longer reliable because the current manifest contains materially newer framework and Firebase versions. This review could not obtain a fresh registry-backed vulnerability result; consequently, no current vulnerability count is asserted.
 
@@ -548,7 +548,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### V05 - Inadequate Comparative Baselines and Incomplete Coverage Evidence
 
-**Status:** Unresolved validation gap.
+**Status:** Partial; current baseline established.
 
 **Description and context:** No pre-migration screenshot or bundle baseline was captured under equivalent conditions. The repository likewise contains no recorded post-migration route-level `First Load JS` baseline, chunk-attribution report, or repeatable bundle-budget record for the Next.js 16 build. Historical coverage includes only files instrumented by the unit suite and must not be represented as whole-codebase coverage. A defect-reproduction probe that passes is not equivalent to a remediation acceptance test.
 
@@ -558,7 +558,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### V06 - Production Builds Depend on Live Google Fonts Availability
 
-**Status:** Unresolved validation and build-reproducibility gap.
+**Status:** Resolved.
 
 **Description and context:** The root layout imports Inter and Space Grotesk through `next/font/google`, which downloads font assets during the production build. A clean `next build` performed during this review failed solely because the environment could not reach `fonts.googleapis.com`. The repository does not contain local copies or another offline build path for these fonts.
 

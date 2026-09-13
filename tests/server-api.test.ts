@@ -1,13 +1,13 @@
 // @vitest-environment node
-import { afterEach, expect, it, vi } from 'vitest';
+import { AdminConfigurationError } from '@/lib/firebase-admin';
+import { apiFailure,authenticatedUser } from '@/lib/server-api';
+import { afterEach,expect,it,vi } from 'vitest';
 vi.mock('server-only', () => ({}));
 const mocks = vi.hoisted(() => ({ auth: vi.fn() }));
 vi.mock('@/lib/firebase-admin', () => ({
   AdminConfigurationError: class extends Error {},
   getAdminAuth: mocks.auth, getAdminDb: vi.fn(),
 }));
-import { AdminConfigurationError } from '@/lib/firebase-admin';
-import { apiFailure, authenticatedUser } from '@/lib/server-api';
 afterEach(() => vi.clearAllMocks());
 it('rejects missing tokens before touching Admin configuration', async () => {
   await expect(authenticatedUser(new Request('http://localhost'))).rejects.toMatchObject({ code: 'AUTH-REQUIRED', status: 401 });

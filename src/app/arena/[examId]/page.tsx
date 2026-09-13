@@ -1,8 +1,8 @@
 "use client";
 import { useLanguageState,useThemeState } from '@/components/app-preferences';
+import { showUnexpectedErrorToast } from '@/lib/error-toast';
 import { uiMessage } from '@/lib/i18n';
 import { quizLabel } from '@/lib/quiz-labels';
-import { showUnexpectedErrorToast } from '@/lib/error-toast';
 
 import Navigation from '@/components/navigation';
 import QuizView from '@/components/quiz-view';
@@ -15,7 +15,7 @@ import { useFirestore,useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { isTrustedArenaExam } from '@/lib/arena-scoring';
 import { translations,TranslationSet } from '@/lib/translations';
-import { ArenaAttempt,ArenaExam,QuizHistoryItem,QuizAnalysis } from '@/lib/types';
+import { ArenaAttempt,ArenaExam,QuizAnalysis,QuizHistoryItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import {
 collection,
@@ -122,6 +122,7 @@ export default function ArenaDetailPage() {
 
       setLastResults(analysis ? { ...results, analysis } : results);
       setView('result');
+      return true;
     } catch (e) {
       toast({ variant: "destructive", title: uiMessage(lang, "arena.could_not_save_attempt_please_retry") });
       return false;

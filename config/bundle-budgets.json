@@ -1,0 +1,12 @@
+{
+  "basis": "Current production artifact measured 2026-09-13; 10 percent headroom rounded up to 1 KiB. Regression guard, not a user-performance target.",
+  "metric": "Sum of gzip bytes for unique script URLs in server HTML",
+  "routes": {
+    "/": 719872,
+    "/login": 493568,
+    "/register": 493568,
+    "/forum": 612352,
+    "/arena": 619520,
+    "/profile": 702464
+  }
+}

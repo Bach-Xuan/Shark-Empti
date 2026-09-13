@@ -1,9 +1,10 @@
-import 'server-only';
-import { createHash } from 'node:crypto';
-import { NextResponse } from 'next/server';
 import { type Transaction } from 'firebase-admin/firestore';
+import { NextResponse } from 'next/server';
+import { createHash } from 'node:crypto';
+import 'server-only';
 import { ZodError } from 'zod';
-import { getAdminAuth, getAdminDb, AdminConfigurationError } from './firebase-admin';
+import { AdminConfigurationError,getAdminAuth,getAdminDb } from './firebase-admin';
+import { receiptExpiry } from './receipt-retention';
 
 export class ApiError extends Error {
   constructor(public code: string, public status: number, message: string) { super(message); }
@@ -37,7 +38,7 @@ export async function idempotentTransaction<T extends object>(scope: string, uid
       }
     }
     const result = await operation(transaction);
-    if (receipt) transaction.create(receipt, { fingerprint, result, createdAt: new Date() });
+    if (receipt) transaction.create(receipt, { fingerprint, result, createdAt: new Date(), expiresAt: receiptExpiry(new Date()) });
     return result;
   });
 }

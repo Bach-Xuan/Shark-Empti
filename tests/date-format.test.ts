@@ -1,5 +1,5 @@
-import { expect, it } from 'vitest';
 import { formatStoredDate } from '@/lib/date-format';
+import { expect,it } from 'vitest';
 it('formats Timestamp and ISO inputs consistently in each locale', () => {
   const date = new Date('2026-09-03T12:00:00Z');
   const options = { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' } as const;

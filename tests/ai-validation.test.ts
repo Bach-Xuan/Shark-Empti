@@ -1,11 +1,11 @@
 // @vitest-environment node
-import { afterEach, expect, it, vi } from 'vitest';
-vi.mock('server-only', () => ({}));
+import { generateFlashcards } from '@/ai/flows/generate-flashcards-flow';
+import { generatePractice } from '@/ai/flows/generate-practice-flow';
 import { generateQuestions } from '@/ai/flows/generate-questions-flow';
 import { personalizedQuizPerformanceFeedback } from '@/ai/flows/personalized-quiz-feedback-flow';
-import { generatePractice } from '@/ai/flows/generate-practice-flow';
-import { generateFlashcards } from '@/ai/flows/generate-flashcards-flow';
-import { question, analysis } from './fixtures/quiz';
+import { afterEach,expect,it,vi } from 'vitest';
+import { analysis,question } from './fixtures/quiz';
+vi.mock('server-only', () => ({}));
 const input = { topic: 'Addition', numQuestions: 1, type: 'Multiple Choice', difficulty: 'Recognition', language: 'en' as const };
 function reply(output: unknown) {
   vi.stubEnv('OPENROUTER_API_KEY', 'fixture-only');

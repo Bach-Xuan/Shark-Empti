@@ -68,7 +68,7 @@ export default function FocusTrackerWidget() {
     pathname === "/login" ||
     pathname === "/register";
 
-  const [lang, setLang] = useLanguageState();
+  const [lang] = useLanguageState();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [isActive, setIsActive] = useState(false);
@@ -166,6 +166,7 @@ export default function FocusTrackerWidget() {
       return model;
     } catch (error) {
       if (generation !== generationRef.current) return null;
+      stopResources();
       console.error("Focus model error:", error);
       showUnexpectedErrorToast(
         "FOCUS-MODEL-LOAD-FAILED",
@@ -230,14 +231,18 @@ export default function FocusTrackerWidget() {
         else setStatus("no-person");
 
       } catch (error) {
-        console.error("Detection loop error:", error);
+        stopResources();
+        setIsActive(false);
+        showUnexpectedErrorToast("FOCUS-MODEL-LOAD-FAILED", "The focus model could not be loaded.", {}, lang);
+        setModelError(uiMessage(lang, "focus.ai_model_error_model_json_please_check"));
+        return;
       }
 
       requestRef.current = requestAnimationFrame(processFrame);
     };
 
     requestRef.current = requestAnimationFrame(processFrame);
-  }, [isActive]);
+  }, [isActive, lang, stopResources]);
 
   const toggleTracking = async () => {
     if (startingRef.current) { stopResources(); return; }
@@ -299,14 +304,16 @@ export default function FocusTrackerWidget() {
     if (isOpen && !isMinimized && isActive && streamRef.current && videoEl) {
       if (videoEl.srcObject !== streamRef.current) {
         videoEl.onloadedmetadata = () => {
-          videoEl.play().catch((err) => {
-            console.error("Video play() failed:", err);
+          videoEl.play().catch(() => {
+            stopResources();
+            setIsActive(false);
+            toast({ variant: "destructive", title: t.cameraErrorTitle, description: t.cameraErrorDesc });
           });
         };
         videoEl.srcObject = streamRef.current;
       }
     }
-  }, [isOpen, isMinimized, isActive]);
+  }, [isOpen, isMinimized, isActive, stopResources, toast, t.cameraErrorTitle, t.cameraErrorDesc]);
 
   if (isAuthPage) return null;
 

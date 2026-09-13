@@ -21,11 +21,7 @@ const QuizResultSchema = z.object({
   difficulty: z.string(),
 });
 
-const LanguageAnalysisSchema = z.object({
-  strengths: z.array(z.string()).describe('List of specific Highlights (Điểm nổi bật).'),
-  weaknesses: z.array(z.string()).describe('List of specific Areas for Improvement (Điểm cần cải thiện).'),
-  recommendations: z.array(z.string()).describe('List of actionable study recommendations.'),
-});
+import { cognitiveMetricsSchema,languageAnalysisSchema as LanguageAnalysisSchema } from '@/lib/analysis-schema';
 
 const PersonalizedQuizFeedbackInputSchema = z.object({
   quizResults: z.array(QuizResultSchema),
@@ -39,14 +35,7 @@ const PersonalizedQuizFeedbackOutputSchema = z.object({
   en: LanguageAnalysisSchema.describe('Feedback in English.'),
   vi: LanguageAnalysisSchema.describe('Feedback in Vietnamese.'),
   errorCategories: z.record(z.string(), z.number().int().nonnegative()).describe('Count of errors by category.'),
-  cognitiveMetrics: z.object({
-    conceptMastery: z.number().min(0).max(100),
-    applicationSkill: z.number().min(0).max(100),
-    problemDecomposition: z.number().min(0).max(100),
-    logicalReasoning: z.number().min(0).max(100),
-    errorAwareness: z.number().min(0).max(100),
-    instructionFollowing: z.number().min(0).max(100),
-  }).describe('Scores from 0-100 for each cognitive dimension.'),
+  cognitiveMetrics: cognitiveMetricsSchema.describe('Scores from 0-100 for each cognitive dimension.'),
 });
 export type PersonalizedQuizFeedbackOutput = z.infer<typeof PersonalizedQuizFeedbackOutputSchema>;
 

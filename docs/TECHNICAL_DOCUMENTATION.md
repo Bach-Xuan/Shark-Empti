@@ -17,6 +17,7 @@ This document describes the architecture and contracts of the current source. It
 | Firestore client authorization | `firestore.rules`, `firebase.json` |
 | Persisted-data readers | `src/lib/history-schema.ts`, `src/lib/profile-schema.ts` and consumers |
 | CI/test execution | `package.json#scripts`, `.github/workflows/ci.yml`, test configs |
+| Route-level script budgets | `config/bundle-budgets.json` |
 | Descriptive data map | `docs/backend.json`; not a validator |
 
 When documentation differs from an executable authority above, that authority determines current behavior and documentation must be updated in the same change. `backend.json` creates no collection, index, TTL, migration or access policy.
@@ -27,7 +28,7 @@ The application uses Next.js App Router. `src/app/layout.tsx` owns root HTML, fo
 
 `AppPreferencesProvider` owns language/theme state, validates local storage, updates `html.lang`/dark class and synchronizes storage events across tabs. `FirebaseProvider` owns one `onAuthStateChanged`; the private subtree is keyed by UID or anonymous so account changes reset private state. Preferences remain outside that subtree.
 
-Home owns navigation view, `learningSessionReducer`, history subscription and notes hook. Quiz still owns answers, timer, feedback, loading and pending state. Ownership is not completely unified across view state, reducer state and component-local state; each asynchronous boundary must control late completion.
+Home owns the non-session navigation section. `useLearningSession` owns reducer transitions, stable save IDs and durable completion; `useHistory` owns the paged history source. Quiz owns answers, timer, generation/feedback UI and retries. Navigation reset/unmount invalidates late completions.
 
 Dashboard and Playground are dynamically imported. TensorFlow.js runtime/model load only when Focus Shield is enabled. Root `error.tsx`/`global-error.tsx` and local `ErrorBoundary` handle render failure only; event, request, subscription, camera and clipboard failures must be caught at their source.
 
@@ -52,7 +53,7 @@ Playground generates and saves flashcard/practice sessions in user subcollection
 | Path | Principal data | Current access |
 |---|---|---|
 | `users/{uid}` | `displayName`, `email`, `photoURL`, `bio`, `sharkCoins`, timestamps | Signed-in reads; owner writes except `sharkCoins`; Admin may increment coins |
-| `users/{uid}/history/{id}` | `userId`, `config`, `quizResults`, `totalTime`, optional `analysis`, ISO `date`, `lang` | Owner read/write |
+| `users/{uid}/history/{id}` | `userId`, `schemaVersion`, `config`, `quizResults`, `totalTime`, optional `analysis`, ISO `date`, `lang` | Owner read/write |
 | `users/{uid}/notes/main` | `content`, `updatedAt` | Owner read/write |
 | `users/{uid}/activity/main` | `activeDays`, `updatedAt` | Owner read/write |
 | `users/{uid}/flashcards/{id}` | source, cards, ISO `createdAt` | Owner read/write |
@@ -61,7 +62,7 @@ Playground generates and saves flashcard/practice sessions in user subcollection
 | `posts/{postId}/comments/{commentId}` | comment, author, likes, timestamps | Public read; Admin create/delete; constrained client edit/like |
 | `arenaExams/{examId}` | title, config, questions, author, `totalAttempts` | Public read; constrained author create/update/delete |
 | `arenaExams/{examId}/attempts/{attemptId}` | user, score, duration, timestamp | Public read; Admin create only |
-| `_requestReceipts/{hash}` | fingerprint, result, createdAt | Admin-only; no client grant |
+| `_requestReceipts/{hash}` | fingerprint, result, createdAt, expiresAt | Admin-only; no client grant |
 
 The `users/{uid}/history` reader uses Zod with defaults for selected legacy omissions; records with corrupt core shape are excluded from the view rather than modified/deleted. The profile reader also normalizes selected missing fields. Forum/Arena boundaries still contain direct casts and are not schema-validated merely because TypeScript compiles.
 
@@ -76,10 +77,10 @@ The `users/{uid}/history` reader uses Zod with defaults for selected legacy omis
 
 ### 3.3. ⚠️ Known Persistence Limitations
 
-- History and Playground contain writes that are not fully awaited; failures can arrive after the UI advances.
+- Quiz and practice await stable-ID saves before completion. Flashcard archival is awaited but failure leaves generated cards usable with an error notice.
 - An object containing nested `undefined` can be rejected by Firestore.
 - Post deletion does not cascade comments; orphan comments remain publicly readable under current Rules.
-- `_requestReceipts` has `createdAt` but no repository-managed TTL/deletion path.
+- New receipts have seven-day `expiresAt`; managed TTL is declared in `firestore.indexes.json` but must be activated. `scripts/receipt-retention.ts` inventories existing receipts by default and applies the idempotent missing-expiry backfill only with `--apply`.
 - `activeDays` writes the complete map from local state, so concurrent tabs/devices can overwrite one another's dates.
 
 These limitations are tracked in the audit; a descriptive data-map edit does not change finding status.
@@ -144,13 +145,13 @@ Gemma receives native JSON Schema; Inkling/Nemotron receive a JSON-only instruct
 
 Foreground timeout is 20 seconds per model; warm-up timeout is 8 seconds. Process-scoped `preferredModel` is updated by warm-up or successful requests. Timeout/transport rollover can create five attempts in one Server Action. AI actions currently do not authenticate callers or enforce server-side quotas. These are current-source properties; the target generation protocol, ledger, quota, cancellation and recovery are not implemented. Review the audit and remediation plan before changing transport.
 
-Chat history currently appears in structured prompt data and provider messages; the current message may also occur in both `userMessage` and accumulated history. Measure and test request-size/semantic duplication rather than deleting context speculatively.
+Chat review context occurs once in the system message, prior conversation turns once in provider messages, and the current user input once at the end. The caller supplies prior turns without appending the current turn to history.
 
 ## 6. 🖥️ Client Behavior, Internationalization, and Focus Shield
 
 `translations.ts` retains domain copy; `src/lib/i18n` retains common/error/UI messages. Tests enforce VI/EN key and interpolation parity. Brand names, error codes, model identifiers, scientific notation, LaTeX and user content are not automatically translated. Locale changes do not regenerate or translate history.
 
-Quick Notes retains a dirty draft across snapshots and reports success only after the write completes. Forum post creation has a pending lock; edit handlers currently close before persistence is confirmed. Setup academic validation has no complete generation/version guard, so a late response can start a quiz after context changes.
+Quick Notes retains a dirty draft across snapshots and reports success only after the write completes. Forum creation and coordinated edits/deletion use pending locks; editors retain drafts until persistence is confirmed. Setup academic validation has no complete generation/version guard, so a late response can start a quiz after context changes.
 
 Focus Shield:
 
@@ -237,10 +238,16 @@ Do not add a dependency for behavior already supported by the platform/current N
 | Coverage | `npm run test:coverage` | V8 for instrumented suite; not the complete system |
 | Rules | `npm run test:rules` | Firestore Rules through Emulator |
 | Integration | `npm run test:integration` | Auth/Firestore Emulator and server APIs |
-| E2E | `npm run test:e2e` | Next dev server, demo Firebase, AI fixture, desktop/mobile Chromium |
-| Build | `npm run build` | Optimized Next artifact; currently downloads Google Fonts |
+| E2E | `npm run test:e2e` | Next dev or production server, demo Firebase, AI fixture; Chromium desktop/mobile, WebKit and Firefox |
+| Build | `npm run build` | Optimized Next artifact; no font-network dependency |
+| Production smoke | `npm run test:production` | Six server routes, referenced script chunks, bundle budgets and unauthenticated API behavior |
+| Bundle/performance | `npm run report:bundle`, `npm run report:performance` | Build inventory and synthetic dataset baseline; not browser interaction timing |
 | Live AI | `npm run ai:smoke` | Live OpenRouter; quota/cost possible |
 
-CI runs `npm ci → lint → typecheck → unit → integration → build → install Chromium → E2E` on Ubuntu with Node 24/JDK 21. E2E uses `npm run dev`, not `next start`, so a production-runtime smoke test remains separate evidence.
+CI runs `npm ci → lint → typecheck → coverage → integration → build → install Chromium/WebKit/Firefox → development E2E → production E2E → bundle report → production HTTP smoke → synthetic performance baseline` on Ubuntu with Node 24/JDK 21. The workflow configuration does not itself prove that a remote run has succeeded.
 
-The existence or success of a test suite does not establish remote CI, deployed Firestore indexes/Rules, production Vercel runtime, Safari/Firefox minimum versions, physical-camera behavior, live-provider reliability or current vulnerability applicability. Builds can fail in a network-restricted environment because `src/app/layout.tsx` uses `next/font/google` for Inter and Space Grotesk.
+The existence or success of a test suite does not establish remote CI, deployed Firestore indexes/Rules, production Vercel runtime, Safari/Firefox minimum versions, physical-camera behavior, live-provider reliability or current vulnerability applicability. Builds use local system font stacks and do not require Google Fonts.
+
+## 13 September implementation notes
+
+History versions 1 and 2 remain readable permanently; absent versions identify legacy records. Unknown future versions are rejected. Numeric quiz settings are validated separately from draft/persisted strings. `usePagedCollection` limits initial live subscriptions to 50 records and cursor-fetches older pages on demand. Statistics/search/report labels explicitly describe loaded-record scope. Current implementation status and operational validation gaps are tracked in [the audit report](AUDIT_REPORT.md).

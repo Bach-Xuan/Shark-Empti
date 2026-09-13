@@ -1,7 +1,7 @@
 
 'use client';
 
-import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
+import { FirebaseErrorListener } from '@/components/firebase-error-listener';
 import { FirebaseApp } from 'firebase/app';
 import { Auth,onAuthStateChanged,type User } from 'firebase/auth';
 import { Firestore } from 'firebase/firestore';

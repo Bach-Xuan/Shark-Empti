@@ -1,14 +1,13 @@
-import React from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, expect, it, vi } from 'vitest';
 import PlaygroundView from '@/components/playground-view';
 import { translations } from '@/lib/translations';
+import { act,cleanup,fireEvent,render,screen,waitFor } from '@testing-library/react';
+import { afterEach,expect,it,vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ validate: vi.fn(), flashcards: vi.fn(), practice: vi.fn(), write: vi.fn() }));
 vi.mock('@/ai/flows/academic-validation-flow', () => ({ validateAcademicTopic: mocks.validate }));
 vi.mock('@/ai/flows/generate-flashcards-flow', () => ({ generateFlashcards: mocks.flashcards }));
 vi.mock('@/ai/flows/generate-practice-flow', () => ({ generatePractice: mocks.practice }));
 vi.mock('@/firebase', () => ({ useUser: () => ({ user: { uid: 'first' } }), useFirestore: () => ({}) }));
-vi.mock('firebase/firestore', () => ({ collection: () => ({ path: 'demo' }), addDoc: mocks.write }));
+vi.mock('firebase/firestore', () => ({ collection: () => ({ path: 'demo' }), doc: () => ({ path: 'demo' }), setDoc: mocks.write, addDoc: mocks.write }));
 vi.mock('@/lib/error-toast', () => ({ showErrorToast: vi.fn(), showUnexpectedErrorToast: vi.fn() }));
 vi.mock('@/components/feature-help', () => ({ default: () => null }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });

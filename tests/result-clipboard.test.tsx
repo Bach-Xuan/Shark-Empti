@@ -1,8 +1,7 @@
-import React from 'react';
-import { afterEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, waitFor } from '@testing-library/react';
 import ResultView from '@/components/result-view';
 import { translations } from '@/lib/translations';
+import { cleanup,fireEvent,render,waitFor } from '@testing-library/react';
+import { afterEach,expect,it,vi } from 'vitest';
 import { history } from './fixtures/quiz';
 const mocks = vi.hoisted(() => ({ error: vi.fn(), toast: vi.fn() }));
 vi.mock('@/ai/flows/personalized-quiz-feedback-flow', () => ({ personalizedQuizPerformanceFeedback: vi.fn() }));

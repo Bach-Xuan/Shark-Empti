@@ -1,11 +1,11 @@
 'use client';
-import { useCallback, useRef, useState } from 'react';
-import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
-import { doc, runTransaction, serverTimestamp } from 'firebase/firestore';
-import { useRouter } from 'next/navigation';
-import { useAuth, useFirestore } from '@/firebase';
 import { useAppPreferences } from '@/components/app-preferences';
+import { useAuth,useFirestore } from '@/firebase';
 import { showErrorToast } from '@/lib/error-toast';
+import { GoogleAuthProvider,signInWithPopup } from 'firebase/auth';
+import { doc,runTransaction,serverTimestamp } from 'firebase/firestore';
+import { useRouter } from 'next/navigation';
+import { useCallback,useRef,useState } from 'react';
 export function useGoogleSignIn() {
   const auth = useAuth(); const db = useFirestore(); const router = useRouter();
   const { lang } = useAppPreferences();

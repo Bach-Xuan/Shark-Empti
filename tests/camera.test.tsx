@@ -1,15 +1,14 @@
-import React from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import FocusTrackerWidget from '@/components/FocusTrackerWidget';
 import { AppPreferencesProvider } from '@/components/app-preferences';
-const mocks = vi.hoisted(() => ({ load: vi.fn(), camera: vi.fn(), stop: vi.fn(), dispose: vi.fn(), toast: vi.fn() }));
+import FocusTrackerWidget from '@/components/focus-tracker-widget';
+import { act,cleanup,fireEvent,render,screen,waitFor } from '@testing-library/react';
+import { afterEach,beforeEach,expect,it,vi } from 'vitest';
+const mocks = vi.hoisted(() => ({ load: vi.fn(), camera: vi.fn(), stop: vi.fn(), dispose: vi.fn(), toast: vi.fn(), warmup: vi.fn() }));
 vi.mock('next/navigation', () => ({ usePathname: () => '/' }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));
 vi.mock('@/lib/error-toast', () => ({ showUnexpectedErrorToast: vi.fn() }));
-vi.mock('@tensorflow/tfjs', () => ({ ready: async () => {}, setBackend: async () => {}, loadLayersModel: mocks.load, loadGraphModel: mocks.load, tidy: () => {}, LayersModel: class {} }));
+vi.mock('@tensorflow/tfjs', () => ({ ready: async () => {}, setBackend: async () => {}, loadLayersModel: mocks.load, loadGraphModel: mocks.load, tidy: mocks.warmup, LayersModel: class {} }));
 beforeEach(() => {
-  vi.clearAllMocks(); localStorage.clear();
+  vi.clearAllMocks(); mocks.warmup.mockReset(); localStorage.clear();
   mocks.load.mockResolvedValue({ dispose: mocks.dispose });
   mocks.camera.mockResolvedValue({ getTracks: () => [{ stop: mocks.stop }] });
   Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: { getUserMedia: mocks.camera } });
@@ -50,4 +49,12 @@ it('shows a recoverable model failure without opening camera', async () => {
   open(); fireEvent.click(screen.getByRole('switch'));
   await waitFor(() => expect(screen.getByText(/AI model error/)).toBeTruthy());
   expect(mocks.camera).not.toHaveBeenCalled();
+});
+
+it('disposes the loaded model if warmup throws before opening the camera', async () => {
+ mocks.warmup.mockImplementation(() => { throw new Error('warmup failed'); });
+ open(); fireEvent.click(screen.getByRole('switch'));
+ await waitFor(() => expect(screen.getByText(/AI model error/)).toBeTruthy());
+ expect(mocks.dispose).toHaveBeenCalledTimes(1);
+ expect(mocks.camera).not.toHaveBeenCalled();
 });

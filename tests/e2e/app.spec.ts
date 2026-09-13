@@ -1,6 +1,6 @@
-import { test, expect, type Page } from '@playwright/test';
-import { getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { expect,test,type Page } from '@playwright/test';
+import { getApps,initializeApp } from 'firebase-admin/app';
+import { getFirestore,Timestamp } from 'firebase-admin/firestore';
 async function signIn(page: Page, route = '/login') {
   await page.goto(route);
   const popupReady = page.waitForEvent('popup');
@@ -32,8 +32,8 @@ test('account isolation, quiz, history, notes and preferences', async ({ page })
   await page.getByRole('button', { name: 'Save', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
+  await page.evaluate(() => localStorage.setItem('shark_help_dashboard_seen', 'true'));
   await page.getByRole('navigation').getByRole('button', { name: 'Overview', exact: true }).click();
-  await page.getByRole('button', { name: 'GOT IT', exact: true }).click();
   await expect(page.getByText('Private first account note', { exact: true }).first()).toBeVisible();
   await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
   await page.getByRole('button', { name: 'Toggle theme' }).click();
@@ -134,3 +134,18 @@ for (const language of ['en', 'vi']) {
     await expect(page.getByRole('button', { name: language === 'vi' ? 'Thu nhỏ Lá chắn tập trung' : 'Minimize Focus Shield', exact: true })).toBeVisible();
   });
 }
+
+// Engine acceptance without request interception isolates SDK/emulator behavior.
+test('Forum comment reaches the subscription without network interception', async ({ page }) => {
+  if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) throw new Error('Demo emulators required');
+  const db = getFirestore(getApps()[0] ?? initializeApp({ projectId: 'demo-shark-empti' }));
+  const id = 'unintercepted-' + test.info().project.name;
+  await db.doc('posts/' + id).set({ title: 'Direct subscription', content: 'Addition', subject: 'math', authorId: 'fixture', authorName: 'Fixture', authorPhoto: '', createdAt: Timestamp.now(), likesCount: 0, likedBy: [], commentsCount: 0 });
+  await signIn(page);
+  await page.goto('/forum/' + id);
+  await page.getByPlaceholder('Add a comment...').fill('Unintercepted comment');
+  await page.getByRole('button', { name: 'Send', exact: true }).click();
+  await expect(page.getByPlaceholder('Add a comment...')).toHaveValue('');
+  await expect(page.getByText('Unintercepted comment', { exact: true })).toBeVisible();
+  expect((await db.doc('posts/' + id).get()).get('commentsCount')).toBe(1);
+});

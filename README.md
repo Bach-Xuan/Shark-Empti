@@ -52,7 +52,7 @@ When an AI operation cannot be completed, the error notification preserves an er
 - A Firebase project with a Web App, Cloud Firestore and Google Authentication.
 - An OpenRouter API key when AI features are required.
 - Firebase Admin service-account credentials when Arena submission or Forum comment creation/deletion APIs must run outside the Emulator.
-- JDK 21 and Playwright Chromium only for integration/E2E tests.
+- JDK 21 and Playwright Chromium/WebKit/Firefox for integration/E2E tests.
 
 ### 📦 Install Dependencies and Create the Environment File
 
@@ -82,7 +82,7 @@ The repository is governed by `package-lock.json`; do not use pnpm or Yarn again
 | Configure the Firebase browser client, sign in and access Firestore | Provide the complete six-field Firebase Web configuration for consistency. The current application initializes Auth and Firestore but not Storage or Messaging; `storageBucket` and `messagingSenderId` are carried as configuration fields rather than independently validated runtime prerequisites. Google provider and the relevant authorized domains remain required for Google sign-in. |
 | Generate quizzes, flashcards, practice, feedback and chatbot responses | `OPENROUTER_API_KEY` |
 | Submit Arena attempts; create/delete Forum comments outside the Emulator | Three `FIREBASE_ADMIN_*` values |
-| Local integration/E2E | JDK 21; Firebase CLI in dev dependencies; Playwright Chromium |
+| Local integration/E2E | JDK 21; Firebase CLI in dev dependencies; Playwright Chromium, WebKit and Firefox |
 
 [docs/CONFIGURATION.md](docs/CONFIGURATION.md) contains the complete process for obtaining every Firebase/OpenRouter value, mapping service-account JSON fields, enabling Google sign-in, creating Firestore, deploying Rules and configuring Vercel. Never expose `OPENROUTER_API_KEY` or `FIREBASE_ADMIN_*` through `NEXT_PUBLIC_*` variables.
 
@@ -97,8 +97,12 @@ The repository is governed by `package-lock.json`; do not use pnpm or Yarn again
 | `npm run test:coverage` | Unit/component tests with V8 coverage | Never calls production services |
 | `npm run test:rules` | Firestore Rules tests through the Emulator | JDK 21 |
 | `npm run test:integration` | Auth/Firestore Emulator, Rules and API integration | JDK 21 |
-| `npm run build` | Next production build | Currently needs Google Fonts access because it uses `next/font/google` |
-| `npm run test:e2e` | Real app, Auth/Firestore Emulator and AI fixture; desktop/mobile Chromium | JDK 21 and installed Chromium |
+| `npm run build` | Next production build | No font download; uses local system fonts |
+| `npm run test:e2e` | Real app, Auth/Firestore Emulator and AI fixture; Chromium desktop/mobile, WebKit and Firefox | JDK 21 and installed Playwright browsers |
+| `npm run test:production` | Start the optimized build and check six routes, script payload budgets and API authentication | No production service; requires a completed build |
+| `npm run report:bundle` | Inventory production entry and deferred JavaScript chunks | No; requires a completed build |
+| `npm run report:performance` | Record synthetic 100/1,000/10,000-record processing baselines | No |
+| `npm run audit:dependencies` | Check lockfile resolutions against npm bulk advisories | npm Registry; transmits dependency names and versions |
 | `npm run ai:health` | Check the model catalogue endpoint and fallback-model presence | OpenRouter network; does not prove key/quota/inference validity |
 | `npm run ai:smoke` | Generate one real quiz and chatbot response | OpenRouter key; may consume quota |
 | `npm run clean` | Remove `.next` only; retain `node_modules` | No |
@@ -106,7 +110,7 @@ The repository is governed by `package-lock.json`; do not use pnpm or Yarn again
 Install the browser after `npm ci`:
 
 ```powershell
-npx --no-install playwright install chromium
+npx --no-install playwright install chromium webkit firefox
 ```
 
 CI in `.github/workflows/ci.yml` uses Node 24, JDK 21, a demo Firebase project and an AI fixture; it does not require production credentials.
@@ -117,7 +121,7 @@ CI in `.github/workflows/ci.yml` uses Node 24, JDK 21, a demo Firebase project a
 - Camera access requires HTTPS or `localhost` and explicit user permission.
 - Firestore Web SDK access is governed by `firestore.rules`; Firebase Admin SDK bypasses Rules, so server APIs must enforce tokens, ownership and payload contracts.
 - `docs/backend.json` is a descriptive data map; Zod schemas, TypeScript readers, Route Handlers and Firestore Rules are the executable contracts.
-- Documented browser targets are Safari 16.4+, Chrome 111+ and Firefox 128+, while E2E currently configures desktop/mobile Chromium only. Review the audit validation gaps before release.
+- Documented browser targets are Safari 16.4+, Chrome 111+ and Firefox 128+, while E2E configures desktop/mobile Chromium, WebKit and Firefox (current engine versions). Review the audit validation gaps before release.
 
 ## 📚 Documentation
 
@@ -129,3 +133,5 @@ CI in `.github/workflows/ci.yml` uses Node 24, JDK 21, a demo Firebase project a
 All repository documentation is maintained in English. The application interface itself remains bilingual, and localization behavior is described in the technical documentation.
 
 Never commit `.env`, service-account JSON, private keys, API tokens, Playwright traces containing credentials or production data. `.gitignore` cannot remove a secret that was already committed; exposed credentials require revocation/rotation and a separately approved history-remediation procedure.
+
+Lists use explicit cursor pagination in batches of 50; search, statistics and reports reflect the records loaded in the client. Current implementation status and external validation gaps are tracked in the audit report.

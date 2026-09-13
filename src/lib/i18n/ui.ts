@@ -1,5 +1,7 @@
 /** Feature-prefixed messages. Keep both catalogs complete. */
 const en = {
+  "pagination.scope": "Search, statistics and reports use loaded records.",
+  "pagination.more": "Load more",
   "arena.exam_not_found": "Exam not found",
   "arena.sign_in_to_start": "Sign in to start",
   "forum.post_too_long": "Use at most 200 characters for the title and 20,000 for the content.",
@@ -95,6 +97,8 @@ const en = {
   "activitycalendar.no_activity_data_yet": "NO ACTIVITY DATA YET"
 };
 const vi: Record<keyof typeof en, string> = {
+  "pagination.scope": "Tìm kiếm, thống kê và báo cáo dùng các bản ghi đã tải.",
+  "pagination.more": "Tải thêm",
   "arena.exam_not_found": "Không tìm thấy đề thi",
   "arena.sign_in_to_start": "Đăng nhập để bắt đầu",
   "forum.post_too_long": "Tiêu đề tối đa 200 ký tự và nội dung tối đa 20.000 ký tự.",

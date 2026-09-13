@@ -1,0 +1,4 @@
+{
+  "scope": "superseded development harness run",
+  "result": "9 passed, 5 failed; warmup fixture/parser and readiness issues repaired. Final production acceptance is in e2e-production.json."
+}

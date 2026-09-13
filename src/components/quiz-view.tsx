@@ -1,6 +1,6 @@
 
 "use client";
-import { messages, uiMessage } from '@/lib/i18n';
+import { messages,uiMessage } from '@/lib/i18n';
 
 import { generateQuestions } from '@/ai/flows/generate-questions-flow';
 import { personalizedQuizPerformanceFeedback } from '@/ai/flows/personalized-quiz-feedback-flow';
@@ -14,6 +14,7 @@ import { answersMatch } from '@/lib/arena-scoring';
 import { showErrorToast } from '@/lib/error-toast';
 import { translatedError } from '@/lib/i18n/errors';
 import type { QuizQuestion } from '@/lib/learning-session';
+import { validateQuizConfig } from '@/lib/quiz-config';
 import { TranslationSet } from '@/lib/translations';
 import { QuizAnalysis,QuizConfig,QuizHistoryItem,QuizResultItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -25,7 +26,7 @@ interface QuizViewProps {
   lang: string;
   config: QuizConfig;
   initialQuestions: QuizQuestion[] | null;
-  onFinish: (results: Omit<QuizHistoryItem, 'date' | 'lang'>, analysis?: QuizAnalysis) => void | boolean | Promise<void | boolean>;
+  onFinish: (results: Omit<QuizHistoryItem, 'date' | 'lang'>, analysis?: QuizAnalysis) => Promise<boolean>;
   onReady?: (questions: QuizQuestion[]) => void;
   onAskGuru: (message: string) => void;
   numericShortAnswers?: boolean;
@@ -77,7 +78,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
           excludeNotes: config.excludeNotes,
           type: config.type,
           difficulty: config.difficulty,
-          numQuestions: Math.min(parseInt(config.numQuestions) || 5, 50),
+          numQuestions: validateQuizConfig(config).numQuestions,
           language: questionLanguage as 'en' | 'vi',
         });
         if (!active) return;
@@ -108,7 +109,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
     setIsFinishing(true);
     try {
       const saved = await onFinish(pendingResult.current.results, pendingResult.current.analysis);
-      if (saved === false) throw new Error('Save failed');
+      if (!saved) throw new Error('Save failed');
     } catch {
       if (mountedRef.current) { setSaveFailed(true); setIsFinishing(false); }
     }
@@ -143,7 +144,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
   }, [answers, currentFeedback, questions, completeQuiz]);
 
   useEffect(() => {
-    if (isLoading || isFinishing || saveFailed) return;
+    if (isLoading || isFinishing || saveFailed || error) return;
 
     const interval = setInterval(() => {
       setOverallTimer(prev => prev + 1);
@@ -152,7 +153,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [isLoading, isFinishing, hasCountdown, saveFailed]);
+  }, [isLoading, isFinishing, hasCountdown, saveFailed, error]);
 
   useEffect(() => {
     if (remainingTime === 0 && !isFinishing) {

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { answersMatch, calculateArenaScore, isTrustedArenaExam, parseNumericAnswer } from '@/lib/arena-scoring';
+import { answersMatch,calculateArenaScore,isTrustedArenaExam,parseNumericAnswer } from '@/lib/arena-scoring';
+import { describe,expect,it } from 'vitest';
 
 describe('Arena numeric scoring', () => {
   it('normalizes decimal separators and rejects prose or units', () => {

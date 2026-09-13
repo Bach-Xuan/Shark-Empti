@@ -6,9 +6,10 @@ export default defineConfig({
   resolve: { alias: { '@': path.resolve(import.meta.dirname, 'src') } },
   test: {
     environment: 'jsdom',
+    maxWorkers: 2,
     setupFiles: ['./tests/setup.ts'],
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     exclude: ['tests/firebase.rules.test.ts', 'tests/integration/**'],
-    coverage: { provider: 'v8', reporter: ['text', 'html'] },
+    coverage: { provider: 'v8', reporter: ['text', 'html', 'json-summary'], include: ['src/**/*.{ts,tsx}'], exclude: ['src/**/*.d.ts'] },
   },
 });

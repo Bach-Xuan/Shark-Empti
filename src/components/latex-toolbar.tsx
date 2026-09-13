@@ -1,9 +1,9 @@
 'use client';
-import { Binary, Type, FlaskConical } from 'lucide-react';
+import { Binary,FlaskConical,Type } from 'lucide-react';
 import { useAppPreferences } from './app-preferences';
-import { Card } from './ui/card';
 import { Button } from './ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Card } from './ui/card';
+import { Tabs,TabsContent,TabsList,TabsTrigger } from './ui/tabs';
 const LATEX_SNIPPETS = [
   {
     id: 'math',

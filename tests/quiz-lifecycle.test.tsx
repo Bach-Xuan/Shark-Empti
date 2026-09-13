@@ -1,8 +1,7 @@
-import React from 'react';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, expect, it, vi } from 'vitest';
 import QuizView from '@/components/quiz-view';
 import { translations } from '@/lib/translations';
+import { act,cleanup,fireEvent,render,screen } from '@testing-library/react';
+import { afterEach,expect,it,vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ generate: vi.fn(), feedback: vi.fn(async () => ({ ok: false, error: { code: 'AI-INVALID-RESPONSE' } })) }));
 vi.mock('@/ai/flows/generate-questions-flow', () => ({ generateQuestions: mocks.generate }));
 vi.mock('@/ai/flows/personalized-quiz-feedback-flow', () => ({ personalizedQuizPerformanceFeedback: mocks.feedback }));
@@ -12,7 +11,7 @@ const config = { subject: 'math', grade: 'none', topic: 'Addition', type: 'Multi
 const questions = [{ question: '2+2?', options: ['4', '3'], correct: '4', explanation: 'Addition', type: 'Multiple Choice', difficulty: 'Easy' }];
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks(); });
 it('finishes a timed quiz only once even as timer/effects rerender', async () => {
-  vi.useFakeTimers(); const finish = vi.fn();
+  vi.useFakeTimers(); const finish = vi.fn().mockResolvedValue(true);
   render(<QuizView t={translations.en} lang="en" config={config} initialQuestions={questions} onFinish={finish} onAskGuru={() => {}} />);
   await act(async () => { await vi.advanceTimersByTimeAsync(61_000); });
   await act(async () => { await vi.advanceTimersByTimeAsync(10_000); });
@@ -20,7 +19,7 @@ it('finishes a timed quiz only once even as timer/effects rerender', async () =>
   expect(mocks.feedback).toHaveBeenCalledTimes(1);
 });
 it('keeps current question and answers when UI language changes', () => {
-  const props = { config, initialQuestions: questions, onFinish: vi.fn(), onAskGuru: () => {} };
+  const props = { config, initialQuestions: questions, onFinish: vi.fn().mockResolvedValue(true), onAskGuru: () => {} };
   const view = render(<QuizView {...props} t={translations.en} lang="en" />);
   fireEvent.click(screen.getByRole('button', { name: '4' }));
   view.rerender(<QuizView {...props} t={translations.vi} lang="vi" />);

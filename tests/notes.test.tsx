@@ -1,6 +1,6 @@
-import { act, cleanup, renderHook } from '@testing-library/react';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useUserNotes } from '@/firebase/firestore/use-user-notes';
+import { act,cleanup,renderHook } from '@testing-library/react';
+import { afterEach,beforeEach,expect,it,vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ user: { uid: 'first' }, callbacks: [] as Array<(snapshot: unknown) => void>, unsubscribe: vi.fn(), write: vi.fn(), emit: vi.fn() }));
 vi.mock('@/firebase/auth/use-user', () => ({ useUser: () => ({ user: mocks.user }) }));
 vi.mock('@/firebase/provider', () => ({ useFirestore: () => 'database' }));

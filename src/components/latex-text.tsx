@@ -1,9 +1,8 @@
-
 'use client';
 
-import React, { useMemo } from 'react';
 import katex from 'katex';
 import 'katex/dist/katex.min.css';
+import React,{ useMemo } from 'react';
 
 interface LatexTextProps {
   text: string;
@@ -13,7 +12,7 @@ interface LatexTextProps {
  * A component that parses text and renders LaTeX expressions using KaTeX.
  * Supports inline ($...$) and block ($$...$$) math.
  */
-export function LatexText({ text }: LatexTextProps) {
+export const LatexText = React.memo(function LatexText({ text }: LatexTextProps) {
   const parts = useMemo(() => {
     if (!text) return [];
     // Split by $$...$$ (block) or $...$ (inline)
@@ -64,4 +63,4 @@ export function LatexText({ text }: LatexTextProps) {
       })}
     </span>
   );
-}
+});

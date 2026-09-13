@@ -11,7 +11,7 @@ This document describes the configuration actually consumed by the current sourc
 | Node.js | 24.x | Development, builds, scripts and tests |
 | npm | Bundled with Node 24 | Lockfile installation and scripts |
 | JDK | 21 | Firebase Emulator integration/rules/E2E |
-| Playwright Chromium | Version selected by the lockfile | Desktop/mobile E2E |
+| Playwright Chromium, WebKit and Firefox | Versions selected by the lockfile | Configured E2E browser matrix |
 | Git | A supported version | Clone, review and version control |
 
 `.nvmrc` and `package.json#engines.node` both select major 24. Install Node from [nodejs.org](https://nodejs.org/en/download) or a trusted version manager, then verify:
@@ -41,10 +41,10 @@ Install JDK 21, restart the terminal if PATH changed, then run:
 
 ```powershell
 java -version
-npx --no-install playwright install chromium
+npx --no-install playwright install chromium webkit firefox
 ```
 
-`npx --no-install` requires the locally installed package and avoids fetching an unrelated CLI version. Linux CI uses `npx playwright install --with-deps chromium` for browser system libraries.
+`npx --no-install` requires the locally installed package and avoids fetching an unrelated CLI version. Linux CI uses `npx playwright install --with-deps chromium webkit firefox` for browser system libraries.
 
 ## 2. 🔐 Environment File and Variable Matrix
 
@@ -270,8 +270,14 @@ npm run typecheck
 npm test
 npm run test:integration
 npm run build
-npx --no-install playwright install chromium
+npx --no-install playwright install chromium webkit firefox
 npm run test:e2e
+$env:E2E_PRODUCTION='true'
+npm run test:e2e
+Remove-Item Env:E2E_PRODUCTION
+npm run test:production
 ```
 
-Release also requires a current dependency audit, production Runtime/Function settings, Firestore indexes, deployed Rules, Safari/Firefox targets, a physical camera and live OpenRouter validation. The build currently depends on Google Fonts network access through `next/font/google`; a network-restricted build can fail even when source, types and unit tests are valid.
+The first E2E run uses the development server; the second uses the optimized build. CI also records the bundle inventory and synthetic performance baseline. Browser installation or launch can require host libraries and may be blocked by local application-control policy.
+
+Release also requires a current dependency audit, production Runtime/Function settings, deployed Firestore Rules and indexes, receipt TTL activation, the documented minimum browser targets, a physical camera and live OpenRouter validation. The build uses local system fonts and no longer downloads Google Fonts. Lists load 50 records initially and fetch older pages by cursor; search, statistics and reports cover loaded records.

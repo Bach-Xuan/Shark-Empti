@@ -16,7 +16,11 @@
     "test:coverage": "vitest run --coverage",
     "test:rules": "firebase emulators:exec --project demo-shark-empti --only auth,firestore \"vitest run --config vitest.integration.config.mts tests/firebase.rules.test.ts\"",
     "test:integration": "firebase emulators:exec --project demo-shark-empti --only auth,firestore \"vitest run --config vitest.integration.config.mts\"",
-    "clean": "node -e \"require('node:fs').rmSync('.next', { recursive: true, force: true })\""
+    "clean": "node -e \"require('node:fs').rmSync('.next', { recursive: true, force: true })\"",
+    "audit:dependencies": "node scripts/dependency-audit.mjs",
+    "report:bundle": "node scripts/bundle-report.mjs",
+    "test:production": "node scripts/production-smoke.mjs",
+    "report:performance": "node --import tsx scripts/performance-baseline.ts"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.6",

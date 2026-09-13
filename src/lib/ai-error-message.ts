@@ -1,4 +1,4 @@
-import { AppError, getAiAppError } from '@/lib/app-error';
+import { AppError,getAiAppError } from '@/lib/app-error';
 
 type SupportedLanguage = 'en' | 'vi';
 

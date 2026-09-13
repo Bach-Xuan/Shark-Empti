@@ -1,6 +1,6 @@
 'use client';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react';
 import type { Language } from '@/lib/types';
+import { createContext,useCallback,useContext,useEffect,useMemo,useState,useSyncExternalStore,type ReactNode } from 'react';
 type Theme = 'light' | 'dark';
 type Preferences = { lang: Language; theme: Theme; setLang: (lang: Language) => void; setTheme: (theme: Theme) => void };
 const PreferencesContext = createContext<Preferences | null>(null);

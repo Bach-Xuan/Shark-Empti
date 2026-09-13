@@ -27,7 +27,7 @@ User as UserIcon
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import React from 'react';
-import { logo as LogoComponent } from './logo';
+import { Logo as LogoComponent } from './logo';
 
 const NavButton = ({ target, icon: Icon, label, view, setView }: { target: AppView; icon: React.ElementType; label: string; view: AppView; setView: (view: AppView) => void }) => {
   const router = useRouter();

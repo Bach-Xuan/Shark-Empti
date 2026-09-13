@@ -1,8 +1,8 @@
 // @vitest-environment node
-import { readFileSync, readdirSync } from 'node:fs';
+import { readFileSync,readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import ts from 'typescript';
-import { expect, it } from 'vitest';
+import { expect,it } from 'vitest';
 
 // Brand/version, native language names and technical identifiers are intentional.
 const exceptions = new Set(['SHARK EMPTI', 'SHARK EMPTI v1.15.1', 'v1.15.1', 'SHARK COINS', 'English', 'Tiếng Việt', 'UID:']);

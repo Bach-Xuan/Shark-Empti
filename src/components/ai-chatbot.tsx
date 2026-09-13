@@ -140,7 +140,7 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
     if (isTyping || requestPending.current) return;
     const updatedMessages: ChatMessage[] = [...messages, { role: 'user', message: msg }];
     setMessages(updatedMessages);
-    await fetchAiResponse(msg, updatedMessages);
+    await fetchAiResponse(msg, messages);
   }, [isTyping, messages, fetchAiResponse]);
 
   useEffect(() => {
@@ -161,7 +161,7 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
     const updatedMessages: ChatMessage[] = [...messages, { role: 'user', message: userMsg }];
     setMessages(updatedMessages);
     setInput("");
-    await fetchAiResponse(userMsg, updatedMessages);
+    await fetchAiResponse(userMsg, messages);
   }, [input, isTyping, messages, fetchAiResponse]);
 
   const handleClose = (e: React.MouseEvent) => {

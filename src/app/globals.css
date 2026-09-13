@@ -195,3 +195,6 @@
     display: none !important;
   }
 }
+
+/* Offline system stacks: no build-time or runtime font request. */
+:root { --font-inter: Arial, Helvetica, sans-serif; --font-space-grotesk: Arial, Helvetica, sans-serif; }

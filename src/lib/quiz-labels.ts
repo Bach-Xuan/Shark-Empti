@@ -1,5 +1,5 @@
-import type { TranslationSet } from './translations';
 import { uiMessage } from './i18n';
+import type { TranslationSet } from './translations';
 
 /** Translate known business codes without changing stored or user-authored values. */
 export function quizLabel(kind: 'subject' | 'type' | 'difficulty', value: string, t: TranslationSet): string {

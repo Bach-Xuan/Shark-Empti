@@ -1,6 +1,7 @@
 
 "use client";
 import { uiMessage } from '@/lib/i18n';
+import { subjectOptions } from '@/lib/subjects';
 
 import { validateAcademicTopic } from '@/ai/flows/academic-validation-flow';
 import { Button } from '@/components/ui/button';
@@ -33,7 +34,7 @@ Sparkles,
 Target,
 XCircle
 } from 'lucide-react';
-import React,{ useCallback,useMemo,useState } from 'react';
+import React,{ useCallback,useState } from 'react';
 import FeatureHelp from './feature-help';
 
 const RequiredLabel = ({ children, icon }: { children: React.ReactNode, icon?: React.ReactNode }) => (
@@ -60,15 +61,7 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
     timeLimit: ''
   });
 
-  const subjects = useMemo(() => [
-    { id: 'literature', label: t.literature },
-    { id: 'math', label: t.math },
-    { id: 'physics', label: t.physics },
-    { id: 'chemistry', label: t.chemistry },
-    { id: 'biology', label: t.biology },
-    { id: 'english', label: t.english },
-    { id: 'other', label: t.other }
-  ], [t]);
+  const subjects = subjectOptions(t);
 
   const types = [
     { id: 'Multiple Choice', label: t.multipleChoice },

@@ -1,7 +1,7 @@
 
 "use client";
-import { uiMessage } from '@/lib/i18n';
 import { copyTextToClipboard } from '@/lib/clipboard';
+import { uiMessage } from '@/lib/i18n';
 
 import { LatexText } from '@/components/latex-text';
 import { UiText } from "@/components/ui-text";

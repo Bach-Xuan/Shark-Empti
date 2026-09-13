@@ -1,4 +1,8 @@
-"use client";
+'use client';
+import { PageControls } from '@/components/page-controls';
+import { useLearningSession } from '@/hooks/use-learning-session';
+import { useHistory } from '@/hooks/use-history';
+
 import { useHydrated,useLanguageState,useThemeState } from '@/components/app-preferences';
 import { UiText } from "@/components/ui-text";
 
@@ -12,25 +16,15 @@ import ResultView from '@/components/result-view';
 import SetupView from '@/components/setup-view';
 import { Tooltip,TooltipContent,TooltipProvider,TooltipTrigger } from '@/components/ui/tooltip';
 import { useFirestore,useUser } from '@/firebase';
-import { errorEmitter } from '@/firebase/error-emitter';
-import { FirestorePermissionError } from '@/firebase/errors';
 import { useUserNotes } from '@/firebase/firestore/use-user-notes';
-import { readHistoryItem } from '@/lib/history-schema';
-import { initialSession,learningSessionReducer,type QuizQuestion } from '@/lib/learning-session';
+import { type QuizQuestion } from '@/lib/learning-session';
 import { calculateDashboardStats } from '@/lib/stats-utils';
 import { translations,TranslationSet } from '@/lib/translations';
-import { AppView,Language,QuizAnalysis,QuizConfig,QuizHistoryItem } from '@/lib/types';
-import {
-addDoc,
-collection,
-onSnapshot,
-orderBy,
-query
-} from 'firebase/firestore';
+import { AppView,Language,QuizConfig } from '@/lib/types';
 import { BarChart3,BrainCircuit,LayoutDashboard,Loader2,Star,StickyNote } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { useRouter,useSearchParams } from 'next/navigation';
-import React,{ Suspense,useCallback,useEffect,useMemo,useReducer,useState } from 'react';
+import React,{ Suspense,useCallback,useEffect,useMemo,useState } from 'react';
 const DashboardView = dynamic(() => import('@/components/dashboard-view'));
 const PlaygroundView = dynamic(() => import('@/components/playground-view'));
 
@@ -59,11 +53,16 @@ function HomeContent() {
   const mounted = useHydrated();
   const [lang, setLang] = useLanguageState();
   const [theme, setTheme] = useThemeState();
-  const [view, setView] = useState<AppView>('setup');
-
-  const [session, dispatchSession] = useReducer(learningSessionReducer, initialSession);
+  const [section, setSection] = useState<AppView>('setup');
+  const { session, reset, start, ready: questionsReady, finish: finishQuiz } = useLearningSession(user, db, lang);
+  const view: AppView = section === 'setup' && session.status !== 'setup' ? (session.status === 'result' ? 'result' : 'quiz') : section;
+  const setView = useCallback((next: AppView) => {
+    reset();
+    setSection(next);
+  }, [reset]);
   const { config: quizConfig, results: lastResults, questions: activeQuestions } = session;
-  const [history, setHistory] = useState<QuizHistoryItem[]>([]);
+  const historyPage = useHistory();
+  const history = historyPage.items;
   const [chatbotTrigger, setChatbotTrigger] = useState<{ message: string, timestamp: number } | null>(null);
 
   // Playground Direct Context
@@ -78,27 +77,14 @@ function HomeContent() {
   // Sync Language and Theme
 
   // Fetch History from Firestore
-  useEffect(() => {
-    if (!user || !db) return;
-    const historyRef = collection(db, 'users', user.uid, 'history');
-    const q = query(historyRef, orderBy('date', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => readHistoryItem(doc.id, doc.data())).filter((item): item is QuizHistoryItem => item !== null);
-      if (data.length !== snapshot.docs.length) errorEmitter.emit('permission-error', new FirestorePermissionError({ path: historyRef.path, operation: 'list' }, { code: 'data-loss' }));
-      setHistory(data);
-    }, (error) => {
-      const permissionError = new FirestorePermissionError({ path: `users/${user.uid}/history`, operation: 'list' }, error);
-      errorEmitter.emit('permission-error', permissionError);
-    });
-    return () => unsubscribe();
-  }, [user, db]);
+
 
   useEffect(() => {
     const viewParam = searchParams.get('view') as AppView;
     if (viewParam && ['setup', 'dashboard', 'playground'].includes(viewParam)) {
       setView(viewParam);
     }
-  }, [searchParams]);
+  }, [searchParams, setView]);
 
   useEffect(() => {
     if (mounted && !authLoading && !user) {
@@ -117,31 +103,9 @@ function HomeContent() {
   }, [setLang]);
 
   const startQuiz = useCallback((config: QuizConfig, initialQuestions: QuizQuestion[] | null = null) => {
-    dispatchSession({ type: 'start', config, questions: initialQuestions });
-    setView('quiz');
-  }, []);
-
-  const questionsReady = useCallback((questions: QuizQuestion[]) => dispatchSession({ type: 'ready', questions }), []);
-  const finishQuiz = useCallback((results: Omit<QuizHistoryItem, 'date' | 'lang'>, analysis?: QuizAnalysis) => {
-    if (!user || !db) return;
-    const dateStr = new Date().toISOString();
-    const combinedResults: QuizHistoryItem = {
-      ...results,
-      analysis,
-      date: dateStr,
-      lang: lang
-    };
-
-    dispatchSession({ type: 'finish', results: combinedResults });
-    const historyRef = collection(db, 'users', user.uid, 'history');
-    addDoc(historyRef, { ...combinedResults, userId: user.uid, date: dateStr })
-      .catch(async () => {
-        const error = new FirestorePermissionError({ path: historyRef.path, operation: 'create', requestResourceData: combinedResults });
-        errorEmitter.emit('permission-error', error);
-      });
-
-    setView('result');
-  }, [user, db, lang]);
+    setSection('setup');
+    start(config, initialQuestions);
+  }, [start]);
 
   const handleAskGuru = useCallback((message: string) => {
     setChatbotTrigger({ message, timestamp: Date.now() });
@@ -159,7 +123,7 @@ function HomeContent() {
   const handleFixWeakness = useCallback((concept: string, type: 'practice' | 'flashcards') => {
     setPlaygroundConfig({ tab: type, concept });
     setView('playground');
-  }, []);
+  }, [setView]);
 
 
   const stats = useMemo(() => calculateDashboardStats(history, t, lang), [history, t, lang]);
@@ -228,6 +192,7 @@ function HomeContent() {
             onRetakeNew={() => startQuiz(quizConfig!, null)}
           />
         )}
+        {view === 'dashboard' && <PageControls lang={lang} {...historyPage} />}
         {view === 'dashboard' && (
           <ErrorBoundary><DashboardView
             t={t} lang={lang} history={history} stats={stats}

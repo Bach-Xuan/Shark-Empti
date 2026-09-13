@@ -1,3 +1,8 @@
+/** Absolute tolerance in the answer's stated unit, not a percentage.
+ * One millionth accommodates decimal rounding in school-level scalar answers.
+ * Units, fractions and scientific notation require another grading policy;
+ * scaling tolerance with magnitude would incorrectly accept larger errors.
+ * IEEE-754 precision still limits distinguishable decimals at large magnitudes. */
 export const NUMERIC_ANSWER_TOLERANCE = 1e-6;
 
 export interface ArenaQuestion {

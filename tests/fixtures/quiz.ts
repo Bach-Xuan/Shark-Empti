@@ -1,4 +1,4 @@
-import type { QuizAnalysis, QuizHistoryItem } from '@/lib/types';
+import type { QuizAnalysis,QuizHistoryItem } from '@/lib/types';
 export const question = { question: '2+2?', section: 'Addition', correct: '4', options: ['4', '3', '2', '1'], explanation: 'Addition', type: 'Multiple Choice', difficulty: 'Recognition' };
 export const analysis: QuizAnalysis = {
   en: { strengths: ['Addition'], weaknesses: [], recommendations: ['Practice'] },

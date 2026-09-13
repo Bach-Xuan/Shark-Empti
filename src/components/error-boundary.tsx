@@ -1,8 +1,8 @@
 'use client';
-import React, { Component, useEffect, useState, type ReactNode } from 'react';
-import Link from 'next/link';
-import { useOptionalAppPreferences } from './app-preferences';
 import { errorMessages } from '@/lib/i18n/errors';
+import Link from 'next/link';
+import { Component,useEffect,useState,type ReactNode } from 'react';
+import { useOptionalAppPreferences } from './app-preferences';
 export function ErrorFallback({ reset }: { reset: () => void }) {
   const preferences = useOptionalAppPreferences();
   const [fallbackLanguage, setFallbackLanguage] = useState<'en' | 'vi'>('en');

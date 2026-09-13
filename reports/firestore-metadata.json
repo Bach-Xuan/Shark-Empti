@@ -1,0 +1,6 @@
+{
+  "measuredAt": "2026-09-13T14:17:20.817Z",
+  "scope": "read-only deployed index and TTL metadata",
+  "indexes": [],
+  "receiptTtl": null
+}

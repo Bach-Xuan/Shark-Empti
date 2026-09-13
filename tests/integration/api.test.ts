@@ -1,9 +1,9 @@
-import { beforeAll, beforeEach, expect, it, vi } from 'vitest';
-import { NextRequest } from 'next/server';
-vi.mock('server-only', () => ({}));
-import { getAdminDb } from '@/lib/firebase-admin';
 import { POST as submit } from '@/app/api/arena/[examId]/submit/route';
-import { POST as comment, DELETE as deleteComment } from '@/app/api/forum/[postId]/comments/route';
+import { POST as comment,DELETE as deleteComment } from '@/app/api/forum/[postId]/comments/route';
+import { getAdminDb } from '@/lib/firebase-admin';
+import { NextRequest } from 'next/server';
+import { beforeAll,beforeEach,expect,it,vi } from 'vitest';
+vi.mock('server-only', () => ({}));
 
 let token: string;
 let uid: string;

@@ -1,9 +1,13 @@
 
 "use client";
 import { useLanguageState,useThemeState } from '@/components/app-preferences';
+import { PageControls } from '@/components/page-controls';
 import { UiText } from "@/components/ui-text";
-import { formatStoredDate } from '@/lib/date-format';
+import { usePagedCollection } from '@/hooks/use-paged-collection';
+import { formatForumDate } from '@/lib/date-format';
 import { uiMessage } from '@/lib/i18n';
+import { subjectOptions } from '@/lib/subjects';
+import { useMemo } from 'react';
 
 import ActivityCalendar from '@/components/activity-calendar';
 import { LatexText } from '@/components/latex-text';
@@ -82,10 +86,12 @@ import { useParams,useRouter } from 'next/navigation';
 import { useEffect,useRef,useState } from 'react';
 
 import { LatexQuickToolbar } from '@/components/latex-toolbar';
+import { useMutation } from '@/hooks/use-mutation';
 
 export default function PostDetailPage() {
   const { user } = useUser();
   const db = useFirestore();
+  const mutation = useMutation();
   const router = useRouter();
   const params = useParams();
   const postId = params.postId as string;
@@ -94,7 +100,7 @@ export default function PostDetailPage() {
   const [lang, setLang] = useLanguageState();
   const [theme, setTheme] = useThemeState();
   const [post, setPost] = useState<ForumPost | null>(null);
-  const [comments, setComments] = useState<ForumComment[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [newComment, setNewComment] = useState("");
   const commentRequest = useRef<{ content: string; id: string } | null>(null);
@@ -132,31 +138,15 @@ export default function PostDetailPage() {
       }
     );
 
-    const commentsRef = collection(db, 'posts', postId, 'comments');
-    const q = query(commentsRef, orderBy('createdAt', 'asc'));
-    const unsubComments = onSnapshot(q,
-      (snapshot) => {
-        setComments(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ForumComment[]);
-      },
-      async () => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: commentsRef.path, operation: 'list' }));
-      }
-    );
-
-    return () => { unsubPost(); unsubComments(); };
+    return () => { unsubPost(); };
   }, [db, postId, router, toast, lang]);
+  const commentSource = useMemo(() => db ? query(collection(db, 'posts', postId, 'comments'), orderBy('createdAt', 'asc')) : null, [db, postId]);
+  const commentPage = usePagedCollection<ForumComment>(commentSource, (id, data) => ({ ...data, id } as ForumComment));
+  const comments = commentPage.items;
 
   const t: TranslationSet = translations[lang];
 
-  const subjectsList = [
-    { id: 'literature', label: t.literature },
-    { id: 'math', label: t.math },
-    { id: 'physics', label: t.physics },
-    { id: 'chemistry', label: t.chemistry },
-    { id: 'biology', label: t.biology },
-    { id: 'english', label: t.english },
-    { id: 'other', label: t.other }
-  ];
+  const subjectsList = subjectOptions(t);
 
   const getSubjectLabel = (id: string) => {
     const s = subjectsList.find(sub => sub.id === id);
@@ -204,7 +194,7 @@ export default function PostDetailPage() {
     }
   };
 
-  const handleUpdatePost = () => {
+  const handleUpdatePost = async () => {
     if (!user || !db || !post) return;
     const postRef = doc(db, 'posts', post.id);
     const updateData = {
@@ -214,44 +204,44 @@ export default function PostDetailPage() {
       updatedAt: serverTimestamp()
     };
 
-    setEditingPost(null);
-    updateDoc(postRef, updateData)
-      .then(() => {
+    const result = await mutation.run(() => updateDoc(postRef, updateData), cause => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'update', requestResourceData: updateData }, cause));
+    });
+    if (result.ok) { setEditingPost(null);
         toast({ title: uiMessage(lang, "forum.updated") });
-      })
-      .catch(async () => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'update', requestResourceData: updateData }));
-      });
+
+    }
+    return result;
   };
 
-  const handleDeletePost = () => {
+  const handleDeletePost = async () => {
     if (!user || !db || !post) return;
     const postRef = doc(db, 'posts', post.id);
 
-    setPostToDelete(null);
-    deleteDoc(postRef)
-      .then(() => {
+    const result = await mutation.run(() => deleteDoc(postRef), cause => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'delete' }, cause));
+    });
+    if (result.ok) { setPostToDelete(null);
         toast({ title: uiMessage(lang, "forum.post_deleted") });
         router.push('/forum');
-      })
-      .catch(async () => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'delete' }));
-      });
+
+    }
+    return result;
   };
 
-  const handleUpdateComment = () => {
+  const handleUpdateComment = async () => {
     if (!user || !db || !editingComment) return;
     const commRef = doc(db, 'posts', postId, 'comments', editingComment.id);
     const updateData = { content: tempContent, updatedAt: serverTimestamp() };
 
-    setEditingComment(null);
-    updateDoc(commRef, updateData)
-      .then(() => {
+    const result = await mutation.run(() => updateDoc(commRef, updateData), cause => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: commRef.path, operation: 'update', requestResourceData: updateData }, cause));
+    });
+    if (result.ok) { setEditingComment(null);
         toast({ title: uiMessage(lang, "forum.comment_updated") });
-      })
-      .catch(async () => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: commRef.path, operation: 'update', requestResourceData: updateData }));
-      });
+
+    }
+    return result;
   };
 
   const handleDeleteComment = async () => {
@@ -318,10 +308,7 @@ export default function PostDetailPage() {
     setTempContent(prev => prev + `$${snippet}$`);
   };
 
-  const formatDate = (item: Pick<ForumPost, 'createdAt' | 'updatedAt'>) => {
-    const formatted = formatStoredDate(item.createdAt, lang);
-    return item.updatedAt ? `${formatted} (${t.edited})` : formatted;
-  };
+
 
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="w-12 h-12 animate-spin text-primary" /></div>;
@@ -352,6 +339,7 @@ export default function PostDetailPage() {
       </div>
 
       <main className="flex-1 w-full max-w-4xl mx-auto p-3 md:p-8 pt-24 md:pt-36 space-y-6 md:space-y-10 animate-in fade-in duration-700">
+      <PageControls lang={lang} {...commentPage} />
         <Button variant="ghost" onClick={() => router.push('/forum')} className="btn-duo h-9 md:h-12 rounded-xl md:rounded-2xl border-[3px] border-transparent hover:border-border font-black uppercase text-[10px] md:text-xs tracking-widest gap-2">
           <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" /> {t.back}
         </Button>
@@ -371,7 +359,7 @@ export default function PostDetailPage() {
                   </Badge>
                 </div>
                 <span className="text-[8px] md:text-xs font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
-                  <Clock className="w-2.5 h-2.5 md:w-3 md:h-3" /> {formatDate(post)}
+                  <Clock className="w-2.5 h-2.5 md:w-3 md:h-3" /> {formatForumDate(post, lang, t.edited)}
                 </span>
               </div>
             </div>
@@ -441,7 +429,7 @@ export default function PostDetailPage() {
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex flex-col">
                         <span className="text-[10px] md:text-sm font-black text-primary uppercase tracking-widest truncate">{comment.authorName}</span>
-                        <span className="text-[8px] md:text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1"><Clock className="w-2.5 h-2.5 md:w-3 md:h-3" /> {formatDate(comment)}</span>
+                        <span className="text-[8px] md:text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1"><Clock className="w-2.5 h-2.5 md:w-3 md:h-3" /> {formatForumDate(comment, lang, t.edited)}</span>
                       </div>
                       <div className="flex items-center gap-2">
                         {user?.uid === comment.authorId && (
@@ -538,8 +526,8 @@ export default function PostDetailPage() {
       </main>
 
       {/* Edit Post Dialog */}
-      <Dialog open={!!editingPost} onOpenChange={(open) => !open && setEditingPost(null)}>
-        <DialogContent className="max-w-4xl w-[95vw] rounded-[2rem] border-[4px] shadow-2xl p-6 md:p-10 bg-card">
+      <Dialog open={!!editingPost} onOpenChange={(open) => { if (!open && !mutation.isPending()) setEditingPost(null); }}>
+        <DialogContent className="max-w-4xl w-[95vw] rounded-[2rem] border-[4px] shadow-2xl p-6 md:p-10 bg-card"><fieldset disabled={mutation.pending} className="contents">
           <DialogHeader><DialogTitle className="text-2xl font-headline font-black text-primary uppercase tracking-tight">{t.edit.toUpperCase()}</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -578,15 +566,15 @@ export default function PostDetailPage() {
             </div>
             <div className="flex gap-3 pt-4">
               <Button variant="ghost" onClick={() => setEditingPost(null)} className="btn-duo flex-1 h-12 rounded-xl font-black uppercase text-xs">{t.cancel}</Button>
-              <Button onClick={handleUpdatePost} className="btn-duo flex-1 h-12 rounded-xl bg-primary text-white font-black uppercase text-xs">{t.update}</Button>
+              <Button disabled={mutation.pending} onClick={handleUpdatePost} className="btn-duo flex-1 h-12 rounded-xl bg-primary text-white font-black uppercase text-xs">{t.update}</Button>
             </div>
           </div>
-        </DialogContent>
+        </fieldset></DialogContent>
       </Dialog>
 
       {/* Edit Comment Dialog */}
-      <Dialog open={!!editingComment} onOpenChange={(open) => !open && setEditingComment(null)}>
-        <DialogContent className="max-w-3xl w-[95vw] rounded-[2rem] border-[4px] shadow-2xl p-6 md:p-10 bg-card">
+      <Dialog open={!!editingComment} onOpenChange={(open) => { if (!open && !mutation.pending) setEditingComment(null); }}>
+        <DialogContent className="max-w-3xl w-[95vw] rounded-[2rem] border-[4px] shadow-2xl p-6 md:p-10 bg-card"><fieldset disabled={mutation.pending} className="contents">
           <DialogHeader><DialogTitle className="text-2xl font-headline font-black text-primary uppercase tracking-tight">{t.edit.toUpperCase()}</DialogTitle></DialogHeader>
           <div className="space-y-4 pt-4">
             <div className="space-y-4">
@@ -604,14 +592,14 @@ export default function PostDetailPage() {
             </div>
             <div className="flex gap-3 pt-4">
               <Button variant="ghost" onClick={() => setEditingComment(null)} className="btn-duo flex-1 h-12 rounded-xl font-black uppercase text-xs">{t.cancel}</Button>
-              <Button onClick={handleUpdateComment} className="btn-duo flex-1 h-12 rounded-xl bg-primary text-white font-black uppercase text-xs">{t.update}</Button>
+              <Button disabled={mutation.pending} onClick={handleUpdateComment} className="btn-duo flex-1 h-12 rounded-xl bg-primary text-white font-black uppercase text-xs">{t.update}</Button>
             </div>
           </div>
-        </DialogContent>
+        </fieldset></DialogContent>
       </Dialog>
 
       {/* Delete Post Alert */}
-      <AlertDialog open={!!postToDelete} onOpenChange={(open) => !open && setPostToDelete(null)}>
+      <AlertDialog open={!!postToDelete} onOpenChange={(open) => { if (!open && !mutation.isPending()) setPostToDelete(null); }}>
         <AlertDialogContent className="rounded-[2rem] border-[4px] shadow-2xl p-8 bg-card">
           <AlertDialogHeader>
             <AlertDialogTitle className="font-headline font-black text-destructive uppercase">{t.delete.toUpperCase()}?</AlertDialogTitle>
@@ -619,7 +607,7 @@ export default function PostDetailPage() {
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 flex flex-row gap-3">
             <AlertDialogCancel className="btn-duo flex-1 h-12 rounded-xl font-black uppercase text-xs m-0 bg-card">{t.cancel}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeletePost} className="btn-duo flex-1 h-12 rounded-xl bg-destructive text-white font-black uppercase text-xs m-0 min-w-[100px] flex items-center justify-center px-8">{t.delete.toUpperCase()}</AlertDialogAction>
+            <AlertDialogAction disabled={mutation.pending} onClick={handleDeletePost} className="btn-duo flex-1 h-12 rounded-xl bg-destructive text-white font-black uppercase text-xs m-0 min-w-[100px] flex items-center justify-center px-8">{t.delete.toUpperCase()}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

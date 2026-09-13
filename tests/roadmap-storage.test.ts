@@ -1,5 +1,5 @@
-import { afterEach, expect, it } from 'vitest';
-import { readRoadmapChecks, writeRoadmapChecks } from '@/lib/roadmap-storage';
+import { readRoadmapChecks,writeRoadmapChecks } from '@/lib/roadmap-storage';
+import { afterEach,expect,it } from 'vitest';
 afterEach(() => localStorage.clear());
 it('isolates account progress and retains unattributed legacy storage', () => {
   localStorage.setItem('shark_roadmap_checks', '{"legacy":{"0":true}}');

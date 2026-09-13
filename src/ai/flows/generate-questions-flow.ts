@@ -6,10 +6,10 @@
 
 import { LATEX_RULE,SHARK_GURU_ROLE } from '@/ai/config/prompts';
 import { generateStructured } from '@/ai/openrouter';
+import { generationCount,questionContentSchema } from '@/ai/question-schema';
 import { AppResult,asAiResult } from '@/lib/app-error';
-import { z } from 'zod';
-import { generationCount, questionContentSchema } from '@/ai/question-schema';
 import { parseNumericAnswer } from '@/lib/arena-scoring';
+import { z } from 'zod';
 
 const GenerateQuestionsInputSchema = z.object({
   subject: z.string().optional(),

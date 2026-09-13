@@ -1,7 +1,6 @@
-import React from 'react';
-import { afterEach, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { ErrorBoundary } from '@/components/error-boundary';
+import { cleanup,fireEvent,render,screen } from '@testing-library/react';
+import { afterEach,expect,it,vi } from 'vitest';
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 it('isolates a render failure and retries without requiring Firebase', () => {
   vi.spyOn(console, 'error').mockImplementation(() => {});

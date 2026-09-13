@@ -1,0 +1,30 @@
+import { act, cleanup, renderHook } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+import type { Firestore } from 'firebase/firestore';
+import { useLearningSession } from '@/hooks/use-learning-session';
+import { history } from './fixtures/quiz';
+const mocks = vi.hoisted(() => ({ write: vi.fn(), emit: vi.fn() }));
+vi.mock('firebase/firestore', () => ({ doc: (...parts: unknown[]) => ({ path: parts.slice(1).join('/') }), setDoc: mocks.write }));
+vi.mock('@/firebase/error-emitter', () => ({ errorEmitter: { emit: mocks.emit } }));
+afterEach(() => { cleanup(); vi.clearAllMocks(); });
+const user = { uid: 'learner' }, db = {} as Firestore;
+it('keeps the quiz on failed saves and retries the same record without undefined analysis', async () => {
+ const { result } = renderHook(() => useLearningSession(user, db, 'en'));
+ act(() => result.current.start(history.config, []));
+ mocks.write.mockRejectedValueOnce({ code: 'unavailable' }).mockResolvedValueOnce(undefined);
+ await act(async () => expect(await result.current.finish({ ...history, analysis: undefined })).toBe(false));
+ expect(result.current.session.status).toBe('quiz');
+ const [reference, data] = mocks.write.mock.calls[0];
+ expect(data).not.toHaveProperty('analysis'); expect(data.schemaVersion).toBe(2);
+ await act(async () => expect(await result.current.finish(history)).toBe(true));
+ expect(mocks.write.mock.calls[1][0]).toEqual(reference);
+ expect(result.current.session.status).toBe('result');
+});
+it('does not navigate back to results after a save finishes beyond reset', async () => {
+ const { result } = renderHook(() => useLearningSession(user, db, 'vi'));
+ let resolve!: () => void; mocks.write.mockReturnValue(new Promise<void>(done => { resolve = done; }));
+ act(() => result.current.start(history.config, []));
+ let saving!: Promise<boolean>; act(() => { saving = result.current.finish(history); result.current.reset(); });
+ await act(async () => { resolve(); expect(await saving).toBe(false); });
+ expect(result.current.session.status).toBe('setup');
+});

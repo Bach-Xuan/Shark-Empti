@@ -6,9 +6,9 @@
 
 import { LATEX_RULE,SHARK_GURU_ROLE } from '@/ai/config/prompts';
 import { generateStructured } from '@/ai/openrouter';
+import { generationCount } from '@/ai/question-schema';
 import { AppResult,asAiResult } from '@/lib/app-error';
 import { z } from 'zod';
-import { generationCount } from '@/ai/question-schema';
 
 const GenerateFlashcardsInputSchema = z.object({
   topic: z.string().trim().min(1),

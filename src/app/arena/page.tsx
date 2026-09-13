@@ -1,8 +1,11 @@
-"use client";
+'use client';
 import { useLanguageState,useThemeState } from '@/components/app-preferences';
+import { PageControls } from '@/components/page-controls';
+import { usePagedCollection } from '@/hooks/use-paged-collection';
 import { formatStoredDate } from '@/lib/date-format';
 import { uiMessage } from '@/lib/i18n';
 import { quizLabel } from '@/lib/quiz-labels';
+import { useMemo as usePageMemo } from 'react';
 
 import { generateQuestions } from '@/ai/flows/generate-questions-flow';
 import Navigation from '@/components/navigation';
@@ -21,12 +24,12 @@ import { Tabs,TabsContent,TabsList,TabsTrigger } from "@/components/ui/tabs";
 import { useDoc,useFirestore,useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { showErrorToast,showUnexpectedErrorToast } from '@/lib/error-toast';
+import { validateQuizConfig } from '@/lib/quiz-config';
 import { translations,TranslationSet } from '@/lib/translations';
 import { ArenaExam,QuizConfig } from '@/lib/types';
 import {
 addDoc,
 collection,
-onSnapshot,
 orderBy,
 query,
 serverTimestamp
@@ -44,7 +47,7 @@ Sparkles,
 Trophy
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect,useState } from 'react';
+import { useState } from 'react';
 
 export default function ArenaPage() {
   const { user } = useUser();
@@ -55,24 +58,15 @@ export default function ArenaPage() {
 
   const [lang, setLang] = useLanguageState();
   const [theme, setTheme] = useThemeState();
-  const [exams, setExams] = useState<ArenaExam[]>([]);
-  const [loading, setLoading] = useState(true);
+
+
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
 
-  useEffect(() => {
-    if (!db) return;
-    const examsRef = collection(db, 'arenaExams');
-    const q = query(examsRef, orderBy('createdAt', 'desc'));
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      setExams(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ArenaExam[]);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [db]);
+  const source = usePageMemo(() => db ? query(collection(db, 'arenaExams'), orderBy('createdAt', 'desc')) : null, [db]);
+  const page = usePagedCollection<ArenaExam>(source, (id, data) => ({ ...data, id } as ArenaExam));
+  const { items: exams, loading } = page;
 
   const t: TranslationSet = translations[lang];
 
@@ -89,7 +83,7 @@ export default function ArenaPage() {
         excludeNotes: config.excludeNotes,
         type: config.type,
         difficulty: config.difficulty,
-        numQuestions: Math.min(parseInt(config.numQuestions) || 5, 50),
+        numQuestions: validateQuizConfig(config).numQuestions,
         language: lang as 'en' | 'vi',
         arenaMode: true,
       });
@@ -141,6 +135,7 @@ export default function ArenaPage() {
       />
 
       <main className="flex-1 main-container pt-24 md:pt-36 space-y-10 pb-20">
+      <PageControls lang={lang} {...page} />
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b-4 border-border/30 pb-10">
           <div className="space-y-2">
             <h1 className="text-4xl md:text-8xl font-headline font-black text-primary uppercase tracking-tighter flex items-center gap-4 md:gap-8">

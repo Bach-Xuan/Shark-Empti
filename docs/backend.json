@@ -161,7 +161,7 @@
           ]
         }
       },
-      "description": "The current writer persists userId while the reader supplies the document ID separately. Legacy defaults come from history-schema.ts. Persistence completion and undefined-value handling remain documented limitations."
+      "description": "The writer persists userId and schemaVersion while the reader supplies the document ID separately. Legacy defaults come from history-schema.ts. Quiz completion awaits a stable-ID write, and the persistence DTO omits absent optional values."
     },
     "UserNotes": {
       "title": "Personal notes",

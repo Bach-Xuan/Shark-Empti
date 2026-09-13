@@ -74,3 +74,6 @@ Desktop.ini
 *.sqlite
 
 docker-compose.override.yml
+
+# Local verification runtimes
+.tools/

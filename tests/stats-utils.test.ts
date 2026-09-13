@@ -1,6 +1,6 @@
-import { expect, it } from 'vitest';
 import { calculateDashboardStats } from '@/lib/stats-utils';
 import { translations } from '@/lib/translations';
+import { expect,it } from 'vitest';
 import { history } from './fixtures/quiz';
 it.each(['constructor', 'toString', '__proto__'])('aggregates the topic %s normally', topic => {
   const result = calculateDashboardStats([{ ...history, config: { ...history.config, topic } }], translations.en, 'en');

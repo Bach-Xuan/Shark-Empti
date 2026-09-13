@@ -1,11 +1,14 @@
-
 'use client';
+import { PageControls } from '@/components/page-controls';
+import { useProfileReport } from '@/hooks/use-profile-report';
+
+
 import { useLanguageState,useThemeState } from '@/components/app-preferences';
-import { uiMessage } from '@/lib/i18n';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import { formatStoredDate } from '@/lib/date-format';
 import { showUnexpectedErrorToast } from '@/lib/error-toast';
-import { readLearnerProfile, type LearnerProfile } from '@/lib/profile-schema';
+import { uiMessage } from '@/lib/i18n';
+import { readLearnerProfile,type LearnerProfile } from '@/lib/profile-schema';
 
 import { LatexText } from '@/components/latex-text';
 import Navigation from '@/components/navigation';
@@ -33,20 +36,12 @@ import { useAuth,useDoc,useFirestore,useUser } from '@/firebase';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useToast } from '@/hooks/use-toast';
-import { readHistoryItem } from '@/lib/history-schema';
-import { readRoadmapChecks } from '@/lib/roadmap-storage';
-import { calculateDashboardStats } from '@/lib/stats-utils';
 import { translations,TranslationSet } from '@/lib/translations';
-import { QuizHistoryItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { signOut } from 'firebase/auth';
 import {
-collection,
 doc,
 getDoc,
-onSnapshot,
-orderBy,
-query,
 serverTimestamp,
 updateDoc
 } from 'firebase/firestore';
@@ -88,8 +83,12 @@ export default function ProfilePage() {
   const [lang, setLang] = useLanguageState();
   const [theme, setTheme] = useThemeState();
   const [bio, setBio] = useState('');
+  const bioDirty = useRef(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+
+  const t: TranslationSet = translations[lang];
+  const { historyPage, history, isReportSelectOpen, setIsReportSelectOpen, isReportViewOpen, setIsReportViewOpen, selectedSessionIds, setSelectedSessionIds, roadmapStatus, reportSearchQuery, setReportSearchQuery, reportSortOrder, setReportSortOrder, reportStats, filteredReportHistory } = useProfileReport(user, t, lang);
 
   // Search States
   const [searchUid, setSearchUid] = useState('');
@@ -99,17 +98,6 @@ export default function ProfilePage() {
   const savingBio = useRef(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
 
-  // Report States
-  const [history, setHistory] = useState<QuizHistoryItem[]>([]);
-  const [isReportSelectOpen, setIsReportSelectOpen] = useState(false);
-  const [isReportViewOpen, setIsReportViewOpen] = useState(false);
-  const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
-  const [roadmapStatus, setRoadmapStatus] = useState<Record<string, Record<number, boolean>>>({});
-
-  // Report Filter States
-  const [reportSearchQuery, setReportSearchQuery] = useState('');
-  const [reportSortOrder, setReportSortOrder] = useState<'recent' | 'alphabetical'>('recent');
-
   useEffect(() => {
 if (!authLoading && !user) {
       router.push('/login');
@@ -117,63 +105,13 @@ if (!authLoading && !user) {
   }, [user, authLoading, router, setLang, setTheme]);
 
   useEffect(() => {
-    if (profile?.bio) {
-      setBio(profile.bio);
+    if (!bioDirty.current) {
+      setBio(profile?.bio ?? '');
     }
   }, [profile]);
 
   // Fetch History for Report
-  useEffect(() => {
-    if (!user || !firestore) return;
-    const historyRef = collection(firestore, 'users', user.uid, 'history');
-    const q = query(historyRef, orderBy('date', 'desc'));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => readHistoryItem(doc.id, doc.data())).filter((item): item is QuizHistoryItem => item !== null);
-      if (data.length !== snapshot.docs.length) errorEmitter.emit('permission-error', new FirestorePermissionError({ path: historyRef.path, operation: 'list' }, { code: 'data-loss' }));
-      setHistory(data);
-    }, (error) => {
-      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `users/${user.uid}/history`, operation: 'list' }, error));
-    });
-    return () => unsubscribe();
-  }, [user, firestore]);
 
-  // Load Roadmap Status
-  useEffect(() => {
-    setRoadmapStatus(readRoadmapChecks(user?.uid));
-  }, [isReportSelectOpen, user?.uid]);
-
-  const t: TranslationSet = translations[lang];
-
-  // Logic to process report stats for SELECTED sessions only
-  const reportStats = useMemo(() => {
-    const selectedHistory = history.filter(h => h.id && selectedSessionIds.includes(h.id));
-    return calculateDashboardStats(selectedHistory, t, lang);
-  }, [history, selectedSessionIds, t, lang]);
-
-  // Filter and Sort history for the selection list
-  const filteredReportHistory = useMemo(() => {
-    let result = [...history];
-
-    if (reportSearchQuery.trim()) {
-      const lowerQuery = reportSearchQuery.toLowerCase();
-      result = result.filter(h => {
-        const topic = lang === 'vi' ? (h.config.topicVi || h.config.topic) : (h.config.topicEn || h.config.topic);
-        return topic.toLowerCase().includes(lowerQuery);
-      });
-    }
-
-    if (reportSortOrder === 'alphabetical') {
-      result.sort((a, b) => {
-        const topicA = lang === 'vi' ? (a.config.topicVi || a.config.topic) : (a.config.topicEn || a.config.topic);
-        const topicB = lang === 'vi' ? (b.config.topicVi || b.config.topic) : (b.config.topicEn || b.config.topic);
-        return topicA.localeCompare(topicB);
-      });
-    } else {
-      result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }
-
-    return result;
-  }, [history, reportSearchQuery, reportSortOrder, lang]);
 
   const handleSignOut = async () => {
     try {
@@ -190,11 +128,12 @@ if (!authLoading && !user) {
     setIsSaving(true);
 
     const userRef = doc(firestore, 'users', user.uid);
-    updateDoc(userRef, {
+    await updateDoc(userRef, {
       bio,
       updatedAt: serverTimestamp()
     })
     .then(() => {
+      bioDirty.current = false;
       toast({
         title: uiMessage(lang, "profile.updated"),
         description: uiMessage(lang, "profile.your_profile_has_been_saved_successfully"),
@@ -352,6 +291,7 @@ if (!authLoading && !user) {
       />
 
       <main className="flex-1 main-container pt-24 md:pt-36 space-y-8 pb-20">
+      <PageControls lang={lang} {...historyPage} />
         <div className="text-center mb-8">
           <h1 className="text-4xl md:text-6xl font-headline font-black text-primary uppercase tracking-tighter">
             {uiMessage(lang, "profile.academic_profile")}
@@ -416,7 +356,7 @@ if (!authLoading && !user) {
                   className="min-h-[120px] rounded-2xl border-4 border-border bg-muted/20 font-bold p-6 focus:ring-8 focus:ring-primary/10 focus:border-primary transition-all shadow-inner text-base"
                   placeholder={uiMessage(lang, "profile.tell_shark_guru_about_yourself")}
                   value={bio}
-                  onChange={(e) => setBio(e.target.value)}
+                  disabled={isSaving} onChange={(e) => { bioDirty.current = true; setBio(e.target.value); }}
                 />
 
                 <Button

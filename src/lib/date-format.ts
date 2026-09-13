@@ -5,3 +5,8 @@ export function formatStoredDate(value: unknown, language: string, options: Intl
     return date instanceof Date && Number.isFinite(date.getTime()) ? new Intl.DateTimeFormat(language === 'vi' ? 'vi-VN' : 'en-US', options).format(date) : '...';
   } catch { return '...'; }
 }
+
+export function formatForumDate(item: { createdAt: unknown; updatedAt?: unknown }, language: string, editedLabel: string): string {
+ const formatted = formatStoredDate(item.createdAt, language);
+ return item.updatedAt ? formatted + ' (' + editedLabel + ')' : formatted;
+}

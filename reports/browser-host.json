@@ -1,0 +1,17 @@
+[
+  {
+    "name": "firefox",
+    "status": "failed",
+    "reason": "browserType.launch: Host system is missing dependencies!\n\nFull list of missing libraries:\n    gkcodecs.dll\n    mozavutil.dll\n"
+  },
+  {
+    "name": "webkit",
+    "status": "failed",
+    "reason": "browserType.launch: Host system is missing dependencies!\n\nFull list of missing libraries:\n    icuin77.dll\n    libxslt.dll\n    libsharpyuv.dll\n    libegl.dll\n"
+  },
+  {
+    "name": "windows-application-control",
+    "status": "blocked",
+    "reason": "PrintDeps on the installed Firefox gkcodecs.dll reported: An Application Control policy has blocked this file. No policy override was attempted."
+  }
+]

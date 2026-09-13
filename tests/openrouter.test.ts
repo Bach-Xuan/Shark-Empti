@@ -1,8 +1,8 @@
 // @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { generateStructured,resetOpenRouterModelPreferenceForTest,warmOpenRouterModels } from '@/ai/openrouter';
+import { afterEach,beforeEach,describe,expect,it,vi } from 'vitest';
 import { z } from 'zod';
 vi.mock('server-only', () => ({}));
-import { generateStructured, resetOpenRouterModelPreferenceForTest, warmOpenRouterModels } from '@/ai/openrouter';
 
 const schema = z.object({ answer: z.string() });
 const request = () => generateStructured({ operation: 'test-request', system: 'Teach clearly.', prompt: 'Question', schema });
@@ -116,4 +116,21 @@ describe('OpenRouter structured response contract', () => {
       'thinkingmachines/inkling:free', 'google/gemma-4-31b-it:free',
     ]);
   });
+});
+
+it('keeps production fixture overrides disabled outside an isolated demo harness', async () => {
+ vi.stubEnv('NODE_ENV', 'production'); vi.stubEnv('OPENROUTER_TEST_URL', 'http://127.0.0.1:9098');
+ vi.stubEnv('GCLOUD_PROJECT', 'demo-shark-empti'); vi.stubEnv('FIRESTORE_EMULATOR_HOST', '127.0.0.1:8080');
+ vi.stubEnv('FIREBASE_AUTH_EMULATOR_HOST', '127.0.0.1:9099'); vi.stubEnv('NEXT_PUBLIC_USE_EMULATORS', 'true');
+ vi.stubEnv('OPENROUTER_API_KEY', 'test-only');
+ const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
+ await expect(generateStructured({ operation: 'guard', system: '', prompt: '', schema: z.object({ ok: z.boolean() }) })).rejects.toMatchObject({ appError: { code: 'AI-CONFIG-MISSING' } });
+ expect(fetchMock).not.toHaveBeenCalled();
+ vi.stubEnv('SHARK_EMULATOR_TEST_MODE', 'true');
+ fetchMock.mockResolvedValue(new Response(JSON.stringify({ choices: [{ message: { content: '{"ok":true}' } }] })));
+ await expect(generateStructured({ operation: 'guard', system: '', prompt: '', schema: z.object({ ok: z.boolean() }) })).resolves.toEqual({ ok: true });
+ expect(fetchMock.mock.calls[0][0]).toBe('http://127.0.0.1:9098/');
+ vi.stubEnv('OPENROUTER_API_KEY', 'real-key-must-not-leave-process');
+ await expect(generateStructured({ operation: 'guard', system: '', prompt: '', schema: z.object({ ok: z.boolean() }) })).rejects.toMatchObject({ appError: { code: 'AI-CONFIG-MISSING' } });
+ expect(fetchMock).toHaveBeenCalledTimes(1);
 });

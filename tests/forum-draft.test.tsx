@@ -1,9 +1,8 @@
-import React from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import ForumPage from '@/app/forum/page';
-import { translations } from '@/lib/translations';
 import { uiMessage } from '@/lib/i18n';
+import { translations } from '@/lib/translations';
+import { act,cleanup,fireEvent,render,screen,waitFor } from '@testing-library/react';
+import { afterEach,beforeEach,expect,it,vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ write: vi.fn(), toast: vi.fn(), emit: vi.fn() }));
 vi.mock('@/components/navigation', () => ({ default: () => null }));
 vi.mock('@/components/feature-help', () => ({ default: () => null }));
@@ -18,8 +17,8 @@ vi.mock('@/firebase/error-emitter', () => ({ errorEmitter: { emit: mocks.emit } 
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('firebase/firestore', () => ({
-  collection: () => 'posts', query: () => 'posts', orderBy: vi.fn(), serverTimestamp: () => 1, addDoc: mocks.write,
-  onSnapshot: (_ref: unknown, callback: (snapshot: unknown) => void) => { callback({ docs: [] }); return vi.fn(); },
+  limit: vi.fn(), collection: () => 'posts', query: () => 'posts', orderBy: vi.fn(), serverTimestamp: () => 1, addDoc: mocks.write,
+  onSnapshot: (_ref: unknown, callback: (snapshot: unknown) => void) => { callback({ docs: [], size: 0 }); return vi.fn(); },
 }));
 beforeEach(() => vi.clearAllMocks());
 afterEach(cleanup);

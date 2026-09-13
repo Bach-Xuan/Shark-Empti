@@ -1,13 +1,14 @@
 import { z } from 'zod';
+import { cognitiveMetricsSchema,languageAnalysisSchema as labels } from './analysis-schema';
 import type { QuizHistoryItem } from './types';
 
 const text = z.union([z.string(), z.number()]).transform(String);
-const labels = z.object({ strengths: z.array(z.string()), weaknesses: z.array(z.string()), recommendations: z.array(z.string()) });
 const analysis = z.object({
   en: labels, vi: labels, errorCategories: z.record(z.string(), z.number()),
-  cognitiveMetrics: z.object({ conceptMastery: z.number(), applicationSkill: z.number(), problemDecomposition: z.number(), logicalReasoning: z.number(), errorAwareness: z.number(), instructionFollowing: z.number() }),
+  cognitiveMetrics: cognitiveMetricsSchema,
 });
 const historySchema = z.object({
+  schemaVersion: z.union([z.literal(1), z.literal(2)]).default(1),
   quizResults: z.array(z.object({
     question: z.string(), correct: text, userAnswer: text.default(''), isCorrect: z.boolean(),
     explanation: z.string().default(''), type: z.string().default('Multiple Choice'), difficulty: z.string().default('Mixed'),

@@ -1,0 +1,168 @@
+{
+  "measuredAt": "2026-09-13T14:48:49.836Z",
+  "environment": "Windows, Chromium 151 desktop and Pixel 7 emulation, production demo build, Auth/Firestore Emulator and isolated AI fixture",
+  "stats": {
+    "startTime": "2026-09-13T14:48:49.836Z",
+    "duration": 182536.838,
+    "expected": 14,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  },
+  "cases": [
+    {
+      "title": "account isolation, quiz, history, notes and preferences",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 30941
+        }
+      ]
+    },
+    {
+      "title": "dashboard boundary isolates a browser failure and recovers on retry",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 8102
+        }
+      ]
+    },
+    {
+      "title": "Forum comment and Arena submission use real demo APIs",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 25944
+        }
+      ]
+    },
+    {
+      "title": "auth pages retain en across navigation without loading TensorFlow",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 3266
+        }
+      ]
+    },
+    {
+      "title": "auth pages retain vi across navigation without loading TensorFlow",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 3270
+        }
+      ]
+    },
+    {
+      "title": "Forum comment reaches the subscription without network interception",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 10549
+        }
+      ]
+    },
+    {
+      "title": "account isolation, quiz, history, notes and preferences",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 26315
+        }
+      ]
+    },
+    {
+      "title": "dashboard boundary isolates a browser failure and recovers on retry",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 6180
+        }
+      ]
+    },
+    {
+      "title": "Forum comment and Arena submission use real demo APIs",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 15640
+        }
+      ]
+    },
+    {
+      "title": "auth pages retain en across navigation without loading TensorFlow",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 3987
+        }
+      ]
+    },
+    {
+      "title": "auth pages retain vi across navigation without loading TensorFlow",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 4457
+        }
+      ]
+    },
+    {
+      "title": "Forum comment reaches the subscription without network interception",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 10114
+        }
+      ]
+    },
+    {
+      "title": "guest Arena requires login and publishing a post waits for a real write",
+      "project": "desktop",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 8945
+        }
+      ]
+    },
+    {
+      "title": "guest Arena requires login and publishing a post waits for a real write",
+      "project": "mobile",
+      "status": "expected",
+      "results": [
+        {
+          "status": "passed",
+          "durationMs": 8560
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
-import { test, expect } from '@playwright/test';
-import { getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { expect,test } from '@playwright/test';
+import { getApps,initializeApp } from 'firebase-admin/app';
+import { getFirestore,Timestamp } from 'firebase-admin/firestore';
 
 test('guest Arena requires login and publishing a post waits for a real write', async ({ page }) => {
   if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) throw new Error('Demo emulators required');

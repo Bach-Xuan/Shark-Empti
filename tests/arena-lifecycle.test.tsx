@@ -1,8 +1,7 @@
-import React from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import ArenaDetailPage from '@/app/arena/[examId]/page';
-import { analysis, history, question } from './fixtures/quiz';
+import { act,cleanup,fireEvent,render,screen,waitFor } from '@testing-library/react';
+import { afterEach,beforeEach,expect,it,vi } from 'vitest';
+import { analysis,history,question } from './fixtures/quiz';
 const mocks = vi.hoisted(() => ({
   user: { uid: 'player', getIdToken: async () => 'fixture' } as { uid: string; getIdToken: () => Promise<string> } | null,
   feedback: vi.fn(), toast: vi.fn(), push: vi.fn(), request: vi.fn(),

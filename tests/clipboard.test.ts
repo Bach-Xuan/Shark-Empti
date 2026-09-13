@@ -1,5 +1,5 @@
-import { afterEach, expect, it, vi } from 'vitest';
 import { copyTextToClipboard } from '@/lib/clipboard';
+import { afterEach,expect,it,vi } from 'vitest';
 afterEach(() => vi.unstubAllGlobals());
 it('reports missing and denied clipboard access without throwing', async () => {
   vi.stubGlobal('navigator', {});

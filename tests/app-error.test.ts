@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { asAiResult, createAppError, getAiAppError, OpenRouterProviderError } from '@/lib/app-error';
+import { asAiResult,createAppError,getAiAppError,OpenRouterProviderError } from '@/lib/app-error';
+import { describe,expect,it } from 'vitest';
 
 describe('AI error contract', () => {
   it('preserves a safe provider error code and values', () => {

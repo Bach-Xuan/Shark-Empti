@@ -43,22 +43,26 @@ export interface QuizAnalysis {
   cognitiveMetrics: CognitiveMetrics;
 }
 
-export interface QuizResultItem {
+export interface QuizQuestion {
   question: string;
   section?: string;
   options?: string[];
   correct: string;
-  userAnswer: string;
-  isCorrect: boolean;
-  timeTakenSeconds: number;
   explanation: string;
   type: string;
   difficulty: string;
+}
+
+export interface QuizResultItem extends QuizQuestion {
+  userAnswer: string;
+  isCorrect: boolean;
+  timeTakenSeconds: number;
   errorCategory?: string | null;
   aiFeedback?: string | null;
 }
 
 export interface QuizHistoryItem {
+  schemaVersion?: 1 | 2;
   id?: string;
   quizResults: QuizResultItem[];
   totalTime: number;
@@ -84,7 +88,7 @@ export interface ArenaExam {
   authorPhoto: string;
   createdAt: StoredDate;
   totalAttempts: number;
-  questions: QuizResultItem[];
+  questions: QuizQuestion[];
 }
 
 export interface Flashcard {

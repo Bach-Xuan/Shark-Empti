@@ -1,7 +1,7 @@
-import { afterAll, afterEach, beforeAll, describe, it } from 'vitest';
-import { assertFails, assertSucceeds, initializeTestEnvironment, RulesTestEnvironment } from '@firebase/rules-unit-testing';
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+import { assertFails,assertSucceeds,initializeTestEnvironment,RulesTestEnvironment } from '@firebase/rules-unit-testing';
+import { deleteDoc,doc,getDoc,setDoc,updateDoc } from 'firebase/firestore';
 import fs from 'node:fs';
+import { afterAll,afterEach,beforeAll,describe,it } from 'vitest';
 
 let testEnv: RulesTestEnvironment;
 

@@ -1,8 +1,7 @@
-import React from 'react';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, expect, it, vi } from 'vitest';
 import QuickNotes from '@/components/quick-notes';
 import { translations } from '@/lib/translations';
+import { act,cleanup,fireEvent,render,screen } from '@testing-library/react';
+import { afterEach,expect,it,vi } from 'vitest';
 vi.mock('@/components/latex-toolbar', () => ({ LatexQuickToolbar: () => null }));
 vi.mock('@/components/ui-text', () => ({ UiText: () => null }));
 afterEach(cleanup);
