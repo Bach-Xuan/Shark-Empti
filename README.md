@@ -43,8 +43,6 @@ When an AI operation cannot be completed, the error notification preserves an er
 - TensorFlow.js for Focus Shield; its runtime and model load only when the feature is enabled.
 - Vitest, Testing Library, Firebase Emulator Suite and Playwright.
 
-The current AI transport has an unresolved finding concerning aggregate request lifetime, retry ownership and recovery after response loss. The [AI transport remediation plan](docs/AI_TRANSPORT_REMEDIATION_PLAN.md) defines the target architecture; it has not been implemented in the current source.
-
 ## 🚀 Quick Start
 
 ### 🔧 Prerequisites
@@ -123,11 +121,10 @@ CI in `.github/workflows/ci.yml` uses Node 24, JDK 21, a demo Firebase project a
 
 ## 📚 Documentation
 
-- [Dependency, key, Firebase, OpenRouter, Emulator, CI/Vercel and troubleshooting guide](docs/CONFIGURATION.md)
-- [Architecture, data flow, contracts and dependency inventory](docs/TECHNICAL_DOCUMENTATION.md)
-- [Annotated backend data map](docs/backend.json)
-- [Technical audit report](docs/AUDIT_REPORT.md)
-- [AI transport remediation plan](docs/AI_TRANSPORT_REMEDIATION_PLAN.md)
+- [Configuration](docs/CONFIGURATION.md)
+- [Technical Documentation](docs/TECHNICAL_DOCUMENTATION.md)
+- [Backend](docs/backend.json)
+- [Audit Report](docs/AUDIT_REPORT.md)
 
 All repository documentation is maintained in English. The application interface itself remains bilingual, and localization behavior is described in the technical documentation.
 
