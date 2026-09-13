@@ -1,141 +1,134 @@
 # 🦈 Shark Empti · v1.15.1
 
-Đây là trang bắt đầu: phạm vi, lệnh phát triển và tài liệu kỹ thuật của ứng dụng.
+Shark Empti addresses a practical educational concern: abundant digital resources often remain disconnected from learners' actual progress. Static question banks encourage repetition, general-purpose chatbots lack sustained learning context, and conventional assessments frequently end with a score rather than meaningful guidance. Shark Empti instead approaches learning as a continuous, evidence-informed process.
 
-Shark Empti là không gian học tập biến một chủ đề bạn tò mò thành tiến bộ có thể nhìn thấy. Bạn bắt đầu bằng một bài quiz, nhận phản hồi đúng lúc, quay lại đúng phần còn yếu và dần xây được nhịp học của riêng mình — trong một trải nghiệm gọn, rõ và có thể kiểm chứng. Đợt tối ưu thứ hai giữ URL, dữ liệu lịch sử và quy tắc tính điểm; không deploy hoặc sửa dữ liệu production.
+This purpose is consistent with Vietnam's wider educational modernization agenda, including **Resolution 57-NQ/TW (2024)** on science, innovation, and digital transformation; **Resolution 71-NQ/TW (2025)** on educational breakthroughs; **Decision 131/QĐ-TTg (2022)** on digital transformation in education; and **Decision 127/QĐ-TTg (2021)** on the national AI strategy. These references establish contextual alignment only; they do not imply governmental endorsement or regulatory compliance.
 
-## 🎯 Học có định hướng, thấy rõ tiến bộ
+Within this context, Shark Empti unifies assessment, reflection, focused practice, and peer learning. Configurable activities, contextual guidance, bilingual access, learning records, community participation, and optional attention support help learners understand their present position, identify appropriate goals, and exercise meaningful control over their progress. Each learning event consequently becomes a visible sequence of evidence, interpretation, and purposeful action.
 
-Mỗi lần học đều để lại một dấu mốc: câu hỏi cho biết bạn đang ở đâu, phản hồi chỉ ra vì sao bạn sai, còn lần luyện tiếp theo giúp bạn tiến thêm một bước. Dashboard nối các dấu mốc ấy thành bức tranh tiến bộ; Shark Guru ở bên khi bạn cần một lời giải thích vừa đủ để tự đi tiếp.
+## 🏆 National Recognition and Continuing Development
 
-- **Quiz AI và phản hồi cá nhân hóa:** biến mục tiêu học thành câu hỏi phù hợp, rồi biến lỗi sai thành hướng cải thiện cụ thể.
-- **Practice, Flashcards và Dashboard:** lặp lại đúng điều cần nhớ, đúng kỹ năng cần củng cố và đúng thời điểm cần nhìn lại.
-- **Arena và Forum:** học cùng cộng đồng qua thử thách, bảng xếp hạng và những cuộc trao đổi có ích.
-- **Focus Shield:** bảo vệ khoảng thời gian tập trung bằng camera chạy ngay trong trình duyệt khi bạn chủ động bật.
+Shark Empti earned national recognition at **AI Young Guru 2026** through **"VTS - Cá Mập Laze"**, representing **Võ Thị Sáu High School, Hồ Chí Minh City**. From more than **26,000 participants**, over **15,000 teams**, and **1,800 upper-secondary and vocational schools**, the team progressed through the Top 250 and Top 30, ranked among the **Top 12**, and received the **Promising Award**. This repository directly continues that award-winning Shark Empti product, not a separate successor or reconstruction. It preserves the original educational purpose while advancing toward greater pedagogical maturity, operational dependability, and socially meaningful application.
 
-AI luôn được kiểm tra schema ở server và dùng fallback OpenRouter để trải nghiệm không phụ thuộc vào một model duy nhất. Kết quả AI là hỗ trợ học tập, không thay thế việc tự kiểm chứng kiến thức.
+**AI Young Guru** is a nationwide AI creativity competition for upper-secondary and vocational students. **FPT University** organizes it under the patronage of the **Ministry of Education and Training** and professional patronage of the **Ministry of Science and Technology**, with the **Science and Education Programme Department of Vietnam Television**, the **Central Committee of the Ho Chi Minh Communist Youth Union**, the **Department of Cybersecurity and High-Tech Crime Prevention under the Ministry of Public Security**, and units of **FPT Corporation**. Its mission, **“Bình dân học AI”**-making AI learning broadly accessible-promotes innovative thinking and practical AI proficiency to improve quality of life and support sustainable development.
 
-Khi AI không hoàn tất, popup giữ mã lỗi và metadata an toàn như thao tác, số model đã thử, lỗi cuối và HTTP status nếu có; không hiển thị prompt, phản hồi raw, stack trace hay secret.
+The progression and recognition of VTS - Cá Mập Laze may be consulted through the following official records:
 
-## 🚀 Bắt đầu
+- [Official AI Young Guru fanpage](https://www.facebook.com/aiyoungguru1)
+- [Announcement of the Top 250 teams advancing to the Regional round](https://www.facebook.com/aiyoungguru1/posts/pfbid0jQvJgADPYpX3ZxuSmLBTrs25xaxLsn7urWU9bNyTQqANqcAFsqi1gXj1Hx9Qv5Hkl)
+- [Announcement of the Top 30 teams advancing to the practical round](https://www.facebook.com/aiyoungguru1/posts/pfbid02bfr57ZqxfWRtY7LYwfaFQ7Bit4x94NHMsmGJBAcWoGN6odB4vApv3L2v64uzxN61l?rdid=nlLB1dfbhFpVTRG9#)
+- [Detailed announcement of the Top 30 teams advancing to the Practical round](https://www.facebook.com/aiyoungguru1/posts/pfbid0JTEMeq62vQy9evu9SS99cbYHpHofMUbMXbV4vrfGVyxYcYsjLP5MveBnR974B1Mpl?rdid=sc7MoUU3UXosSdm5#)
+- [Recognition published by Võ Thị Sáu High School](https://www.facebook.com/permalink.php?story_fbid=pfbid023FaPNEaCvTwEcFmfQ9CrxVHXpY2zKhc9xBpDdiYeVXZcjn8Q9VrEWuCawZWkAwuUl&id=61583508615694&rdid=BipgwzyCQMh6luqG#)
+- [Promising Award ceremony and recognition](https://www.facebook.com/reel/1516002886825130)
 
-Yêu cầu Node 24, npm và cấu hình Firebase Web App. Dùng PowerShell trên Windows:
+## 🎯 Directed Learning with Visible Progress
+
+Every learning activity leaves a meaningful marker: a question indicates the learner's present understanding, feedback explains why an answer was unsuccessful, and the next practice activity provides an opportunity to advance. The Dashboard connects these markers into a broader view of progress, while Shark Guru remains available when a learner needs sufficient explanation to continue independently.
+
+- **AI-generated quizzes and personalized feedback:** transform a learning objective into an appropriate set of questions, then translate mistakes into specific directions for improvement.
+- **Practice, Flashcards, and Dashboard:** revisit the knowledge that must be retained, the skills that require reinforcement, and the evidence that should be reviewed.
+- **Arena and Forum:** support community learning through academic challenges, leaderboards, and constructive discussion.
+- **Focus Shield:** protects a deliberate period of concentration through an in-browser camera feature that operates only when the learner explicitly enables it.
+
+AI inputs and outputs are validated against server-side schemas, and the OpenRouter fallback sequence prevents generation from depending upon a single model. AI results remain educational support and do not replace independent verification of academic knowledge.
+
+When an AI operation cannot be completed, the error notification preserves an error code and allowlisted diagnostic metadata, such as the operation, number of attempted models, final failure classification, and HTTP status when available. It does not display prompts, raw model responses, stack traces, or secrets.
+
+## 🧭 Current Technology
+
+- Next.js 16.3.4, React 19.2.8 and TypeScript 6.
+- Firebase Authentication, Cloud Firestore, Firebase Admin SDK and Firestore Security Rules.
+- OpenRouter Chat Completions through `fetch`, with a nominal Inkling → Gemma → Nemotron priority. The effective starting model can change to the process-scoped `preferredModel` after a successful request or warm-up.
+- Tailwind CSS 4, Radix UI, Recharts and KaTeX.
+- TensorFlow.js for Focus Shield; its runtime and model load only when the feature is enabled.
+- Vitest, Testing Library, Firebase Emulator Suite and Playwright.
+
+The current AI transport has an unresolved finding concerning aggregate request lifetime, retry ownership and recovery after response loss. The [AI transport remediation plan](docs/AI_TRANSPORT_REMEDIATION_PLAN.md) defines the target architecture; it has not been implemented in the current source.
+
+## 🚀 Quick Start
+
+### 🔧 Prerequisites
+
+- Node.js **24.x** and its bundled npm. `.nvmrc` and `package.json#engines` both select major 24.
+- npm registry access for the first clean installation.
+- A Firebase project with a Web App, Cloud Firestore and Google Authentication.
+- An OpenRouter API key when AI features are required.
+- Firebase Admin service-account credentials when Arena submission or Forum comment creation/deletion APIs must run outside the Emulator.
+- JDK 21 and Playwright Chromium only for integration/E2E tests.
+
+### 📦 Install Dependencies and Create the Environment File
+
+From the repository root, use PowerShell:
 
 ```powershell
-if (-not (Test-Path -LiteralPath .env)) { Copy-Item -LiteralPath .env.example -Destination .env }
-# Điền cấu hình Firebase và OpenRouter trong .env; không commit file này.
+node --version
+npm --version
 npm ci
+
+if (-not (Test-Path -LiteralPath .env)) {
+  Copy-Item -LiteralPath .env.example -Destination .env
+}
+
+# Fill the required variables in .env; never commit or print this file.
 npm run dev
 ```
 
-Mở http://localhost:9002. Bật Google provider và authorized domain trong Firebase Authentication. Các API Forum/Arena cần Firebase Admin; AI cần OPENROUTER_API_KEY. Không đưa secret vào biến NEXT_PUBLIC_.
+Open [http://localhost:9002](http://localhost:9002).
 
-## 🧩 Công nghệ và phạm vi
+The repository is governed by `package-lock.json`; do not use pnpm or Yarn against the same `node_modules`. `npm ci` performs a clean installation, requires the lockfile to match the manifest and may replace the complete `node_modules` directory.
 
-Next 16 / React 19, Firebase Auth + Firestore, Zod 4, Tailwind 4, Radix, Recharts và KaTeX. AI dùng fetch OpenRouter trực tiếp với fallback server-side theo thứ tự Inkling → Gemma → Nemotron. Khi khởi động, browser lên lịch probe nền không chặn UI; flow thực vẫn tự fallback nếu probe chưa xong hoặc model đổi trạng thái. TensorFlow chỉ tải runtime/model khi bật Focus Shield. Genkit, Dev UI và Jaeger đã được loại bỏ.
+### 🔑 Minimum Configuration by Feature
 
-Trình duyệt mục tiêu: Safari 16.4+, Chrome 111+, Firefox 128+. E2E hiện cấu hình Chromium desktop/mobile; đây không phải bằng chứng đã kiểm thử mọi trình duyệt mục tiêu.
-
-Giao diện hỗ trợ VI/EN, lưu ngôn ngữ/theme giữa trang và tab. Không dịch lại dữ liệu người dùng hoặc lịch sử khi đổi ngôn ngữ. Camera chạy trong trình duyệt, cần HTTPS hoặc localhost và quyền camera.
-
-## ✅ Lệnh kiểm tra
-
-| Lệnh | Mục đích |
+| Feature | Configuration requirement or guidance |
 |---|---|
-| npm run lint | ESLint, Next và React Hooks |
-| npm run typecheck | TypeScript không phát sinh JavaScript |
-| npm test | Unit/component, không cần production |
-| npm run test:coverage | Coverage V8 |
-| npm run test:integration | Auth/Firestore Emulator, Rules và API |
-| npm run test:rules | Chỉ kiểm tra Rules qua Emulator |
-| npm run build | Build production |
-| npm run test:e2e | App thật, Emulator và AI fixture, Chromium desktop/mobile |
-| npm run ai:health | Kiểm tra metadata model, không xác thực key/quota hoặc khả năng sinh nội dung |
-| npm run ai:smoke | Quiz và chatbot thật; có thể tiêu thụ quota |
-| npm run clean | Chỉ xóa cache .next, giữ node_modules |
+| Configure the Firebase browser client, sign in and access Firestore | Provide the complete six-field Firebase Web configuration for consistency. The current application initializes Auth and Firestore but not Storage or Messaging; `storageBucket` and `messagingSenderId` are carried as configuration fields rather than independently validated runtime prerequisites. Google provider and the relevant authorized domains remain required for Google sign-in. |
+| Generate quizzes, flashcards, practice, feedback and chatbot responses | `OPENROUTER_API_KEY` |
+| Submit Arena attempts; create/delete Forum comments outside the Emulator | Three `FIREBASE_ADMIN_*` values |
+| Local integration/E2E | JDK 21; Firebase CLI in dev dependencies; Playwright Chromium |
 
-Integration/E2E cần Java 21 và trình duyệt Playwright: `npx playwright install chromium`. Không chạy integration trực tiếp thiếu Emulator: cấu hình phải báo thất bại. CI nằm ở .github/workflows/ci.yml và dùng demo-shark-empti, không cần secret production.
+[docs/CONFIGURATION.md](docs/CONFIGURATION.md) contains the complete process for obtaining every Firebase/OpenRouter value, mapping service-account JSON fields, enabling Google sign-in, creating Firestore, deploying Rules and configuring Vercel. Never expose `OPENROUTER_API_KEY` or `FIREBASE_ADMIN_*` through `NEXT_PUBLIC_*` variables.
 
-## 📚 Tài liệu
+## 🧪 Development and Validation Commands
 
-- [Cấu hình, Windows, CI/Vercel và chẩn đoán](docs/CONFIGURATION.md).
-- [Kiến trúc, contracts, bảo trì, dependency inventory và giới hạn](docs/TECHNICAL_DOCUMENTATION.md).
+| Command | Purpose | Network/external services |
+|---|---|---|
+| `npm run dev` | Run the Next development server on port 9002 | Not required for static pages; Firebase/AI require their respective configuration |
+| `npm run lint` | ESLint, Next and React Hooks | No |
+| `npm run typecheck` | TypeScript `--noEmit` | No |
+| `npm test` | Unit/component tests | Never calls production services |
+| `npm run test:coverage` | Unit/component tests with V8 coverage | Never calls production services |
+| `npm run test:rules` | Firestore Rules tests through the Emulator | JDK 21 |
+| `npm run test:integration` | Auth/Firestore Emulator, Rules and API integration | JDK 21 |
+| `npm run build` | Next production build | Currently needs Google Fonts access because it uses `next/font/google` |
+| `npm run test:e2e` | Real app, Auth/Firestore Emulator and AI fixture; desktop/mobile Chromium | JDK 21 and installed Chromium |
+| `npm run ai:health` | Check the model catalogue endpoint and fallback-model presence | OpenRouter network; does not prove key/quota/inference validity |
+| `npm run ai:smoke` | Generate one real quiz and chatbot response | OpenRouter key; may consume quota |
+| `npm run clean` | Remove `.next` only; retain `node_modules` | No |
 
-Có test không đồng nghĩa tất cả kịch bản đã được chứng minh. Xem báo cáo chạy thực tế trước khi release; không coi ảnh chụp sau migration là so sánh trước/sau. Giữ phiên bản 1.15.1; chỉ deploy sau một yêu cầu riêng.
-
-Chạy các lệnh kiểm tra phù hợp với thay đổi trước khi bàn giao. Kết quả chỉ có ý nghĩa cho đúng môi trường, fixture và thời điểm chạy; kiểm thử browser, camera thật và dịch vụ AI trực tiếp cần được xác nhận riêng khi phạm vi thay đổi liên quan.
-
-Ba tài liệu chính dùng Việt–Anh trong cùng file. AGENTS.md/CLAUDE.md chỉ dẫn quy trình bảo trì; docs/backend.json là sơ đồ dữ liệu có chú thích, không phải validator hoặc nguồn Rules. Không lưu báo cáo lâu dài trong coverage/test-results vì công cụ có thể tạo lại chúng. .gitignore bảo vệ các biến thể .env và artifact local; nó không xóa secret đã từng được theo dõi bởi Git.
-
----
-
-English below
-
-# 🦈 Shark Empti · v1.15.1
-
-This is the starting page for the application scope, development commands and technical documentation.
-
-Shark Empti is a learning space that turns a topic you are curious about into progress you can see. Start with a quiz, get timely feedback, return to the gaps that matter and gradually build a rhythm that is your own—in an experience that stays clear, focused and verifiable. The second optimization pass preserves URLs, historical data and scoring rules; it does not deploy or modify production data.
-
-## 🎯 Learn with direction and see your progress
-
-Every study session leaves a useful marker: questions show where you are, feedback explains why an answer missed, and the next practice round helps you move one step further. The dashboard connects those markers into a picture of progress; Shark Guru is there when you need just enough explanation to keep going on your own.
-
-- **AI quizzes and personalized feedback:** turn a learning goal into fitting questions, then turn mistakes into a concrete next step.
-- **Practice, Flashcards and Dashboard:** revisit what needs remembering, reinforce the skills that need work and see when to look back.
-- **Arena and Forum:** learn with a community through challenges, leaderboards and useful conversation.
-- **Focus Shield:** protect focused study time with an in-browser camera feature when you choose to enable it.
-
-AI responses are schema-validated on the server and use OpenRouter fallback, so the experience does not depend on one model alone. AI output supports learning; it does not replace checking your own understanding.
-
-When AI cannot complete a request, the popup retains an error code and safe metadata such as operation, attempted-model count, last failure and HTTP status when available; it never shows prompts, raw responses, stack traces or secrets.
-
-## 🚀 Getting started
-
-Requires Node 24, npm and Firebase Web App configuration. On Windows, use PowerShell:
+Install the browser after `npm ci`:
 
 ```powershell
-if (-not (Test-Path -LiteralPath .env)) { Copy-Item -LiteralPath .env.example -Destination .env }
-# Fill Firebase and OpenRouter settings in .env; never commit this file.
-npm ci
-npm run dev
+npx --no-install playwright install chromium
 ```
 
-Open http://localhost:9002. Enable the Google provider and authorized domain in Firebase Authentication. Forum/Arena APIs require Firebase Admin; AI requires OPENROUTER_API_KEY. Never put secrets in NEXT_PUBLIC_ variables.
+CI in `.github/workflows/ci.yml` uses Node 24, JDK 21, a demo Firebase project and an AI fixture; it does not require production credentials.
 
-## 🧩 Technology and scope
+## 🧩 Functional and Data Scope
 
-Next 16 / React 19, Firebase Auth + Firestore, Zod 4, Tailwind 4, Radix, Recharts and KaTeX. AI uses direct OpenRouter fetch with server-side fallback in this order: Inkling → Gemma → Nemotron. On startup, the browser schedules a background probe that never blocks the UI; real flows still fall back if the probe has not completed or model availability changes. TensorFlow runtime/model load when Focus Shield is enabled. Genkit, its Dev UI and Jaeger have been removed.
-
-Target browsers: Safari 16.4+, Chrome 111+, Firefox 128+. E2E currently configures desktop/mobile Chromium; this is not evidence that every target browser has been tested.
-
-The UI supports VI/EN with shared language/theme persistence across pages and tabs. Changing language does not translate user content or historical data. Camera inference runs in the browser and requires HTTPS or localhost plus camera permission.
-
-## ✅ Validation commands
-
-| Command | Purpose |
-|---|---|
-| npm run lint | ESLint, Next and React Hooks |
-| npm run typecheck | TypeScript without JavaScript output |
-| npm test | Unit/component tests without production |
-| npm run test:coverage | V8 coverage |
-| npm run test:integration | Auth/Firestore Emulator, Rules and API |
-| npm run test:rules | Rules-only Emulator validation |
-| npm run build | Production build |
-| npm run test:e2e | Real app, Emulator and AI fixture, desktop/mobile Chromium |
-| npm run ai:health | Check model metadata, not key validity/quota or successful inference |
-| npm run ai:smoke | Live quiz and chatbot; may consume quota |
-| npm run clean | Remove only .next cache, retain node_modules |
-
-Integration/E2E require Java 21 and Playwright browsers: `npx playwright install chromium`. Do not run integration directly without Emulator: configuration must fail. CI lives in .github/workflows/ci.yml and uses demo-shark-empti without production secrets.
+- The interface supports Vietnamese and English; language/theme preferences persist across pages and tabs.
+- Camera access requires HTTPS or `localhost` and explicit user permission.
+- Firestore Web SDK access is governed by `firestore.rules`; Firebase Admin SDK bypasses Rules, so server APIs must enforce tokens, ownership and payload contracts.
+- `docs/backend.json` is a descriptive data map; Zod schemas, TypeScript readers, Route Handlers and Firestore Rules are the executable contracts.
+- Documented browser targets are Safari 16.4+, Chrome 111+ and Firefox 128+, while E2E currently configures desktop/mobile Chromium only. Review the audit validation gaps before release.
 
 ## 📚 Documentation
 
-- [Configuration, Windows, CI/Vercel and troubleshooting](docs/CONFIGURATION.md).
-- [Architecture, contracts, maintenance, dependency inventory and limitations](docs/TECHNICAL_DOCUMENTATION.md).
+- [Dependency, key, Firebase, OpenRouter, Emulator, CI/Vercel and troubleshooting guide](docs/CONFIGURATION.md)
+- [Architecture, data flow, contracts and dependency inventory](docs/TECHNICAL_DOCUMENTATION.md)
+- [Annotated backend data map](docs/backend.json)
+- [Technical audit report](docs/AUDIT_REPORT.md)
+- [AI transport remediation plan](docs/AI_TRANSPORT_REMEDIATION_PLAN.md)
 
-Having tests does not prove every scenario. Review actual execution results before release; post-migration screenshots are not before/after comparisons. Version remains 1.15.1; deployment requires a separate request.
+All repository documentation is maintained in English. The application interface itself remains bilingual, and localization behavior is described in the technical documentation.
 
-Run validation commands appropriate to the change before handoff. Results apply only to the environment, fixtures and time in which they ran; browser coverage, physical cameras and live AI services need separate confirmation when the change involves them.
-
-The three main documents keep Vietnamese and English in the same file. Agent instruction files, when present, provide maintenance guidance; docs/backend.json is an annotated data map, not a validator or Rules source. Keep durable reports out of coverage/test-results because tools may recreate them. .gitignore protects .env variants and local artifacts; it does not remove secrets already tracked by Git.
+Never commit `.env`, service-account JSON, private keys, API tokens, Playwright traces containing credentials or production data. `.gitignore` cannot remove a secret that was already committed; exposed credentials require revocation/rotation and a separately approved history-remediation procedure.

@@ -4,17 +4,17 @@ import { UiText } from "@/components/ui-text";
 import { uiMessage } from '@/lib/i18n';
 
 /**
- * @fileOverview Tính năng Lá Chắn Tập Trung (Focus Shield) - v1.15.1
+ * @fileOverview Focus Shield feature - v1.15.1
  *
- * FIX v1.15.1 (khôi phục vòng lặp AI sau khi minimize):
- *   Bổ sung isOpen và isMinimized vào danh sách dependency của useEffect
- *   chạy startDetection. Điều này đảm bảo khi người dùng mở rộng widget
- *   (thẻ video được mount lại), logic nhận diện sẽ tự động khởi động lại
- *   thay vì bị ngắt vĩnh viễn do ref bị null lúc thu nhỏ.
+ * FIX v1.15.1 (restoration of the AI detection loop after minimization):
+ *   Added isOpen and isMinimized to the dependency list of the useEffect
+ *   that invokes startDetection. This ensures that, when the user expands the widget
+ *   and the video element is mounted again, the detection logic restarts automatically
+ *   instead of remaining permanently interrupted because the reference was null while minimized.
  *
- * FIX trước đó:
- *   Sử dụng onloadedmetadata để gọi play() an toàn, tránh race condition.
- *   Chuẩn hóa pixel về [-1, 1] khớp MobileNetV2 preprocess_input.
+ * Previous corrections:
+ *   Use onloadedmetadata to invoke play() safely and prevent a race condition.
+ *   Normalize pixel values to [-1, 1] in accordance with MobileNetV2 preprocess_input.
  */
 
 import type * as tf from "@tensorflow/tfjs";
@@ -280,7 +280,7 @@ export default function FocusTrackerWidget() {
     }
   };
 
-  // Vòng lặp nhận diện - Cần Restart khi videoRef xuất hiện trở lại (isOpen/isMinimized thay đổi)
+  // Restart the detection loop when videoRef becomes available after isOpen or isMinimized changes.
   useEffect(() => {
     if (isActive && modelRef.current && videoRef.current) {
       startDetection();
@@ -291,9 +291,9 @@ export default function FocusTrackerWidget() {
         requestRef.current = null;
       }
     };
-  }, [isActive, startDetection, isOpen, isMinimized]); // Cần theo dõi isOpen/isMinimized để hồi sinh vòng lặp khi remount video
+  }, [isActive, startDetection, isOpen, isMinimized]); // Track isOpen and isMinimized so the loop resumes when the video is remounted.
 
-  // Gán/đính lại stream vào <video> mỗi khi UI mở/hiện preview và đang active.
+  // Attach or reattach the stream to <video> whenever the interface or preview is visible and active.
   useEffect(() => {
     const videoEl = videoRef.current;
     if (isOpen && !isMinimized && isActive && streamRef.current && videoEl) {

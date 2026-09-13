@@ -1,54 +1,235 @@
-# ⚙️ Cấu hình và chẩn đoán · v1.15.1
+# ⚙️ Configuration, Dependencies, and Troubleshooting · Shark Empti v1.15.1
 
-English below. Hướng dẫn trong file này không phải xác nhận cấu hình local/production đã đầy đủ.
+This document describes the configuration actually consumed by the current source. Placeholders do not configure a service, and the existence of `.env` does not prove that a credential is valid.
 
-## 1. ⚙️ Runtime và cài đặt
+## 1. 🧰 Runtime and Dependency Installation
 
-Dùng Node 24.x cho local, CI và cấu hình project Vercel. .nvmrc và engines trong package.json thống nhất major; @types/node theo major runtime. Chạy npm ci để cài đúng lockfile; không dùng --force hoặc --legacy-peer-deps để bỏ qua xung đột peer.
+### 1.1. 📋 Required Prerequisites
 
-Chỉ copy .env.example thành .env nếu .env chưa tồn tại; không ghi đè credential đã cấu hình. Next tự nạp biến môi trường; scripts AI dùng Node --env-file-if-exists=.env, không cần dotenv. Biến đã có trong process được ưu tiên bởi Node. Script AI chỉ nạp .env theo lệnh hiện tại, không tự thực hiện toàn bộ thứ tự nạp file env của Next. Sau khi đổi biến NEXT_PUBLIC_, khởi động/build lại vì chúng được đóng vào client bundle.
-
-## 2. 🔐 Ma trận biến môi trường
-
-| Biến | Phạm vi | Ý nghĩa |
+| Component | Version/scope | Required for |
 |---|---|---|
-| OPENROUTER_API_KEY | Server secret | Bearer key cho AI |
-| NEXT_PUBLIC_FIREBASE_API_KEY | Browser | Firebase Web API key; Rules bảo vệ dữ liệu |
-| NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN | Browser | Domain Firebase Auth |
-| NEXT_PUBLIC_FIREBASE_PROJECT_ID | Browser | Project dữ liệu |
-| NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET | Browser | Bucket Web App |
-| NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID | Browser | Sender ID |
-| NEXT_PUBLIC_FIREBASE_APP_ID | Browser | Firebase app ID |
-| FIREBASE_ADMIN_PROJECT_ID | Server secret/config | Project Admin |
-| FIREBASE_ADMIN_CLIENT_EMAIL | Server secret | Service account |
-| FIREBASE_ADMIN_PRIVATE_KEY | Server secret | Private key với newline escaped \\n |
-| NEXT_PUBLIC_USE_EMULATORS | Test only | true kết nối Auth9099/Firestore8080; project phải demo- |
-| FIRESTORE_EMULATOR_HOST | Test only | CLI tự đặt; không có http:// |
-| FIREBASE_AUTH_EMULATOR_HOST | Test only | CLI tự đặt |
-| GCLOUD_PROJECT | Test only | demo-shark-empti |
-| OPENROUTER_TEST_URL | Test only | Fixture localhost9098; bị từ chối ở production hoặc ngoài demo Emulator |
+| Node.js | 24.x | Development, builds, scripts and tests |
+| npm | Bundled with Node 24 | Lockfile installation and scripts |
+| JDK | 21 | Firebase Emulator integration/rules/E2E |
+| Playwright Chromium | Version selected by the lockfile | Desktop/mobile E2E |
+| Git | A supported version | Clone, review and version control |
 
-Không in token/private key trong log, screenshot, báo cáo hay CI artifact. Không commit .env. Không bật biến emulator/fixture trong production.
+`.nvmrc` and `package.json#engines.node` both select major 24. Install Node from [nodejs.org](https://nodejs.org/en/download) or a trusted version manager, then verify:
 
-## 3. ☁️ Firebase và Vercel
+```powershell
+node --version
+npm --version
+```
 
-Bật Google sign-in, thêm domain local/deployment vào authorized domains. Firebase Web config không cấp quyền Admin. API kiểm tra Bearer Firebase ID token bằng Admin SDK. Service account phải cùng project với client. Admin bypass Rules, vì vậy API phải tự kiểm tra UID, ownership, payload và transaction.
+Do not continue when Node is not major 24. `@types/node` supplies types; it does not install the runtime.
 
-Trong Vercel chọn Node 24.x, cấu hình Web variables và server secrets cho đúng environment. Không đặt OPENROUTER_API_KEY hoặc Admin key dưới NEXT_PUBLIC_. Chạy build sau thay đổi. Đợt này không tự thay setting remote, deploy Rules hay deploy app.
+### 1.2. 📦 Install the Exact Dependency Graph
 
-## 4. 🖥️ Windows và Emulator
+From the repository root:
 
-Cài JDK 21, bảo đảm java -version nhận đúng runtime. Cổng: app9002, Auth9099, Firestore8080, AI fixture9098. Không chạy đồng thời hai bộ Emulator trên cùng cổng.
+```powershell
+npm ci
+```
+
+`npm ci` is authoritative because the repository contains a lockfileVersion 3 `package-lock.json`. It requires manifest/lockfile consistency, does not rewrite the lockfile and performs a clean installation. It may delete/replace the complete `node_modules`; do not run it concurrently with another dev server, build or test.
+
+Do not use pnpm or Yarn against the same `node_modules`, and do not use `--force` or `--legacy-peer-deps` to conceal peer conflicts. For an intentional dependency change, use npm, review both `package.json` and `package-lock.json`, then validate a fresh `npm ci`.
+
+### 1.3. 🧪 Install Integration/E2E Prerequisites
+
+Install JDK 21, restart the terminal if PATH changed, then run:
 
 ```powershell
 java -version
-npm ci
-npx playwright install chromium
+npx --no-install playwright install chromium
+```
+
+`npx --no-install` requires the locally installed package and avoids fetching an unrelated CLI version. Linux CI uses `npx playwright install --with-deps chromium` for browser system libraries.
+
+## 2. 🔐 Environment File and Variable Matrix
+
+Create `.env` only when it does not already exist:
+
+```powershell
+if (-not (Test-Path -LiteralPath .env)) {
+  Copy-Item -LiteralPath .env.example -Destination .env
+}
+```
+
+Next.js reads `.env` for development/build. The two AI scripts use `node --env-file-if-exists=.env`; Node gives existing process variables precedence. Restart the development server and create a new build/deployment after changing `NEXT_PUBLIC_*`, because those values enter the browser bundle.
+
+| Variable | Scope | Required for | Source |
+|---|---|---|---|
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | Browser-visible | Firebase client | Firebase Web App `firebaseConfig.apiKey` |
+| `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` | Browser-visible | Firebase Auth | `firebaseConfig.authDomain` |
+| `NEXT_PUBLIC_FIREBASE_PROJECT_ID` | Browser-visible | Auth/Firestore | `firebaseConfig.projectId` |
+| `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` | Browser-visible | Firebase app initialization | `firebaseConfig.storageBucket` |
+| `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Browser-visible | Firebase app initialization | `firebaseConfig.messagingSenderId` |
+| `NEXT_PUBLIC_FIREBASE_APP_ID` | Browser-visible | Firebase app initialization | `firebaseConfig.appId` |
+| `OPENROUTER_API_KEY` | Server secret | Seven AI flows and live smoke | Standard OpenRouter API key |
+| `FIREBASE_ADMIN_PROJECT_ID` | Server config | Arena/Forum Admin APIs outside Emulator | Service-account JSON `project_id` |
+| `FIREBASE_ADMIN_CLIENT_EMAIL` | Server secret | Arena/Forum Admin APIs outside Emulator | Service-account JSON `client_email` |
+| `FIREBASE_ADMIN_PRIVATE_KEY` | Server secret | Arena/Forum Admin APIs outside Emulator | Service-account JSON `private_key` |
+| `NEXT_PUBLIC_USE_EMULATORS` | Test only | Browser connection to local emulators | `true`, supplied by E2E config |
+| `FIRESTORE_EMULATOR_HOST` | Test only | Admin/SDK connection to Firestore Emulator | Set by Firebase CLI as `host:port` |
+| `FIREBASE_AUTH_EMULATOR_HOST` | Test only | Admin/SDK connection to Auth Emulator | Set by Firebase CLI as `host:port` |
+| `GCLOUD_PROJECT` | Test only | Demo Admin app and fixture guard | `demo-shark-empti` |
+| `OPENROUTER_TEST_URL` | Test only | Deterministic local AI fixture | `http://127.0.0.1:9098` |
+
+`NODE_ENV` is managed by Next/scripts and does not belong in `.env`. `API_KEYS`, `GEMINI_API_KEY` and `GOOGLE_GENAI_API_KEY` are not read by the current `src` or `scripts`.
+
+## 3. 🔥 Complete Firebase Setup
+
+### 3.1. 🧩 Create a Project and Register a Web App
+
+1. Open the [Firebase Console](https://console.firebase.google.com/) and create/select a project.
+2. From Project Overview, select the Web icon (`</>`) or **Add app → Web**.
+3. Enter a nickname and select **Register app**. Firebase Hosting is not required by this repository.
+4. Open **Project settings → General → Your apps → SDK setup and configuration**.
+5. Select the config-object view and map the six fields exactly:
+
+```text
+firebaseConfig.apiKey            -> NEXT_PUBLIC_FIREBASE_API_KEY
+firebaseConfig.authDomain        -> NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+firebaseConfig.projectId         -> NEXT_PUBLIC_FIREBASE_PROJECT_ID
+firebaseConfig.storageBucket     -> NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+firebaseConfig.messagingSenderId -> NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+firebaseConfig.appId             -> NEXT_PUBLIC_FIREBASE_APP_ID
+```
+
+Firebase Web configuration identifies/configures the client; it is not an Admin credential. It is intentionally present in the browser bundle, so Authentication, Firestore Rules and server authorization must protect data. See [Firebase Web setup](https://firebase.google.com/docs/web/setup).
+
+### 3.2. 🗄️ Create Cloud Firestore and Deploy Rules
+
+1. In Firebase Console, open **Build → Firestore Database → Create database**.
+2. Select the default database in Firestore Native mode and a location appropriate for the deployment. Location is a difficult infrastructure decision to reverse; confirm it before production.
+3. Do not retain broad test-mode rules in production. `firestore.rules` is the repository authority and `firebase.json` points to it.
+4. Authenticate the CLI, select the exact project and validate Rules in the Emulator before deployment:
+
+```powershell
+npx --no-install firebase login
+npx --no-install firebase use YOUR_FIREBASE_PROJECT_ID
+npm run test:rules
+npx --no-install firebase deploy --only firestore:rules
+```
+
+Rules deployment mutates remote state and can overwrite Console rules; review the diff, project ID and test result first. Firebase Admin SDK bypasses Firestore Rules, so Route Handlers must still enforce ID tokens, ownership, payloads and transactions. See [Firestore Rules setup and deployment](https://firebase.google.com/docs/firestore/security/get-started).
+
+### 3.3. 👤 Enable Google Authentication
+
+1. Open **Build → Authentication** and complete **Get started** when necessary.
+2. Under **Sign-in method**, enable **Google**.
+3. Select a support email and save.
+4. Add required development/preview/production hostnames to authorized domains in Authentication settings. Supply a hostname, not a URL path.
+5. Confirm the local hostname and every Vercel Preview/custom domain that will host authentication.
+
+The application currently uses `GoogleAuthProvider` with popup sign-in. See [Firebase Google sign-in](https://firebase.google.com/docs/auth/web/google-signin).
+
+### 3.4. 🔐 Create Firebase Admin Service-Account Credentials
+
+Admin credentials are required only for server APIs outside the Emulator:
+
+1. Open **Project settings → Service accounts** in the exact Firebase project.
+2. Select the appropriate service account and **Generate new private key**.
+3. Store the JSON outside the repository and do not transmit it through an unsecured chat or ticket.
+4. Map these JSON fields into `.env` or the deployment secret manager:
+
+```text
+project_id   -> FIREBASE_ADMIN_PROJECT_ID
+client_email -> FIREBASE_ADMIN_CLIENT_EMAIL
+private_key  -> FIREBASE_ADMIN_PRIVATE_KEY
+```
+
+Syntactically representative placeholders:
+
+```dotenv
+FIREBASE_ADMIN_PROJECT_ID=your-project-id
+FIREBASE_ADMIN_CLIENT_EMAIL=firebase-adminsdk@your-project-id.iam.gserviceaccount.com
+FIREBASE_ADMIN_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+```
+
+Keep the complete PEM header/footer. Current code accepts actual newlines or literal `\n` escapes and normalizes escaped newlines before `cert()`. `FIREBASE_ADMIN_PROJECT_ID` must equal `NEXT_PUBLIC_FIREBASE_PROJECT_ID`; never mix a service account from a different project.
+
+Firebase also documents `GOOGLE_APPLICATION_CREDENTIALS`, but the current code **does not read it**; this repository requires exactly the three `FIREBASE_ADMIN_*` variables in non-emulator runtime. See [Firebase Admin setup](https://firebase.google.com/docs/admin/setup).
+
+Never invent, record or infer a missing private key. If a key is exposed, revoke/delete it in Google Cloud IAM, generate a replacement and redeploy; removing text from a file is insufficient.
+
+## 4. 🤖 OpenRouter Setup
+
+1. Sign in to OpenRouter and open [API Keys](https://openrouter.ai/settings/keys).
+2. Create a **standard API key** for completion requests. Do not use a Management API key; management keys administer other keys and cannot call completion endpoints.
+3. Name keys per environment, such as `shark-empti-development` and `shark-empti-production`.
+4. Where supported, assign an appropriate spending limit/expiration and isolate development, preview and production keys for rotation/audit.
+5. Copy the plaintext key when issued and store it in secret storage:
+
+```dotenv
+OPENROUTER_API_KEY=your_openrouter_api_key
+```
+
+Never place this key in `NEXT_PUBLIC_*`, source code, screenshots, logs or committed fixtures. OpenRouter uses Bearer authentication for Chat Completions; see the [OpenRouter Quickstart](https://openrouter.ai/docs/quickstart) and [API-key management](https://openrouter.ai/docs/guides/overview/auth/management-api-keys).
+
+### 4.1. ✅ Validate the Key and AI Contract
+
+```powershell
+npm run ai:health
+npm run ai:smoke
+```
+
+- `ai:health` confirms that a key is present, calls the model catalogue and checks that all three fallback models are listed. The catalogue may return 200 for an invalid key, so this command **does not prove authentication, quota or inference**.
+- `ai:smoke` generates one real quiz and chatbot response through the live transport. It may consume quota and does not run in CI.
+- Never print the key for debugging. Inspect only variable names/presence and safe status/error codes.
+
+### 4.2. 🔄 Current AI Transport
+
+The current source sends `POST https://openrouter.ai/api/v1/chat/completions`. Its nominal server-side priority is:
+
+1. `thinkingmachines/inkling:free`;
+2. `google/gemma-4-31b-it:free`;
+3. `nvidia/nemotron-3.5-lightning:free`.
+
+The effective first model is not fixed: process-scoped `preferredModel` is updated after a successful foreground request or warm-up, and `orderedModels(preferredModel)` begins a later request from that model before appending the remaining nominal-priority models. Each foreground attempt has a 20-second timeout; warm-up uses 8 seconds. A timeout/transport rollover can make one generation perform up to five attempts in the same Server Action. This is the audited current state, not the target architecture. Do not address remediation by changing only the timeout or treating every HTTP 400/403 as retryable; see [AUDIT_REPORT.md](AUDIT_REPORT.md) and [AI_TRANSPORT_REMEDIATION_PLAN.md](AI_TRANSPORT_REMEDIATION_PLAN.md).
+
+## 5. 💻 Local Execution
+
+After dependencies and `.env` are ready:
+
+```powershell
+npm run dev
+```
+
+Open `http://localhost:9002`. At minimum, verify:
+
+1. The page renders without a Firebase initialization error.
+2. The Google popup signs in and returns to the correct origin.
+3. Firestore reads/writes are allowed only as intended by Rules.
+4. An AI flow returns a structured result when an OpenRouter key is present.
+5. Arena submission and Forum comment APIs work when Admin credentials are present.
+
+Missing Admin credentials do not mean the Firebase Web config is invalid; they make Admin Route Handlers return `APP-CONFIG-MISSING`. A missing OpenRouter key produces `AI-CONFIG-MISSING` without preventing Firebase-only features from rendering.
+
+## 6. 🧪 Emulator and Test Execution
+
+Configured ports:
+
+| Service | Port |
+|---|---|
+| Next app | 9002 |
+| Firebase Auth Emulator | 9099 |
+| Firestore Emulator | 8080 |
+| Deterministic AI fixture | 9098 |
+
+Run the scope needed:
+
+```powershell
+npm test
+npm run test:rules
 npm run test:integration
 npm run test:e2e
 ```
 
-Nếu Windows báo UnixDomainSockets / Unable to establish loopback connection với đường dẫn TEMP chứa dấu, tạo một thư mục tạm ASCII riêng rồi cấu hình trong phiên shell:
+`test:rules` and `test:integration` use `firebase emulators:exec --project demo-shark-empti`; the CLI supplies emulator host variables. E2E supplies browser demo Firebase configuration and a fake OpenRouter key in `playwright.config.ts`. Source guards reject `OPENROUTER_TEST_URL` in production, off localhost or outside a demo Emulator context.
+
+If Windows/JDK reports UnixDomainSockets or loopback errors caused by a TEMP path, use a dedicated ASCII-only directory for that test shell:
 
 ```powershell
 New-Item -ItemType Directory -Force C:\Users\Public\shark-empti-java-tmp
@@ -56,138 +237,41 @@ $env:JAVA_TOOL_OPTIONS='-Djava.io.tmpdir=C:\Users\Public\shark-empti-java-tmp -D
 npm run test:integration
 ```
 
-Đây là workaround local, không cần trong CI Linux. Không xóa TEMP hoặc thư mục user để xử lý lỗi. vitest.integration.config.mts bắt buộc cả Auth và Firestore Emulator; không silently skip nếu thiếu. Các script luôn truyền --project demo-shark-empti; không truyền thêm --project sau npm run test:e2e vì tham số có thể đi vào Firebase CLI.
+Do not delete TEMP or a user directory. Do not run two Emulator suites on the same ports. `vitest.integration.config.mts` intentionally fails when either Auth or Firestore Emulator is absent.
 
-## 5. 🤖 AI và chẩn đoán
+## 7. ☁️ Vercel and the Production Environment
 
-Adapter ở src/ai/openrouter.ts dùng POST /api/v1/chat/completions và dùng thứ tự cố định `thinkingmachines/inkling:free` → `google/gemma-4-31b-it:free` → `nvidia/nemotron-3.5-lightning:free`. Mỗi model trong flow có deadline 20s; probe nền dùng 8s mỗi model để không cạnh tranh lâu với tính năng thật. Khi một model trả lỗi model-specific (bao gồm 400/403), rate limit, upstream, transport hoặc output sai schema, flow thử model kế tiếp; chỉ lỗi 401, cấu hình và input sai dừng ngay vì fallback không thể sửa chúng. Nếu generation bị huỷ/transport bị ngắt, rollover xảy ra đúng một lần: thử Nemotron ngay (nếu request trước không phải Nemotron), rồi chạy trọn một priority pass. Toàn bộ feature request hữu hạn: không lặp vô hạn và không reload/mất draft ở client.
+1. Import the repository into Vercel and confirm the Next.js Framework Preset.
+2. Select Node.js 24.x under **Project Settings → Build and Deployment**.
+3. Under **Project Settings → Environment Variables**, add the six `NEXT_PUBLIC_FIREBASE_*` values and four server values (`OPENROUTER_API_KEY` plus three `FIREBASE_ADMIN_*`) to the correct Development, Preview and Production scopes.
+4. Mark server credentials sensitive where supported; do not reuse an unrestricted development key in production.
+5. Create a new deployment after every env change; changes are not retroactive.
+6. Add Vercel/custom hostnames to Firebase Authentication authorized domains.
+7. Deploy `firestore.rules` separately after verifying the project ID and Emulator tests; a Vercel deployment does not deploy Firebase Rules.
+8. Run controlled smoke tests on Preview before Production and inspect Function duration/logs for AI requests.
 
-Inkling và Nemotron không được giả định hỗ trợ `response_format`: adapter yêu cầu JSON-only rồi parse/Zod tại server. Gemma dùng JSON Schema native. HTTP200 vẫn có thể chứa error. Khi toàn bộ fallback thất bại, UI nhận `AI-FALLBACK-EXHAUSTED` cùng allowlist metadata `operation`, `attemptedModels`, `lastFailure`, `httpStatus` và `providerCode` nếu có. Không gửi raw upstream body, prompt, stack trace, API key hay tên model qua Server Action. Browser lên lịch một probe nền sau startup, từng model theo thứ tự và dừng khi thành công; khi cả vòng thất bại, retry exponential bounded chạy nền và không chặn UI hay flow thật. Model availability/quota thay đổi theo thời gian; một lần smoke thành công không bảo đảm lần sau.
+There is no `vercel.json` in this repository; dashboard/project defaults are the out-of-repository deployment authority. See [Vercel environment variables](https://vercel.com/docs/environment-variables) and [Vercel project settings](https://vercel.com/docs/project-configuration/project-settings).
 
-ai:health kiểm tra key có được khai báo và tất cả model fallback có mặt trong danh mục; nó KHÔNG xác thực key hợp lệ, quota hay khả năng inference. ai:smoke sinh quiz và chat thực qua cùng fallback adapter, có thể tiêu thụ quota. Không chạy live smoke trong CI. Nếu 429, kiểm tra quota/cooldown; 401 kiểm tra key; 403 có thể là giới hạn riêng model và sẽ fallback; timeout/transport kiểm tra mạng; AI-INVALID-RESPONSE kiểm tra model output. Không log credential hay raw provider response.
+## 8. 🛡️ Credential Security and Rotation
 
-## 6. ✅ CI và release checklist
+- `.env`, `.env.*`, service-account JSON, `.pem`, `.key`, `.vercel` and test artifacts are protected by `.gitignore`; `.env.example` remains tracked.
+- `NEXT_PUBLIC_*` values are not secrets.
+- Firebase Admin and OpenRouter keys require an owner, environment, rotation date and revocation procedure.
+- Never store credentials in the audit, Markdown, issues, screenshots, console output or Playwright traces.
+- Inspect headers, request payloads and storage state before sharing failure artifacts.
+- If a secret was committed, revoke/rotate it first, then handle Git history through a separately approved procedure. Adding an ignore rule does not remove history.
 
-Workflow: npm ci → lint → typecheck → unit → Emulator/API/Rules → production build → install Chromium → E2E. Chỉ dùng project demo và fixture AI. Artifact failure giữ trace/screenshot; không đưa token hoặc dữ liệu thật vào fixtures.
-
-Trước release: chạy đầy đủ suite, kiểm tra dependency paths, ảnh desktop/mobile VI/EN/light/dark, đo bundle cùng điều kiện, kiểm tra camera thật riêng. Không đánh dấu camera thật/Safari/Firefox đã qua chỉ vì Chromium giả lập qua. Kiểm tra cài mới npm ci và bảo đảm lockfile không lệch manifest.
-
-## 7. 🛡️ Bảo toàn env, Git và artifact
-
-Đợt đồng bộ tài liệu giữ nguyên các giá trị local có sẵn. Khi chủ project cấp rõ ràng service account khớp Firebase Web project, có thể thêm FIREBASE_ADMIN_* riêng tư vào .env để API Arena/Forum ngoài Emulator hoạt động; file tài liệu không ghi, in hoặc xác nhận credential cụ thể. API_KEYS/GEMINI_API_KEY/GOOGLE_GENAI_API_KEY là tên biến legacy không được src/scripts hiện tại đọc; không tự xóa giá trị local vì công cụ ngoài repo có thể còn dùng. Comment/placeholder không làm API sẵn sàng. Không đưa credential vào báo cáo hoặc tự thêm biến test hoạt động vào env production.
-
-.gitignore bỏ qua .env và .env.*, ngoại trừ .env.example, cùng cache .firebase, output test, log debug, thư mục emulator-data và file credential theo tên quy ước. Không bỏ qua toàn bộ JSON hoặc Markdown. Kiểm tra bằng git check-ignore -v .env .env.production .env.test.local; .env.example và docs phải không bị ignore. Ignore không bỏ theo dõi file đã commit: nếu từng lộ secret, cần xử lý credential/history riêng với quyền rõ ràng; không tự rewrite Git history.
-
-Artifact trong coverage/test-results/playwright-report có thể bị công cụ thay thế. Lưu kết luận và cách tái hiện trong tài liệu; chỉ giữ fixture tổng hợp không có secret trong tests. Trace có thể chứa token ngay cả khi screenshot không có; rà/redact trước khi chia sẻ. Không chạy dev, production build và E2E dùng cùng .next đồng thời. Không tăng timeout để che race; ghi điểm fail, ảnh đã tải hay còn loading, trace và kết quả rerun riêng.
-
-## 8. 🧭 Ma trận chẩn đoán cần dùng
-
-| Dấu hiệu | Nguyên nhân đã biết / giả thuyết cần kiểm tra | Validate trước khi sửa |
-|---|---|---|
-| Health xanh nhưng AI báo auth/config | Metadata endpoint không xác thực key; thiếu Admin là vấn đề API khác | Dùng key sai có chủ đích trên endpoint không sinh nội dung; kiểm tra tên biến/mức hiện diện, không in giá trị; live smoke chỉ khi được phép |
-| Arena retake báo conflict | ID và payload phải biểu diễn cùng một thao tác; retry mất response là tình huống khác | Ghi nhận ID/payload giả trên demo, kiểm tra new attempt khác ID và retry cùng ID |
-| Create Post không mở ổn định ngay sau navigation | Auth restoration có thể thay đổi private subtree trong khi trang khởi tạo | Trì hoãn auth callback, kiểm tra loading và dialog; giữ reset UID, không sửa bằng sleep cố định |
-| Forum WebKit còn loading | Hành vi SDK/Emulator/browser cần được cô lập | Tách SDK/Emulator/browser, xem subscription/network và test không interception; không nới CORS/Rules theo phỏng đoán |
-| Firefox không khởi động | Có thể thiếu browser runtime prerequisite, không nhất thiết là lỗi app | Sửa prerequisite runtime của browser rồi chạy lại đúng suite; không đếm ca chưa khởi động thành fail chức năng |
-| Chỉ in được phần đầu báo cáo | Dialog có thể giới hạn chiều cao/nội dung in | Print-media + PDF nhiều trang VI/EN; kiểm tra trang cuối, không chỉ ảnh viewport |
-
-Workflow hiện build rồi chạy E2E trên npm run dev, không phải next start. Production-runtime E2E, browser tối thiểu, camera thật và so sánh baseline vẫn là các kiểm tra cần bổ sung trước release theo phạm vi thay đổi.
-
----
-
-English below
-
-# ⚙️ Configuration and troubleshooting · v1.15.1
-
-English below. This guide does not certify that local/production configuration is complete.
-
-## 1. ⚙️ Runtime and installation
-
-Use Node 24.x locally, in CI and in Vercel project settings. .nvmrc and package.json engines agree on the major; @types/node follows the runtime major. Use npm ci to install the lockfile exactly; do not bypass peer conflicts with --force or --legacy-peer-deps.
-
-Copy .env.example to .env only if .env does not exist; never overwrite configured credentials. Next loads environment variables; AI scripts use Node --env-file-if-exists=.env without dotenv. Existing process variables take precedence in Node. The current AI command loads .env only, not Next's complete env-file precedence sequence. Restart/rebuild after changing NEXT_PUBLIC_ variables because they are embedded in the client bundle.
-
-## 2. 🔐 Environment matrix
-
-| Variable | Scope | Meaning |
-|---|---|---|
-| OPENROUTER_API_KEY | Server secret | AI Bearer key |
-| NEXT_PUBLIC_FIREBASE_API_KEY | Browser | Firebase Web API key; Rules protect data |
-| NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN | Browser | Firebase Auth domain |
-| NEXT_PUBLIC_FIREBASE_PROJECT_ID | Browser | Data project |
-| NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET | Browser | Web App bucket |
-| NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID | Browser | Sender ID |
-| NEXT_PUBLIC_FIREBASE_APP_ID | Browser | Firebase app ID |
-| FIREBASE_ADMIN_PROJECT_ID | Server secret/config | Admin project |
-| FIREBASE_ADMIN_CLIENT_EMAIL | Server secret | Service account |
-| FIREBASE_ADMIN_PRIVATE_KEY | Server secret | Private key with escaped \\n newlines |
-| NEXT_PUBLIC_USE_EMULATORS | Test only | true connects Auth9099/Firestore8080; project must start demo- |
-| FIRESTORE_EMULATOR_HOST | Test only | Set by CLI; no http:// |
-| FIREBASE_AUTH_EMULATOR_HOST | Test only | Set by CLI |
-| GCLOUD_PROJECT | Test only | demo-shark-empti |
-| OPENROUTER_TEST_URL | Test only | localhost9098 fixture; rejected in production or outside demo Emulator |
-
-Never print tokens/private keys in logs, screenshots, reports or CI artifacts. Never commit .env. Do not enable emulator/fixture variables in production.
-
-## 3. ☁️ Firebase and Vercel
-
-Enable Google sign-in and add local/deployment domains to authorized domains. Firebase Web configuration does not grant Admin access. APIs verify Bearer Firebase ID tokens with Admin SDK. Service accounts must match the client project. Admin bypasses Rules, so APIs must enforce UID, ownership, payload and transaction checks themselves.
-
-Select Node 24.x in Vercel and configure Web variables and server secrets for the correct environment. Never use NEXT_PUBLIC_ for OPENROUTER_API_KEY or Admin keys. Rebuild after changes. This pass does not modify remote settings, deploy Rules or deploy the app.
-
-## 4. 🖥️ Windows and Emulator
-
-Install JDK21 and ensure java -version selects it. Ports: app9002, Auth9099, Firestore8080, AI fixture9098. Do not run two Emulator suites on the same ports simultaneously.
+## 9. ✅ Release Checklist
 
 ```powershell
-java -version
 npm ci
-npx playwright install chromium
+npm run lint
+npm run typecheck
+npm test
 npm run test:integration
+npm run build
+npx --no-install playwright install chromium
 npm run test:e2e
 ```
 
-If Windows reports UnixDomainSockets / Unable to establish loopback connection with accented TEMP paths, create a dedicated ASCII temporary directory and configure the shell session:
-
-```powershell
-New-Item -ItemType Directory -Force C:\Users\Public\shark-empti-java-tmp
-$env:JAVA_TOOL_OPTIONS='-Djava.io.tmpdir=C:\Users\Public\shark-empti-java-tmp -Djdk.net.unixdomain.tmpdir=C:\Users\Public\shark-empti-java-tmp'
-npm run test:integration
-```
-
-This is a local workaround, unnecessary on Linux CI. Do not delete TEMP or user directories to address this issue. vitest.integration.config.mts requires both Auth and Firestore Emulator; it must not silently skip missing services. Scripts always pass --project demo-shark-empti; do not append --project to npm run test:e2e because it may be forwarded to Firebase CLI.
-
-## 5. 🤖 AI and troubleshooting
-
-The adapter in src/ai/openrouter.ts uses POST /api/v1/chat/completions and this fixed order: `thinkingmachines/inkling:free` → `google/gemma-4-31b-it:free` → `nvidia/nemotron-3.5-lightning:free`. Each flow-model request has a 20s deadline; the background probe uses 8s per model so it does not compete with a real feature for long. A model-specific error (including 400/403), rate limit, upstream, transport, or invalid schema output advances to the next model; only 401, configuration and invalid input stop immediately because fallback cannot repair them. A cancelled/interrupted generation rolls over exactly once: it tries Nemotron immediately when the interrupted request was not Nemotron, then completes one full priority pass. A foreground feature request is finite: it never loops forever or reloads the page/discards a client draft.
-
-Inkling and Nemotron are not assumed to support `response_format`: the adapter requests JSON-only and parses/validates it with Zod on the server. Gemma uses native JSON Schema. HTTP200 may still contain error. When every fallback fails, the UI receives `AI-FALLBACK-EXHAUSTED` with allowlisted `operation`, `attemptedModels`, `lastFailure`, `httpStatus` and `providerCode` when available. No raw upstream body, prompt, stack trace, API key or model name crosses the Server Action boundary. After startup, the browser schedules a non-blocking probe of models in priority order and stops at the first success; after a failed full pass, a bounded exponential background retry runs without blocking the UI or a real flow. Model availability/quota vary over time; one successful smoke run does not guarantee future success.
-
-ai:health checks that a key is declared and every fallback model is listed in the catalog; it does NOT validate key authenticity, quota or inference. ai:smoke generates a real quiz and chat through the same fallback adapter and may consume quota. Do not run live smoke in CI. For429 check quota/cooldown;401 checks the key;403 can be model-specific and falls back; timeout/transport check connectivity; AI-INVALID-RESPONSE checks model output. Never log credentials or raw provider responses.
-
-## 6. ✅ CI and release checklist
-
-Workflow: npm ci → lint → typecheck → unit → Emulator/API/Rules → production build → install Chromium → E2E. Only demo project and AI fixtures are used. Failure artifacts retain traces/screenshots; never put real tokens or data in fixtures.
-
-Before release: run the complete suite, inspect dependency paths, desktop/mobile VI/EN/light/dark screenshots, measure bundles under identical conditions and test a real camera separately. Do not mark real-camera/Safari/Firefox validation passed because fake Chromium tests pass. Verify a fresh npm ci and manifest/lockfile consistency.
-
-## 7. 🛡️ Preserving env, Git and artifacts
-
-Documentation synchronization preserves existing local values. When the project owner explicitly supplies a service account matching the Firebase Web project, FIREBASE_ADMIN_* may be added privately to .env for non-emulator Arena/Forum APIs; documentation never records, prints or certifies a specific credential. API_KEYS/GEMINI_API_KEY/GOOGLE_GENAI_API_KEY are legacy names not read by current src/scripts; local values are not deleted because external tools may still consume them. Comments/placeholders do not configure the API. Never copy credentials into reports or activate test variables in production env files.
-
-.gitignore excludes .env and .env.* except .env.example, plus .firebase cache, test output, debug logs, emulator-data and conventionally named credential files. It does not ignore all JSON or Markdown. Verify using git check-ignore -v .env .env.production .env.test.local; .env.example and docs must remain visible. Ignore rules do not untrack committed files: exposed secrets require a separate authorized credential/history response; never rewrite Git history automatically.
-
-Tools may replace artifacts in coverage/test-results/playwright-report. Keep conclusions and reproduction instructions in documentation; commit only synthetic, secret-free fixtures in tests. Traces can contain tokens even if screenshots do not; inspect/redact before sharing. Do not concurrently run dev, production build and E2E against the same .next directory. Do not increase timeouts to hide races; record the failing step, whether the page loaded, its trace and separate rerun results.
-
-## 8. 🧭 Troubleshooting matrix
-
-| Symptom | Known cause / hypothesis to investigate | Validate before changing code |
-|---|---|---|
-| Health passes but AI reports auth/config errors | Model metadata does not authenticate keys; missing Admin is a separate API issue | Use an intentionally invalid key with a non-generating endpoint; inspect variable names/presence, not values; live smoke only when authorized |
-| Arena retake conflicts | ID and payload must represent the same operation; retry after a lost response is different | Observe synthetic IDs/payloads on demo; new attempts get different IDs, retries retain the same ID |
-| Create Post opens inconsistently after navigation | Auth restoration can replace a private subtree while the page initializes | Delay auth callbacks, inspect loading/dialog state; retain UID reset and do not fix with a fixed sleep |
-| Forum keeps loading in WebKit | SDK/Emulator/browser behavior must be isolated | Isolate SDK/Emulator/browser, inspect subscriptions/network and run without interception; do not weaken CORS/Rules speculatively |
-| Firefox does not launch | A browser runtime prerequisite may be missing; this is not necessarily an app failure | Repair the runtime prerequisite, then rerun the same suite; do not count an unstarted browser as a functional failure |
-| Only the beginning of a report prints | A dialog may constrain printable height/content | Print-media plus multi-page VI/EN PDF; inspect the final page, not just the viewport |
-
-The workflow builds and then runs E2E against npm run dev, not next start. Production-runtime E2E, minimum browser versions, a physical camera and comparable baselines remain additional release checks according to the scope of change.
+Release also requires a current dependency audit, production Runtime/Function settings, Firestore indexes, deployed Rules, Safari/Firefox targets, a physical camera and live OpenRouter validation. The build currently depends on Google Fonts network access through `next/font/google`; a network-restricted build can fail even when source, types and unit tests are valid.

@@ -65,15 +65,15 @@
   }
   
   html {
-    /* Mặc định là 100% cho Mobile */
+    /* The default scale is 100% on mobile viewports. */
     font-size: 16px;
     scroll-behavior: smooth;
   }
 
-  /* Áp dụng tỉ lệ 80% cho Viewport Desktop (LG trở lên) */
+  /* Apply an 80% scale to desktop viewports (LG and above). */
   @media (min-width: 1024px) {
     html {
-      font-size: 12.8px; /* 80% của 16px */
+      font-size: 12.8px; /* 80% of 16px */
     }
   }
 

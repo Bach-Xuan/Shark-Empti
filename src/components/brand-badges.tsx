@@ -3,7 +3,7 @@
 import { UiText } from "@/components/ui-text";
 
 /**
- * @fileOverview Huy hiệu thương hiệu cố định ở góc dưới bên trái màn hình.
+ * @fileOverview Fixed brand badges displayed in the lower-left corner of the screen.
  */
 export default function BrandBadges() {
   return (
