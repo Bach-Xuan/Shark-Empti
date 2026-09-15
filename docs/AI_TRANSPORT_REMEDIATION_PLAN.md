@@ -6,6 +6,8 @@
 
 This document defines the complete remediation required for the current AI transport. It is a target design and implementation plan, not a description of behavior that already exists. Current behavior remains authoritative in the source code and is documented in [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md). The corresponding risk remains open in [AUDIT_REPORT.md](AUDIT_REPORT.md) until the acceptance criteria in this plan are supported by implementation and evidence.
 
+**Reconciliation, 15 September 2026:** The WebKit, dependency-assessment, camera and measurement changes do not implement this proposal. The seven-day `_requestReceipts` policy covers existing Arena/Forum operations; the proposed AI generation ledger and suggested staging retention below are separate, unimplemented contracts. Finding status remains in the audit report. GitHub operations require the user's explicit request.
+
 ## 1. 🧭 Purpose and Architectural Conclusion
 
 The remediation must do more than shorten the lifetime of a single HTTP request. Every AI generation must be controlled by the server, constrained by an explicit retry budget, recoverable when the browser loses a response, and protected against unexpected OpenRouter request amplification. The design must preserve or strengthen authentication, authorization, quota, validation, privacy, and operational observability.

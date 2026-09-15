@@ -102,7 +102,11 @@ The repository is governed by `package-lock.json`; do not use pnpm or Yarn again
 | `npm run test:production` | Start the optimized build and check six routes, script payload budgets and API authentication | No production service; requires a completed build |
 | `npm run report:bundle` | Inventory production entry and deferred JavaScript chunks | No; requires a completed build |
 | `npm run report:performance` | Record synthetic 100/1,000/10,000-record processing baselines | No |
-| `npm run audit:dependencies` | Check lockfile resolutions against npm bulk advisories | npm Registry; transmits dependency names and versions |
+| `npm run audit:dependencies` | Assess advisories against dated exact-version exceptions; print JSON | npm Registry; transmits dependency names and versions |
+| `npm run test:browser-performance` | Sample cold/warm public routes, heap, bytes and automated interaction timing | Running local production server and Chromium |
+| `npm run test:physical-camera` | Verify two real-camera start/stop cycles and cleanup | Running local app, headed Chromium and camera |
+| `npm run test:read-baseline` | Compare unbounded and 50-document queries | Demo emulators; JDK 21 |
+| `npm run firestore:retention` | Inspect deployed index/TTL metadata; read-only by default | Google API and Admin credentials; `-- --apply` changes configuration |
 | `npm run ai:health` | Check the model catalogue endpoint and fallback-model presence | OpenRouter network; does not prove key/quota/inference validity |
 | `npm run ai:smoke` | Generate one real quiz and chatbot response | OpenRouter key; may consume quota |
 | `npm run clean` | Remove `.next` only; retain `node_modules` | No |
@@ -129,6 +133,7 @@ CI in `.github/workflows/ci.yml` uses Node 24, JDK 21, a demo Firebase project a
 - [Technical Documentation](docs/TECHNICAL_DOCUMENTATION.md)
 - [Backend](docs/backend.json)
 - [Audit Report](docs/AUDIT_REPORT.md)
+- [Proposed AI Transport Remediation Plan](docs/AI_TRANSPORT_REMEDIATION_PLAN.md)
 
 All repository documentation is maintained in English. The application interface itself remains bilingual, and localization behavior is described in the technical documentation.
 

@@ -1,5 +1,5 @@
 {
-  "$comment": "Descriptive data map, not an executable validation schema. English descriptions have x-description-vi counterparts; technical identifiers are not translated.",
+  "$comment": "Descriptive data map, not an executable validation schema. Technical identifiers follow the source; editing this file changes no runtime behavior.",
   "x-version": "1.15.1",
   "x-authority": {
     "description": "Actual contracts: Firestore Rules, AI/API Zod schemas, history/profile readers and server-api.ts. Updating this file changes no validation, migration or access policy.",
@@ -159,6 +159,14 @@
             "vi",
             "en"
           ]
+        },
+        "schemaVersion": {
+          "type": "integer",
+          "enum": [
+            1,
+            2
+          ],
+          "description": "New writes use 2. The reader treats absence as legacy version 1, supports both permanently and rejects unsupported versions."
         }
       },
       "description": "The writer persists userId and schemaVersion while the reader supplies the document ID separately. Legacy defaults come from history-schema.ts. Quiz completion awaits a stable-ID write, and the persistence DTO omits absent optional values."
@@ -405,9 +413,13 @@
         },
         "createdAt": {
           "$ref": "#/$defs/FirestoreTimestamp"
+        },
+        "expiresAt": {
+          "$ref": "#/$defs/FirestoreTimestamp",
+          "description": "New receipts expire seven days after creation; legacy records may lack this field pending backfill."
         }
       },
-      "description": "Server hashes scope/UID/requestId to form the document ID. Date written by Admin is stored as Timestamp. No TTL policy is configured."
+      "description": "Server hashes scope/UID/requestId to form the document ID. Admin dates are stored as Timestamp. Seven-day TTL and a field index exemption are declared in firestore.indexes.json; retained receipts remain replayable until asynchronous deletion. The 15 September 2026 check found TTL disabled; configuration application failed with IAM 403."
     }
   },
   "serverInterfaces": {

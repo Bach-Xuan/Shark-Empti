@@ -39,12 +39,11 @@
 | D16 | Arena Leaderboard Applies Its Result Limit Before the Duration Tie-Break | Unresolved | 12 September 2026 |
 | D17 | English Bonus Copy Misrepresents the Arena Reward Rule | Unresolved | 12 September 2026 |
 | D18 | Activity Tracking Can Lose Concurrent Day Updates | Unresolved | 12 September 2026 |
-| P04 | Idempotency Receipts Have No Defined Retention Bound | Implemented; TTL activation pending | 13 September 2026 |
-| V01 | Incomplete WebKit Validation | Blocked by host application-control policy | 13 September 2026 |
-| V02 | Unverified Minimum Browser Versions and Physical-Camera Behaviour | Partial; exact browsers and devices pending | 13 September 2026 |
-| V03 | Unverified Remote CI, Production Runtime, and Firestore Index State | Partial; remote CI and deployment pending | 13 September 2026 |
-| V04 | Dependency-Risk Assessment Is Not Current | Blocked; registry egress approval required | 13 September 2026 |
-| V05 | Inadequate Comparative Baselines and Incomplete Coverage Evidence | Partial; current baseline established | 13 September 2026 |
+| P04 | Idempotency Receipts Have No Defined Retention Bound | Implemented; production TTL/index activation blocked by IAM | 15 September 2026 |
+| V01 | Incomplete WebKit Validation | Partial; WebKit development passed, production matrix pending | 15 September 2026 |
+| V02 | Unverified Minimum Browser Versions and Physical-Camera Behaviour | Partial; local physical camera passed, target matrix pending | 15 September 2026 |
+| V03 | Unverified Remote CI, Production Runtime, and Firestore Index State | Partial; hosted CI failure observed, deployment verification pending | 15 September 2026 |
+| V05 | Inadequate Comparative Baselines and Incomplete Coverage Evidence | Partial; current and query baselines measured, historical comparison pending | 15 September 2026 |
 
 ## ✅ Resolved Findings
 
@@ -70,9 +69,12 @@
 | P01 | Unbounded Queries and Client-Side List Processing | Resolved | 13 September 2026 |
 | P02 | Recurrent Timer Updates and Repeated KaTeX Rendering | Resolved | 13 September 2026 |
 | P03 | Duplicate Conversation Context in AI Requests | Resolved | 13 September 2026 |
+| V04 | Dependency-Risk Assessment Is Not Current | Resolved | 15 September 2026 |
 | V06 | Production Builds Depend on Live Google Fonts Availability | Resolved | 13 September 2026 |
 
 ## 🔎 Detailed Findings
+
+Original mechanisms and verification criteria preserve the audit baseline; they are not fresh assertions that every historical code example remains present. Current implementation and dated evidence paragraphs supersede those descriptions. Findings outside the assigned N01–N03, S01–S04, P01–P04 and V01–V06 scope retain their prior acceptance status until separately verified.
 
 ### M01 - Multi-Model AI Fallback Can Exceed a Single Transport Lifetime and Obscure Terminal Failures
 
@@ -402,164 +404,194 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Status:** Resolved.
 
-**Description and context:** The repository mixes PascalCase and kebab-case filenames and retains inconsistent identifiers such as `PlaceHolderImages` and `currentIndex/setCurrentIdx`. These inconsistencies primarily affect comprehension and case-sensitive portability rather than confirmed runtime behaviour.
+**Current implementation:** Component filenames and import paths now use the selected kebab-case convention, inconsistent state/setter names were normalized, and unused placeholder exports were removed. The original naming examples below describe the audited baseline.
+
+**Historical description and context:** The repository mixes PascalCase and kebab-case filenames and retains inconsistent identifiers such as `PlaceHolderImages` and `currentIndex/setCurrentIdx`. These inconsistencies primarily affect comprehension and case-sensitive portability rather than confirmed runtime behaviour.
 
 **Observed scope and consequence:** The inconsistency occurs across component filenames, exported symbols, and state/setter pairs rather than within a single isolated module. It increases the cognitive cost of predicting import paths and identifier names and creates avoidable risk when development on case-insensitive Windows filesystems is later validated or deployed on case-sensitive Linux filesystems.
 
-**Required verification:** Renaming should be selective and accompanied by consumer analysis, import-graph inspection, route and filename casing checks, and Linux type-check/build validation.
+**Original verification criteria:** Renaming should be selective and accompanied by consumer analysis, import-graph inspection, route and filename casing checks, and Linux type-check/build validation.
 
 ### N02 - Domain Types and Schemas Do Not Consistently Represent Their Lifecycle Stage
 
 **Status:** Resolved.
 
-**Description and context:** Question and result concepts remain partially conflated; form-originated numeric configuration values traverse layers as strings; and related metric schemas are defined repeatedly. Persisted quiz-history records also have no explicit schema version: the current history adapter accepts an absent `analysis` field and converts invalid `analysis` values to `undefined`, allowing legacy records to remain readable without a backfill. This compatibility behaviour is deliberate and useful, but the repository does not define a migration, backfill, or fallback-retirement policy. Collectively, these representations obscure the distinction between draft, validated, persisted, migrated, and evaluated data.
+**Current implementation:** Lifecycle-specific quiz configuration validation and shared analysis schemas are present. New history writes use schemaVersion 2; versions 1 and 2 remain permanently readable, an absent version maps to legacy version 1, and unsupported future versions are rejected. Invalid optional analysis remains safely omitted. No migration or fallback retirement is required by this compatibility policy.
+
+**Historical description and context:** Question and result concepts remain partially conflated; form-originated numeric configuration values traverse layers as strings; and related metric schemas are defined repeatedly. Persisted quiz-history records also have no explicit schema version: the current history adapter accepts an absent `analysis` field and converts invalid `analysis` values to `undefined`, allowing legacy records to remain readable without a backfill. This compatibility behaviour is deliberate and useful, but the repository does not define a migration, backfill, or fallback-retirement policy. Collectively, these representations obscure the distinction between draft, validated, persisted, migrated, and evaluated data.
 
 **Observed scope and consequence:** A value may satisfy a TypeScript interface while still belonging to the wrong lifecycle stage or requiring runtime normalization before use. Repeated structural definitions can also diverge without a compiler error because nominal ownership is absent. For quiz history, heterogeneous legacy and current documents can remain operationally indistinguishable after adaptation, which makes it difficult to quantify migration progress, identify records that have lost optional analytical output, or determine when compatibility logic can be removed. The principal risk is incorrect confidence at module boundaries and indefinite schema ambiguity rather than an immediate type-check failure.
 
-**Required verification:** Separate lifecycle-specific types and shared schemas while preserving legacy adapters. Define whether history documents are to remain permanently backward-compatible or be migrated; if migration is intended, introduce an explicit schema-version contract, an idempotent backfill strategy, observability for remaining legacy records, and documented fallback-retirement criteria. Validate legacy fixtures with absent and malformed `analysis`, migration retries, numeric bounds, cross-flow contracts, and compilation.
+**Original verification criteria:** Separate lifecycle-specific types and shared schemas while preserving legacy adapters. Define whether history documents are to remain permanently backward-compatible or be migrated; if migration is intended, introduce an explicit schema-version contract, an idempotent backfill strategy, observability for remaining legacy records, and documented fallback-retirement criteria. Validate legacy fixtures with absent and malformed `analysis`, migration retries, numeric bounds, cross-flow contracts, and compilation.
 
 ### N03 - Readability Debt and Potentially Unused Modules
 
 **Status:** Resolved.
 
-**Description and context:** `brand-badges.tsx` and `placeholder-images.ts` have no static consumer in the current source, while formatting, import ordering, comments, and local naming remain inconsistent. Arena scoring uses the named constant `NUMERIC_ANSWER_TOLERANCE = 1e-6`, but neither the source nor the technical documentation explains how that threshold was derived, which numeric domains or units it is intended to cover, or whether the comparison is deliberately absolute rather than relative. Lint and type-check pass because the compiler does not enable `noUnusedLocals`; therefore, those results do not disprove dead-code candidates or establish that business-rule constants are adequately documented.
+**Current implementation:** Unused brand/placeholder modules were removed after consumer review. The scoring source documents the absolute 1e-6 tolerance, and boundary fixtures cover its intended acceptance behavior. The observations below refer to the earlier source rather than active modules.
+
+**Historical description and context:** `brand-badges.tsx` and `placeholder-images.ts` have no static consumer in the current source, while formatting, import ordering, comments, and local naming remain inconsistent. Arena scoring uses the named constant `NUMERIC_ANSWER_TOLERANCE = 1e-6`, but neither the source nor the technical documentation explains how that threshold was derived, which numeric domains or units it is intended to cover, or whether the comparison is deliberately absolute rather than relative. Lint and type-check pass because the compiler does not enable `noUnusedLocals`; therefore, those results do not disprove dead-code candidates or establish that business-rule constants are adequately documented.
 
 **Observed scope and consequence:** The candidate modules add maintenance surface and can mislead a reviewer into assuming that dormant assets or branding behaviour remain active. Inconsistent imports, comments, and unexplained constants further obscure ownership during change review. The Arena threshold is directly testable and is not itself evidence of incorrect scoring; however, without a documented domain rationale, a future maintainer cannot determine whether changing the accepted answer format, magnitude, or unit requires changing the tolerance. Static absence of a consumer is strong evidence of disuse, but dynamic loading and external scripts must be excluded before deletion is justified.
 
-**Required verification:** Dynamic and script-based consumers must be excluded before deletion. A dedicated unused-symbol check, import graph, lint, type-check, production build, and focused diff review are required. The numeric tolerance should additionally be supported by a documented product or mathematical rationale and by fixtures immediately below, at, and above the accepted boundary, including representative small and large magnitudes.
+**Original verification criteria:** Dynamic and script-based consumers must be excluded before deletion. A dedicated unused-symbol check, import graph, lint, type-check, production build, and focused diff review are required. The numeric tolerance should additionally be supported by a documented product or mathematical rationale and by fixtures immediately below, at, and above the accepted boundary, including representative small and large magnitudes.
 
 ### S01 - Feature Modules Combine Excessive and Heterogeneous Responsibilities
 
 **Status:** Resolved.
 
-**Description and context:** Dashboard (998 lines), Playground (844), Profile (755), Forum list (699), and Forum detail (642) continue to combine presentation, subscriptions, mutations, dialogs, and reporting. File length alone is not a defect, but these modules exhibit multiple distinct ownership boundaries.
+**Current implementation:** Domain responsibilities were extracted into dedicated modules, including dashboard cards, practice mode, flashcard gameplay, shared authentication UI, paged collection loading and learning-session lifecycle. Historical line counts below are baseline observations, not current measurements or acceptance thresholds.
+
+**Historical description and context:** Dashboard (998 lines), Playground (844), Profile (755), Forum list (699), and Forum detail (642) continue to combine presentation, subscriptions, mutations, dialogs, and reporting. File length alone is not a defect, but these modules exhibit multiple distinct ownership boundaries.
 
 **Observed scope and consequence:** A single component frequently owns remote-data lifecycle, form drafts, mutation error handling, navigation transitions, derived statistics, and large presentation trees. Changes to one responsibility consequently require reasoning about unrelated state and effects. This increases regression risk and makes focused component testing more difficult without establishing that any particular line-count threshold is inherently unacceptable.
 
-**Required verification:** Refactoring should follow domain responsibility rather than arbitrary size limits and should preserve routing, dialog focus, subscription lifetime, UID resets, and principal end-to-end flows.
+**Original verification criteria:** Refactoring should follow domain responsibility rather than arbitrary size limits and should preserve routing, dialog focus, subscription lifetime, UID resets, and principal end-to-end flows.
 
 ### S02 - Duplicated Implementations Have Diverged Semantically
 
 **Status:** Resolved.
 
-**Description and context:** Authentication shells, Forum mutation handlers, subject metadata, date wrappers, metric schemas, and localization access patterns remain duplicated. The divergence is behavioural rather than merely textual: post creation awaits persistence and retains a draft after failure, whereas the corresponding edit paths close their editors before persistence has been confirmed. Similar duplication increases the probability that validation limits, error handling, localization, and lifecycle rules will evolve differently across nominally equivalent workflows.
+**Current implementation:** Shared authentication, subject metadata, date formatting, analysis schemas and coordinated mutation handling now provide common policy boundaries. Coordinated Forum edits retain drafts and await persistence. The duplicated behavior described below is historical.
+
+**Historical description and context:** Authentication shells, Forum mutation handlers, subject metadata, date wrappers, metric schemas, and localization access patterns remain duplicated. The divergence is behavioural rather than merely textual: post creation awaits persistence and retains a draft after failure, whereas the corresponding edit paths close their editors before persistence has been confirmed. Similar duplication increases the probability that validation limits, error handling, localization, and lifecycle rules will evolve differently across nominally equivalent workflows.
 
 **Observed scope and consequence:** The duplicated implementations do not share a single executable contract, so correcting one path provides no mechanical assurance that its peers receive the same correction. Consolidation should target stable policy boundaries-such as mutation completion, validation, or formatting-rather than forcing unrelated feature behaviour into a highly parameterized generic component.
 
-**Required verification:** Shared abstractions should be introduced only where contracts are genuinely equivalent. Parity, locale/date fixtures, limits, create/edit/retry behaviour, and all relevant consumers require validation.
+**Original verification criteria:** Shared abstractions should be introduced only where contracts are genuinely equivalent. Parity, locale/date fixtures, limits, create/edit/retry behaviour, and all relevant consumers require validation.
 
 ### S03 - Ambiguous State Ownership Between Views and Reducers
 
 **Status:** Resolved.
 
-**Description and context:** Home maintains a separate `view`, the learning-session reducer defines transitions that are not uniformly dispatched, and Quiz owns additional loading and error state. The architecture does not document which representation is authoritative for each transition.
+**Current implementation:** useLearningSession owns reducer transitions and persistence; navigation owns non-session sections and Quiz owns generation/answer-feedback UI. Reset invalidates pending save completions. This establishes ownership for the assigned structural finding without closing separately tracked setup/authentication race findings.
+
+**Historical description and context:** Home maintains a separate `view`, the learning-session reducer defines transitions that are not uniformly dispatched, and Quiz owns additional loading and error state. The architecture does not document which representation is authoritative for each transition.
 
 **Observed scope and consequence:** The same conceptual session can be represented simultaneously by route/view selection, reducer state, and component-local flags. A transition may update only a subset of those representations, especially after late asynchronous completion. The ambiguity complicates cancellation and reset behaviour and makes illegal or contradictory states possible even though each individual state variable is correctly typed.
 
-**Required verification:** Establish ownership and cancellation rules, remove genuinely dead actions or connect required ones, and test start, ready, finish, failure, reset, navigation, stale responses, and locale changes.
+**Original verification criteria:** Establish ownership and cancellation rules, remove genuinely dead actions or connect required ones, and test start, ready, finish, failure, reset, navigation, stale responses, and locale changes.
 
 ### S04 - Inconsistent Asynchronous Completion and Error-Boundary Contracts
 
 **Status:** Resolved.
 
-**Description and context:** Render boundaries cannot capture event-handler or request failures, while several mutations use detached `.then/.catch` chains or return before the durable operation completes. Callers therefore cannot consistently infer completion or recovery semantics.
+**Current implementation:** Coordinated mutations return promises with explicit success/failure outcomes and pending exclusion, and success is tied to completed persistence. Render boundaries remain separate from asynchronous failure reporting. This resolution covers the assigned completion contract, not every independently tracked error-handling defect.
+
+**Historical description and context:** Render boundaries cannot capture event-handler or request failures, while several mutations use detached `.then/.catch` chains or return before the durable operation completes. Callers therefore cannot consistently infer completion or recovery semantics.
 
 **Observed scope and consequence:** Some handlers return `void`, others return booleans or promises, and success notifications are not uniformly tied to durable completion. A caller cannot apply a consistent pending lock, retry decision, or navigation policy without understanding each implementation. Render recovery and asynchronous operation recovery are separate mechanisms and should not be treated as interchangeable.
 
-**Required verification:** Mutations that require coordination should return an explicit `Promise<Result>`, apply pending exclusion where necessary, and retain safe typed diagnostics. Delayed and rejected promises, provider failures, boundary reset, and localized recovery UI require testing.
+**Original verification criteria:** Mutations that require coordination should return an explicit `Promise<Result>`, apply pending exclusion where necessary, and retain safe typed diagnostics. Delayed and rejected promises, provider failures, boundary reset, and localized recovery UI require testing.
 
 ### P01 - Unbounded Queries and Client-Side List Processing
 
 **Status:** Resolved.
 
-**Description and context:** History, posts, exams, and comments use broad real-time queries or subscriptions, with substantial filtering and sorting performed on the client. Reads, memory, and render work may grow with the dataset.
+**Current implementation:** usePagedCollection maintains a live first page limited to 50 records and fetches older pages by cursor. First-page changes invalidate older pages and in-flight continuations; duplicate IDs are filtered. Search, statistics and reports explicitly cover loaded records. The September 15 emulator comparison confirms a 50-document query bound at 100, 1,000 and 10,000 records without asserting production cost savings.
+
+**Historical description and context:** History, posts, exams, and comments use broad real-time queries or subscriptions, with substantial filtering and sorting performed on the client. Reads, memory, and render work may grow with the dataset.
 
 **Evidence and interpretive boundary:** The source contains no cursor, page-size limit, or virtualization boundary for the principal history and Forum lists. This establishes an unbounded growth path, but not a measured performance regression at the current production dataset size. Network cache behaviour, Firestore billing, device capacity, and actual record distribution must be observed before severity is quantified.
 
-**Required verification:** Measure representative datasets (for example 100, 1,000, and 10,000 records) using read counts, transferred bytes, heap, and render time before selecting cursors, pagination, virtualization, or aggregation. Statistical and sorting correctness must be preserved.
+**Original verification criteria:** Measure representative datasets (for example 100, 1,000, and 10,000 records) using read counts, transferred bytes, heap, and render time before selecting cursors, pagination, virtualization, or aggregation. Statistical and sorting correctness must be preserved.
 
 ### P02 - Recurrent Timer Updates and Repeated KaTeX Rendering
 
 **Status:** Resolved.
 
-**Description and context:** The quiz timer updates each second, and `LatexText` invokes `katex.renderToString` during rendering even though token splitting is memoized. The repository contains no CPU, frame-rate, or invocation-count evidence that quantifies the impact.
+**Current implementation:** LatexText is memoized and its rendering preparation is keyed by text, reducing repeated formula work during unrelated timer updates. Timer termination remains part of quiz behavior. This closes the identified repeated-render mechanism; a material CPU/frame-rate improvement remains outside the available measurements.
+
+**Historical description and context:** The quiz timer updates each second, and `LatexText` invokes `katex.renderToString` during rendering even though token splitting is memoized. The repository contains no CPU, frame-rate, or invocation-count evidence that quantifies the impact.
 
 **Evidence and interpretive boundary:** The relevant execution paths are directly visible, but their cost depends on component boundaries, the number and complexity of expressions, browser hardware, and React scheduling. The finding therefore identifies repeated work suitable for profiling; it does not establish that memoization or timer isolation would produce a material user-visible improvement.
 
-**Required verification:** Profile before optimization. Any timer isolation or output cache must preserve timer termination and invalidate correctly when text, rendering options, theme, or locale changes.
+**Original verification criteria:** Profile before optimization. Any timer isolation or output cache must preserve timer termination and invalidate correctly when text, rendering options, theme, or locale changes.
 
 ### P03 - Duplicate Conversation Context in AI Requests
 
 **Status:** Resolved.
 
-**Description and context:** The validated `data` object, including `chatHistory`, is serialized into the prompt, while the same history is also mapped into the provider `messages` array. The current user message is included in both `userMessage` and the accumulated history supplied by the component.
+**Current implementation:** Review context appears once in the system message, prior conversation turns once in provider messages, and current input once at the end. The caller no longer appends the current input to the prior-turn history. Provider token and answer-quality gains are not inferred solely from this structural correction.
+
+**Historical description and context:** The validated `data` object, including `chatHistory`, is serialized into the prompt, while the same history is also mapped into the provider `messages` array. The current user message is included in both `userMessage` and the accumulated history supplied by the component.
 
 **Observed mechanism and consequence:** Each conversational turn can reach the provider through two representations with overlapping semantics. This increases request size and may cause the model to assign disproportionate weight to repeated text or interpret the duplicated current turn as two separate instructions. The actual token and response-quality impact remains input- and tokenizer-dependent.
 
-**Required verification:** Review context and conversational turns should be represented once without removing necessary quiz information. Request-body structure, role mapping, message ordering, multi-turn behaviour, both languages, and byte/token measurements require validation.
+**Original verification criteria:** Review context and conversational turns should be represented once without removing necessary quiz information. Request-body structure, role mapping, message ordering, multi-turn behaviour, both languages, and byte/token measurements require validation.
 
 ### P04 - Idempotency Receipts Have No Defined Retention Bound
 
-**Status:** Implemented; TTL activation pending.
+**Status:** Implemented; production TTL/index activation blocked by IAM.
 
-**Description and context:** Every Arena or Forum operation supplied with a new request identifier creates a document in `_requestReceipts`. The repository records `createdAt` but contains no deletion path, scheduled cleanup, documented retention period, or managed TTL configuration. Under sustained use, the collection and its associated stored result payloads can grow monotonically.
+**Historical finding:** Request receipts previously lacked a defined expiry, permitting unbounded retention.
 
-**Required verification:** Define a retention interval that exceeds the supported retry window, then confirm whether a deployment-level Firestore TTL already exists. If it does not, introduce and test an explicit retention mechanism. Storage growth, retry behaviour before expiry, reuse after expiry, and operational observability should be measured before this item is closed.
+**Implemented behavior:** New Arena and Forum receipts include `expiresAt` seven days after creation. `src/lib/receipt-retention.ts` defines the supported retry window; a retained receipt remains replayable after its expiry timestamp until asynchronous TTL deletion occurs. After deletion, the same request identifier is no longer guaranteed to suppress a new operation. `firestore.indexes.json` declares the receipt TTL field and index exemption. `scripts/receipt-retention.ts` inventories legacy receipts and only backfills missing expiry values with `--apply`.
+
+**Recorded evidence, 15 September 2026:** The production metadata inspection found TTL disabled and the configured posts compound index missing. Receipt inventory returned zero documents. `scripts/firestore-retention-admin.mjs --apply` was rejected with HTTP 403 `PERMISSION_DENIED` at index creation, before TTL configuration was attempted; no production configuration change succeeded. Local integration tests passed 7/7.
+
+**Remaining acceptance:** Use an appropriately authorized Google identity to apply the configuration and verify completed index/TTL operations. Verify actual expiry cleanup and retry behavior around deletion. Local machine access does not grant Google IAM permissions.
 
 ### V01 - Incomplete WebKit Validation
 
-**Status:** Blocked by host application-control policy.
+**Status:** Partial; WebKit development passed, production matrix pending.
 
-**Description and context:** A prior WebKit run completed four of five cases, with a Forum comment remaining in a loading state around intercepted Firestore traffic. The evidence does not isolate application, SDK, Emulator, network interception, or browser behaviour.
+**Historical finding:** Earlier WebKit attempts were limited by host application control and stalled Firestore subscriptions. The host launch restriction no longer prevented the September 15 run.
 
-**Evidence and interpretive boundary:** The partial failure is a valid acceptance gap because one supported engine did not complete the expected workflow. It is not sufficient evidence of a Safari production defect: the failing environment combined WebKit automation, local emulators, and request interception. Any corrective change made before isolating those variables could address the test harness rather than the application.
+**Implemented correction:** Emulator-only Firestore initialization forces long polling to avoid the observed WebKit streaming failure. Production initialization retains its normal transport. The toast viewport allows pointer events through its empty area, while visible notifications remain interactive; the failed-comment E2E case dismisses its error notification before retrying.
 
-**Required verification:** Reproduce without interception, isolate each layer, and inspect subscription, network, and CORS behaviour. Firestore Rules or CORS policy must not be weakened merely to obtain a passing test.
+**Recorded evidence, 15 September 2026:** Before these fixes, production E2E passed 26/28 cases, with two WebKit failures. After the fixes, WebKit development E2E passed 7/7 and the production build passed. Firestore Rules and access controls were not weakened.
+
+**Remaining acceptance:** Run the complete 28-case production E2E matrix on the corrected build. Development E2E and a successful build do not substitute for that result, and current Playwright WebKit does not establish exact Safari-version support.
 
 ### V02 - Unverified Minimum Browser Versions and Physical-Camera Behaviour
 
-**Status:** Partial; exact browsers and devices pending.
+**Status:** Partial; local physical camera passed, target matrix pending.
 
-**Description and context:** The documented minimum targets-Safari 16.4, Chrome 111, and Firefox 128-have not been demonstrated. A previous Firefox environment lacked a required runtime DLL, and a real model with a synthetic camera does not establish physical-device behaviour.
+**Implemented verification:** `scripts/check-physical-camera.mjs` uses headed Chromium and a real camera against a local application. It checks live video and media-track termination through two start/stop cycles without substituting a synthetic camera.
 
-**Evidence and interpretive boundary:** Tests on newer Chromium or a synthetic media stream establish only those particular environments. Browser engine version, operating-system media permissions, camera drivers, lighting, TensorFlow backend selection, and device performance can alter the result independently. Acceptance must therefore record each target environment rather than generalize from one passing configuration.
+**Recorded evidence, 15 September 2026:** The local HP Wide Vision HD Camera produced 640 × 480 video in both cycles, and all acquired tracks ended after stopping. This establishes capture and cleanup on that Windows/Chromium configuration only.
 
-**Required verification:** Execute the precise browser matrix and physical-camera cases covering permission, lighting, CPU load, backend selection, stop/restart, and resource cleanup, with results reported separately by environment.
+**Remaining acceptance:** Safari 16.4, Chrome 111 and Firefox 128 remain documented targets without exact-version acceptance evidence. Physical mobile devices, lighting, CPU load, backend selection and permission-revocation scenarios require separate results. The script grants camera permission and therefore does not validate the operating-system permission prompt or denial flow.
 
 ### V03 - Unverified Remote CI, Production Runtime, and Firestore Index State
 
-**Status:** Partial; remote CI and deployment pending.
+**Status:** Partial; hosted CI failure observed, deployment verification pending.
 
-**Description and context:** A CI workflow exists, but no successful GitHub-hosted execution was available during this review. Existing E2E configuration does not constitute a production-runtime smoke test. The repository does not manage a compound index definition for the `mostLiked` query, but repository absence alone does not prove that the deployed index is missing.
+**Recorded external evidence, 15 September 2026:** The previously inspected hosted run `34766457053` for revision `cc97e79` passed installation, static checks, coverage, integration and build, then failed four development WebKit cases; production E2E and later validation steps were skipped. Six deployed public routes returned HTTP 200, and the deployment status indicated success. These observations predate the user's restriction on GitHub operations; no new remote verification is implied.
 
-**Evidence and interpretive boundary:** Workflow syntax and local success demonstrate intent, not execution on the hosted runner with its network, Java, browser, and emulator dependencies. Likewise, development-server E2E cannot establish behaviour of the optimized server artifact. Firestore index state is deployment metadata and must be observed directly rather than inferred exclusively from tracked files.
+**Local implementation and evidence:** The repository manages the posts compound index and receipt TTL in `firestore.indexes.json`, and includes production HTTP smoke and full production E2E commands. The corrected local production build passed; the complete corrected production E2E matrix remains unverified. A direct Firestore metadata read found the configured posts index missing and receipt TTL disabled; the subsequent configuration attempt failed with IAM 403.
 
-**Required verification:** Obtain remote CI evidence, run an isolated production-runtime smoke test, and inspect deployed index state through an appropriately scoped read-only mechanism before proposing deployment changes.
+**Remaining acceptance:** Obtain a successful complete hosted run only when the user explicitly requests GitHub activity, validate the corrected optimized runtime and deployment settings, and confirm deployed Rules, index readiness and TTL activation. Public-route HTTP responses do not establish authenticated workflows, live AI inference or production configuration correctness.
 
 ### V04 - Dependency-Risk Assessment Is Not Current
 
-**Status:** Blocked; registry egress approval required.
+**Status:** Resolved.
 
-**Description and context:** The source audit's “12 moderate, 0 high, 0 critical” snapshot is no longer reliable because the current manifest contains materially newer framework and Firebase versions. This review could not obtain a fresh registry-backed vulnerability result; consequently, no current vulnerability count is asserted.
+**Resolved assessment gap:** A registry-backed assessment of the current lockfile was completed on 15 September 2026, replacing the stale vulnerability snapshot. The `qs` override and installed resolution were updated to 6.16.0, reducing the measured advisory count from six to four moderate findings; zero high and zero critical findings were reported. These are dated measurements, not a guarantee about future advisory data.
 
-**Evidence and interpretive boundary:** Manifest versions and the lockfile establish the dependency graph intended by the repository, but vulnerability applicability depends on current advisory data, resolved transitive versions, execution paths, and deployment exposure. Historical counts must not be carried forward as present facts, and an audit command's severity label alone would not establish exploitability.
+**Residual dependency risks:** `config/dependency-audit-policy.json` records exact package versions and advisory identifiers for `@opentelemetry/core` 1.30.1, `csv-parse` 5.6.0, `stream-json` 1.9.1 and `uuid` 9.0.1, with review due by 15 October 2026. The first three are development-tool dependencies. For the runtime UUID dependency, inspected callers use `v4()` without an output buffer, outside the advisory's identified v3/v5/v6 buffer path. These reviewed exceptions do not remove vulnerable package versions or prove that all future usage is safe.
 
-**Required verification:** Run a fresh audit against `package-lock.json`, trace each dependency path, assess applicability and peer compatibility, and document time-bounded exceptions. Forced upgrades, `legacy-peer-deps`, and unexamined downgrades are not acceptable evidence of remediation.
+**Enforcement and evidence:** `scripts/dependency-audit.mjs` checks advisory identity, severity, every matching installed version, development-only constraints where specified, and expiry of the review policy. Unreviewed findings cause failure. The workflow includes this command after installation. The command prints JSON by default; `--write-report` is required to create a report file. Lint, typecheck, 106 unit/component tests, seven integration tests and the production build passed following the dependency change.
 
 ### V05 - Inadequate Comparative Baselines and Incomplete Coverage Evidence
 
-**Status:** Partial; current baseline established.
+**Status:** Partial; current and query baselines measured, historical comparison pending.
 
-**Description and context:** No pre-migration screenshot or bundle baseline was captured under equivalent conditions. The repository likewise contains no recorded post-migration route-level `First Load JS` baseline, chunk-attribution report, or repeatable bundle-budget record for the Next.js 16 build. Historical coverage includes only files instrumented by the unit suite and must not be represented as whole-codebase coverage. A defect-reproduction probe that passes is not equivalent to a remediation acceptance test.
+**Implemented measurement:** The repository has a production bundle inventory, route budget configuration, production smoke checks, synthetic dataset processing measurements, a local browser performance script, and an emulator query comparison. `scripts/browser-performance.mjs` samples cold/warm loads for login, Forum and Arena, transferred bytes, heap, DOM nodes and an automated language-menu interaction. Its interaction timing includes automation overhead and is not real-user INP.
 
-**Evidence and interpretive boundary:** Existing post-change measurements can describe the current build but cannot support a causal improvement claim without a comparable baseline. Dynamic imports in selected Dashboard and Playground paths demonstrate code-splitting intent, but they do not establish the size, loading priority, or user-visible cost of the resulting route and asynchronous chunks. Conversely, the absence of a bundle report does not establish that the present bundle is excessive. Coverage percentages describe only the configured instrumentation set and test execution, not all application branches or external integrations. Evidence should therefore be reported with its denominator, environment, and behavioural purpose.
+**Recorded evidence, 15 September 2026:** The Admin SDK emulator comparison returned 100, 1,000 and 10,000 documents for unbounded queries versus 50 documents at each scale for `limit(50)`. Serialized result sizes were 12,801 / 128,001 / 1,280,001 bytes versus 6,401 bytes for bounded results. This measures query shape in an emulator; it does not measure production billing, browser subscription behavior or full application speed. Browser measurements were exploratory and do not establish a controlled historical comparison. Attempts to build the historical comparator did not complete.
 
-**Required verification:** Use fixed hardware, browser, build, and dataset conditions to measure cold and warm loads, route-level `First Load JS`, compressed and decoded bytes, initial and asynchronously loaded chunk composition, interaction percentiles, heap, and reads. Preserve machine-readable build reports or an equivalent repeatable bundle analysis, define justified route-level budgets, and compare them under the same Next.js production-build conditions. Add changed-branch coverage and explicit before/after behavioural cases for each remediation.
+**Coverage boundary:** The latest local unit/component run passed 106 tests in 30 files and integration passed 7/7. Test counts do not imply whole-codebase branch coverage. Bundle inventory and configured budgets establish repeatability, not a before/after improvement by themselves.
+
+**Remaining acceptance:** Complete a comparable historical production build, use equivalent hardware/browser/cache/dataset conditions, and compare route/chunk bytes, cold/warm loads, interaction distributions, heap and reads. Record changed-branch coverage with its actual instrumentation denominator. Do not label the exploratory measurements as proof of a performance improvement.
 
 ### V06 - Production Builds Depend on Live Google Fonts Availability
 
 **Status:** Resolved.
 
-**Description and context:** The root layout imports Inter and Space Grotesk through `next/font/google`, which downloads font assets during the production build. A clean `next build` performed during this review failed solely because the environment could not reach `fonts.googleapis.com`. The repository does not contain local copies or another offline build path for these fonts.
+**Current implementation:** The root layout now uses local system font stacks and has no next/font/google build dependency. The September 15 production build passed without a Google Fonts download. The unavailable-network failure below describes the historical baseline.
 
-**Required verification:** Decide whether network access to Google Fonts is an explicit build prerequisite or whether the fonts should be self-hosted through `next/font/local`. A clean build should then be tested both in the intended CI environment and in a network-restricted environment consistent with the chosen policy. This finding concerns deterministic build availability and does not assert a defect in the application's runtime font rendering.
+**Historical description and context:** The root layout imports Inter and Space Grotesk through `next/font/google`, which downloads font assets during the production build. A clean `next build` performed during this review failed solely because the environment could not reach `fonts.googleapis.com`. The repository does not contain local copies or another offline build path for these fonts.
+
+**Original verification criteria:** Decide whether network access to Google Fonts is an explicit build prerequisite or whether the fonts should be self-hosted through `next/font/local`. A clean build should then be tested both in the intended CI environment and in a network-restricted environment consistent with the chosen policy. This finding concerns deterministic build availability and does not assert a defect in the application's runtime font rendering.
