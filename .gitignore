@@ -1,5 +1,4 @@
-# Build/test artifacts; keep durable reports at the repository root, not in generated output.
-# Artifact build/test; luu bao cao ben vung o root repository, khong trong output tao tu dong.
+# Build, test, and generated verification artifacts.
 .next/
 coverage/
 test-results/
@@ -9,6 +8,7 @@ playwright/.cache/
 out/
 build/
 dist/
+/reports/
 
 node_modules/
 jspm_packages/
@@ -24,7 +24,6 @@ web_modules/
 .pnpm-debug.log*
 
 # Local environment variants may contain secrets. Only the template is tracked.
-# Moi bien the env co the chua secret; chi theo doi template.
 .env
 .env.*
 !.env.example
