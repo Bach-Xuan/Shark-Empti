@@ -1,0 +1,47 @@
+import { cleanup, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import DashboardView from '@/components/dashboard-view';
+import { translations } from '@/lib/translations';
+import { readRoadmapChecks } from '@/lib/roadmap-storage';
+import { calculateDashboardStats } from '@/lib/stats-utils';
+import { history } from './fixtures/quiz';
+
+vi.mock('@/firebase', () => ({ useUser: () => ({ user: { uid: 'learner' } }) }));
+vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => false }));
+vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
+vi.mock('@/components/feature-help', () => ({ default: () => null }));
+vi.mock('@/components/ui-text', () => ({ UiText: () => null }));
+vi.mock('recharts', () => {
+  const Empty = () => null;
+  return Object.fromEntries(['Bar', 'BarChart', 'CartesianGrid', 'PolarAngleAxis', 'PolarGrid', 'Radar', 'RadarChart', 'Tooltip', 'ResponsiveContainer', 'XAxis', 'YAxis'].map(name => [name, Empty]));
+});
+beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }));
+afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals(); });
+it('shares stable progress across dashboard, expanded roadmap, locale changes and remount', async () => {
+  const props = { history: [history], personalNotes: '', onNotesChange: async () => true };
+  const view = render(<DashboardView {...props} t={translations.en} lang="en" />);
+  const user = userEvent.setup();
+  const card = screen.getByRole('checkbox', { name: 'Practice' });
+  await user.click(card);
+  expect(card.getAttribute('aria-checked')).toBe('true');
+  await user.click(screen.getByRole('button', { name: translations.en.expandView }));
+  const dialog = screen.getByRole('dialog');
+  const checkbox = within(dialog).getByRole('checkbox', { name: 'Practice' });
+  expect(checkbox.getAttribute('aria-checked')).toBe('true');
+  await user.click(checkbox);
+  expect(checkbox.getAttribute('aria-checked')).toBe('false');
+  await user.click(within(dialog).getByText('Practice'));
+  expect(checkbox.getAttribute('aria-checked')).toBe('true');
+  checkbox.focus();
+  await user.keyboard('[Space]');
+  expect(checkbox.getAttribute('aria-checked')).toBe('false');
+  await user.keyboard('[Space]');
+  view.rerender(<DashboardView {...props} t={translations.vi} lang="vi" />);
+  expect(within(screen.getByRole('dialog')).getByRole('checkbox', { name: 'Luyện tập' }).getAttribute('aria-checked')).toBe('true');
+  view.unmount();
+  render(<DashboardView {...props} t={translations.vi} lang="vi" />);
+  expect(screen.getByRole('checkbox', { name: 'Luyện tập' }).getAttribute('aria-checked')).toBe('true');
+  const group = calculateDashboardStats([history], translations.en, 'en')!.processedGroupedInsights[0];
+  expect(readRoadmapChecks('learner')[group.topicId][group.recommendations[0].id]).toBe(true);
+});

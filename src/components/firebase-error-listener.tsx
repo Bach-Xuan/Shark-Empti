@@ -9,8 +9,8 @@ import { useAppPreferences } from './app-preferences';
 
 /**
  * Turns Firebase failures into the application's standard toast notification.
- * The raw error remains in the console for developers, but is never thrown into
- * the user-facing Next.js overlay.
+ * Only the safe code and operation are logged; raw SDK messages, payloads and
+ * credentials are neither logged nor thrown into the user-facing overlay.
  */
 export function FirebaseErrorListener() {
   const { lang } = useAppPreferences();

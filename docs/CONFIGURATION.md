@@ -292,23 +292,37 @@ Remove-Item Env:E2E_PRODUCTION
 npm run test:production
 ```
 
-The first E2E run uses the development server; the second uses the optimized build. CI also records the bundle inventory and synthetic performance baseline. Browser installation requires the relevant host libraries. The earlier local WebKit launch restriction no longer prevented the 15 September 2026 run: corrected development WebKit passed 7/7, while the complete corrected production matrix remains pending.
+The first E2E run uses the development server; the second uses the optimized build. CI also records the bundle inventory and synthetic performance baseline. Browser installation requires the relevant host libraries. The earlier local WebKit launch restriction no longer prevented the recorded run: corrected development WebKit passed 7/7, while the complete corrected production matrix remains pending.
 
 Release also requires a current dependency audit, production Runtime/Function settings, deployed Firestore Rules and indexes, receipt and AI-ledger TTL activation, the documented minimum browser targets, a physical camera and live OpenRouter validation. The AI feature flag must remain disabled outside approved staging/canary scopes. The build uses local system fonts and no longer downloads Google Fonts. Lists load 50 records initially and fetch older pages by cursor; search, statistics and reports cover loaded records.
 
+The public-data changes require coordinated deployment of server routes, client assets and Firestore Rules: Arena creation now uses `POST /api/arena`, and post deletion uses `DELETE /api/forum/{postId}`. Old browser create/delete paths are denied by the new Rules. `_forumDeletions` records deliberately have no TTL; they retain owner recovery and post-ID reuse protection. No production deployment or legacy data sweep is implied by local verification.
+
+Optional print-layout verification runs independently of the Firebase emulators:
+
+```powershell
+$env:REPORT_PRINT_BROWSER='chrome' # alternatively msedge, chromium, firefox or webkit
+node node_modules/vitest/vitest.mjs run tests/report-print.browser.test.tsx
+Remove-Item Env:REPORT_PRINT_BROWSER
+```
+
+The selected browser must be installed. The test renders the actual print component with long English/Vietnamese fixtures in both themes; Chromium also writes multipage PDFs to ignored `tmp/pdfs/`. With no environment opt-in, these browser tests are skipped by the ordinary unit suite. This is a print fixture check, not an authenticated end-to-end profile test.
+
+The recorded local fixture run passed on Chrome, Firefox and WebKit (two language tests per engine, each covering both themes), using `PLAYWRIGHT_BROWSERS_PATH=.tools/playwright` for the local Playwright engines. The final Vietnamese dark Chrome output contains 13 A4 pages. This does not establish native print-preview or physical-printer behavior.
+
 ### 9.1. 🔍 Dependency Assessment
 
-`npm run audit:dependencies` sends resolved package names and versions to npm, prints a JSON summary, and writes `reports/dependency-audit.json`. The current script does not read a checked-in exception-policy file and does not implement a `--write-report` mode. The 15 September 2026 assessment of four moderate, zero high and zero critical advisories is historical evidence only; rerun the command before making a current dependency-risk claim. V04 in [AUDIT_REPORT.md](AUDIT_REPORT.md) records the remaining verification gap.
+`npm run audit:dependencies` sends resolved package names and versions to npm, prints a JSON summary, and writes `reports/dependency-audit.json`. The current script does not read a checked-in exception-policy file and does not implement a `--write-report` mode. The historical assessment of four moderate, zero high and zero critical advisories is evidence only; rerun the command before making a current dependency-risk claim. V04 in [AUDIT_REPORT.md](AUDIT_REPORT.md) records the remaining verification gap.
 
 ### 9.2. 🧾 Receipt and AI-Ledger Retention and Index Operations
 
 New receipts carry `expiresAt` seven days after creation. AI generation and quota records also carry short-lived `expiresAt` fields. Deletion is asynchronous, and retained receipts remain replayable until deletion. Desired posts index and TTL field settings for `_requestReceipts`, `_aiGenerations` and `_aiQuota` are in `firestore.indexes.json`. From the repository root, `node scripts/inspect-firestore.mjs` loads the Admin identity from `.env`, reads the deployed posts index and all three TTL policies, and writes `reports/firestore-metadata.json`. It is read-only. This checkout contains no package command or source file that applies index or TTL configuration, so production changes require a separately authorized infrastructure workflow and subsequent verification.
 
-The 15 September inspection found the posts index missing and receipt TTL disabled. Application failed with IAM 403 at index creation, before TTL was applied; receipt inventory returned zero documents. For legacy data, `node --conditions=react-server --env-file=.env --import tsx scripts/receipt-retention.ts` inventories missing expiry values; adding `--apply` backfills them without directly deleting receipts. Its `alreadyExpired` counter concerns missing-expiry records whose calculated expiry is past, not every expired document.
+A historical inspection found the posts index missing and receipt TTL disabled. Application failed with IAM 403 at index creation, before TTL was applied; receipt inventory returned zero documents. For legacy data, `node --conditions=react-server --env-file=.env --import tsx scripts/receipt-retention.ts` inventories missing expiry values; adding `--apply` backfills them without directly deleting receipts. Its `alreadyExpired` counter concerns missing-expiry records whose calculated expiry is past, not every expired document.
 
 ### 9.3. 📊 Local Measurements and Evidence Boundaries
 
 - `npm run report:performance` measures synthetic processing and serialized-data cardinality for 100, 1,000, and 10,000 history records. It is not a browser, Firestore-billing, heap, or interaction benchmark.
-- This checkout does not contain checked-in browser-performance, physical-camera, or emulator read-comparison commands. The 15 September claims for those activities are historical evidence and cannot be reproduced from the current tree without restoring or replacing the missing tooling.
+- This checkout does not contain checked-in browser-performance, physical-camera, or emulator read-comparison commands. The historical claims for those activities cannot be reproduced from the current tree without restoring or replacing the missing tooling.
 
 Current verification scripts print or write their evidence when explicitly run. Bundle, dependency-audit, Firestore-metadata, and synthetic-performance commands generate machine-readable artifacts. GitHub operations require the user's explicit request, including pushes, pull requests and workflow actions.

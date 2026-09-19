@@ -2,6 +2,7 @@ import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { Query } from 'firebase/firestore';
 import { usePagedCollection, PAGE_SIZE } from '@/hooks/use-paged-collection';
+import { readForumPost } from '@/lib/public-firestore-schema';
 const mocks = vi.hoisted(() => ({ callbacks: [] as Array<(snapshot: unknown) => void>, get: vi.fn(), unsubscribe: vi.fn(), limit: vi.fn(), report: vi.fn() }));
 vi.mock('@/firebase/error-emitter', () => ({ errorEmitter: { emit: mocks.report } }));
 vi.mock('firebase/firestore', () => ({ query: (...args: unknown[]) => args, limit: mocks.limit, startAfter: (cursor: unknown) => cursor, getDocs: mocks.get,
@@ -46,4 +47,16 @@ it('deduplicates records that move across an older cursor boundary', async () =>
  await act(async () => result.current.loadMore());
  expect(result.current.items).toHaveLength(55);
  expect(new Set(result.current.items).size).toBe(55);
+});
+
+it('keeps valid items in a mixed feed and reports corrupt records without rendering them', () => {
+ const { result } = renderHook(() => usePagedCollection(source, readForumPost));
+ act(() => mocks.callbacks[0]({ size: 3, docs: [
+  { id: 'good', data: () => ({ authorId: 'owner', title: 'Title', content: 'Content', subject: 'math' }) },
+  { id: 'bad', data: () => ({ title: [] }) },
+  { id: 'throws', data: () => { throw Error('broken document'); } },
+ ] }));
+ expect(result.current.items.map(item => item.id)).toEqual(['good']);
+ expect(result.current.loading).toBe(false);
+ expect(mocks.report).toHaveBeenCalledTimes(2);
 });

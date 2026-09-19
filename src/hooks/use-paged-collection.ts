@@ -16,9 +16,11 @@ export function usePagedCollection<T>(source: Query<DocumentData> | null, read: 
  const [loading, setLoading] = useState(true), [hasMore, setHasMore] = useState(false);
  const report = useCallback((cause: unknown) => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'paged-collection', operation: 'list' }, cause)), []);
  const decode = useCallback((docs: QueryDocumentSnapshot<DocumentData>[]) => docs.flatMap(doc => {
-  const item = reader.current(doc.id, doc.data());
-  if (item === null) { report({ code: 'data-loss' }); return []; }
-  return [item];
+  try {
+   const item = reader.current(doc.id, doc.data());
+   if (item !== null) return [item];
+  } catch { /* One malformed record must not abort the rest of a page. */ }
+  report({ code: 'data-loss' }); return [];
  }), [report]);
  useEffect(() => {
   const lifecycle = epoch;
@@ -30,7 +32,7 @@ export function usePagedCollection<T>(source: Query<DocumentData> | null, read: 
    cursor.current = snapshot.docs.at(-1) ?? null;
    seenIds.current = new Set(snapshot.docs.map(doc => doc.id));
    setItems(decode(snapshot.docs)); setHasMore(snapshot.size === PAGE_SIZE); setLoading(false);
-  }, cause => { if (generation === epoch.current) { report(cause); setLoading(false); } });
+  }, cause => { if (generation === epoch.current) { report(cause); setItems([]); setHasMore(false); cursor.current = null; setLoading(false); } });
   return () => { lifecycle.current++; unsubscribe(); };
  }, [source, decode, report]);
  const loadMore = useCallback(async () => {

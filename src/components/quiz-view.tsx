@@ -27,10 +27,11 @@ interface QuizViewProps {
   onFinish: (results: Omit<QuizHistoryItem, 'date' | 'lang'>, analysis?: QuizAnalysis) => Promise<boolean>;
   onReady?: (questions: QuizQuestion[]) => void;
   onAskGuru: (message: string) => void;
+  askGuruDisabledReason?: string;
   numericShortAnswers?: boolean;
 }
 
-export default function QuizView({ t, lang, config, initialQuestions, onFinish, onReady, onAskGuru, numericShortAnswers = false }: QuizViewProps) {
+export default function QuizView({ t, lang, config, initialQuestions, onFinish, onReady, onAskGuru, askGuruDisabledReason, numericShortAnswers = false }: QuizViewProps) {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [questions, setQuestions] = useState<QuizQuestion[]>(initialQuestions || []);
   const [answers, setAnswers] = useState<QuizResultItem[]>([]);
@@ -227,12 +228,12 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
 
   const handleAskGuruForDetail = useCallback(() => {
     const currentQ = questions[currentIdx];
-    if (!currentQ || !currentFeedback) return;
+    if (!currentQ || !currentFeedback || askGuruDisabledReason) return;
 
     const questionLabel = messages(lang === 'vi' ? 'vi' : 'en').common.question;
     const message = `${t.askSharkGuruPrompt}\n\n📍 **${questionLabel}**: "${currentQ.question}"\n✅ **${t.correctAnswer}**: "${currentQ.correct}"\n📝 **${uiMessage(lang, 'quiz.initial_explanation')}**: "${currentQ.explanation}"`;
     onAskGuru(message);
-  }, [questions, currentIdx, currentFeedback, onAskGuru, t.askSharkGuruPrompt, t.correctAnswer, lang]);
+  }, [questions, currentIdx, currentFeedback, onAskGuru, askGuruDisabledReason, t.askSharkGuruPrompt, t.correctAnswer, lang]);
 
   const formattedRemainingTime = useMemo(() => {
     if (remainingTime === null) return null;
@@ -413,11 +414,14 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
                     variant="ghost"
                     size="sm"
                     onClick={handleAskGuruForDetail}
+                    disabled={!!askGuruDisabledReason}
+                    title={askGuruDisabledReason}
                     className="h-8 md:h-10 rounded-lg md:rounded-xl text-[9px] md:text-xs font-black uppercase tracking-widest border-2 border-primary/20 text-primary hover:bg-primary/10 transition-all active:scale-95"
                   >
                     <Sparkles className="w-3.5 h-3.5 md:w-4 md:h-4 mr-1.5 md:mr-2 fill-current" /> {t.askShark}
                   </Button>
                 </div>
+                {askGuruDisabledReason && <p className="text-sm text-muted-foreground">{askGuruDisabledReason}</p>}
                 <div className="p-5 md:p-10 bg-primary/5 rounded-2xl md:rounded-[2.5rem] border-2 border-primary/10 text-xs md:text-xl font-bold leading-relaxed italic text-foreground whitespace-normal break-words shadow-inner">
                   <LatexText text={currentQ.explanation} />
                 </div>

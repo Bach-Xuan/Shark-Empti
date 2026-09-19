@@ -1,5 +1,7 @@
 'use client';
 import { PageControls } from '@/components/page-controls';
+import { ProfilePrintReport } from '@/components/profile-print-report';
+import { ReportSelectionRow } from '@/components/report-selection-row';
 import { useProfileReport } from '@/hooks/use-profile-report';
 
 
@@ -15,7 +17,6 @@ import Navigation from '@/components/navigation';
 import { Avatar,AvatarFallback,AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Card,CardContent } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
 import {
 Dialog,
 DialogContent,
@@ -468,21 +469,16 @@ if (!authLoading && !user) {
                   const isSelected = selectedSessionIds.includes(item.id!);
 
                   return (
-                    <div
+                    <ReportSelectionRow
                       key={item.id}
+                      checked={isSelected}
+                      onToggle={() => toggleSessionSelection(item.id!)}
+                      label={`${topic} — ${formatSessionDate(item.date)}`}
                       className={cn(
                         "flex items-center gap-4 p-4 md:p-6 rounded-2xl border-2 transition-all cursor-pointer group/item",
                         isSelected ? "bg-primary/10 border-primary shadow-xs translate-x-1" : "bg-card border-border/50 hover:border-primary/30 hover:translate-x-0.5"
                       )}
-                      onClick={() => toggleSessionSelection(item.id!)}
                     >
-                      <div className="shrink-0">
-                        <Checkbox
-                          checked={isSelected}
-                          onCheckedChange={() => toggleSessionSelection(item.id!)}
-                          className="w-6 h-6 border-2"
-                        />
-                      </div>
                       <div className="flex-1 min-w-0 space-y-1">
                         <span className="font-black text-xs md:text-xl uppercase tracking-tight block truncate text-foreground group-hover/item:text-primary transition-colors">
                           <LatexText text={topic} />
@@ -498,7 +494,7 @@ if (!authLoading && !user) {
                            </div>
                         </div>
                       </div>
-                    </div>
+                    </ReportSelectionRow>
                   );
                 })}
                 {filteredReportHistory.length === 0 && (
@@ -530,6 +526,11 @@ if (!authLoading && !user) {
       </Dialog>
 
       {/* Report View Dialog */}
+      {isReportViewOpen && reportStats && <ProfilePrintReport
+        stats={reportStats} roadmapStatus={roadmapStatus} name={user.displayName ?? ''}
+        issued={new Date().toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+        t={t} lang={lang}
+      />}
       <Dialog open={isReportViewOpen} onOpenChange={setIsReportViewOpen}>
         <DialogContent className="max-w-5xl w-[95vw] rounded-[2.5rem] border-[4px] shadow-2xl p-0 overflow-hidden bg-background">
           <div className="flex items-center justify-between p-6 md:p-8 bg-card border-b-4 border-border shrink-0">
@@ -563,12 +564,12 @@ if (!authLoading && !user) {
               </div>
 
               {reportStats?.processedGroupedInsights.map((group, i) => {
-                const topicChecks = roadmapStatus[group.topic] || {};
-                const completedRecs = group.recommendations.filter((_, idx) => !!topicChecks[idx]);
-                const pendingRecs = group.recommendations.filter((_, idx) => !topicChecks[idx]);
+                const topicChecks = roadmapStatus[group.topicId] || {};
+                const completedRecs = group.recommendations.filter(rec => !!topicChecks[rec.id]);
+                const pendingRecs = group.recommendations.filter(rec => !topicChecks[rec.id]);
 
                 return (
-                  <div key={i} className="space-y-8 animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${i * 150}ms` }}>
+                  <div key={group.topicId} className="space-y-8 animate-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: `${i * 150}ms` }}>
                     <div className="flex items-center gap-4 border-l-8 border-primary pl-6">
                        <h3 className="text-2xl md:text-4xl font-headline font-black uppercase tracking-tight"><LatexText text={group.topic} /></h3>
                     </div>
@@ -611,20 +612,20 @@ if (!authLoading && !user) {
                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                          <div className="space-y-3">
                             <span className="text-[10px] font-black uppercase text-green-600 tracking-widest px-2">{t.completedTasks}</span>
-                            {completedRecs.length > 0 ? completedRecs.map((r, idx) => (
-                              <div key={idx} className="flex items-start gap-3 p-4 rounded-xl bg-muted/10 border-2 border-green-500/20 opacity-70">
+                            {completedRecs.length > 0 ? completedRecs.map(r => (
+                              <div key={r.id} className="flex items-start gap-3 p-4 rounded-xl bg-muted/10 border-2 border-green-500/20 opacity-70">
                                 <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 stroke-[3.5px] shrink-0 mt-0.5" />
-                                <p className="text-xs md:sm font-bold line-through"><LatexText text={r} /></p>
+                                <p className="text-xs md:sm font-bold line-through"><LatexText text={r.text} /></p>
                               </div>
                             )) : <p className="text-xs italic opacity-40 px-2">---</p>}
                          </div>
 
                          <div className="space-y-3">
                             <span className="text-[10px] font-black uppercase text-orange-600 tracking-widest px-2">{t.pendingTasks}</span>
-                            {pendingRecs.length > 0 ? pendingRecs.map((r, idx) => (
-                              <div key={idx} className="flex items-start gap-3 p-4 rounded-xl bg-card border-2 border-orange-500/10 shadow-xs">
+                            {pendingRecs.length > 0 ? pendingRecs.map(r => (
+                              <div key={r.id} className="flex items-start gap-3 p-4 rounded-xl bg-card border-2 border-orange-500/10 shadow-xs">
                                 <Circle className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
-                                <p className="text-xs md:sm font-bold"><LatexText text={r} /></p>
+                                <p className="text-xs md:sm font-bold"><LatexText text={r.text} /></p>
                               </div>
                             )) : <p className="text-xs italic opacity-40 px-2">---</p>}
                          </div>

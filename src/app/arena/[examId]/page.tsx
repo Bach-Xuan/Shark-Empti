@@ -1,6 +1,11 @@
 "use client";
 import { useLanguageState,useThemeState } from '@/components/app-preferences';
-import { showUnexpectedErrorToast } from '@/lib/error-toast';
+import { showErrorToast,showUnexpectedErrorToast } from '@/lib/error-toast';
+import { createAppError,type AppError } from '@/lib/app-error';
+import { arenaDetailMessages,arenaResponseError,arenaSubscriptionError } from '@/lib/arena-detail';
+import { errorMessages,translatedError } from '@/lib/i18n/errors';
+import { readArenaExam,readArenaAttempt } from '@/lib/public-firestore-schema';
+import AiChatbot from '@/components/ai-chatbot';
 import { uiMessage } from '@/lib/i18n';
 import { quizLabel } from '@/lib/quiz-labels';
 
@@ -41,11 +46,16 @@ import { useParams,useRouter } from 'next/navigation';
 import React,{ useEffect,useRef,useState } from 'react';
 
 export default function ArenaDetailPage() {
+  const { user } = useUser();
+  const params = useParams();
+  const examId = typeof params.examId === 'string' ? params.examId : '';
+  return <ArenaDetailSession key={JSON.stringify([examId, user?.uid ?? null])} examId={examId} />;
+}
+
+function ArenaDetailSession({ examId }: { examId: string }) {
   const { user, loading: authLoading } = useUser();
   const db = useFirestore();
   const router = useRouter();
-  const params = useParams();
-  const examId = params.examId as string;
   const { toast } = useToast();
 
   const [lang, setLang] = useLanguageState();
@@ -56,75 +66,131 @@ export default function ArenaDetailPage() {
   const [leaderboard, setLeaderboard] = useState<ArenaAttempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'details' | 'quiz' | 'result'>('details');
-  const [lastResults, setLastResults] = useState<Omit<QuizHistoryItem, 'date' | 'lang'> | null>(null);
+  const [lastResults, setLastResults] = useState<QuizHistoryItem | null>(null);
   const [earnedCoins, setEarnedCoins] = useState(0);
-  const submissionId = useRef<string | null>(null);
+  const pendingSubmission = useRef<{ body: string; results: QuizHistoryItem } | null>(null);
   const submitting = useRef(false);
+  const mounted = useRef(false);
+  const requestController = useRef<AbortController | null>(null);
+  const [examError, setExamError] = useState<AppError | null>(null);
+  const [leaderboardError, setLeaderboardError] = useState<AppError | null>(null);
+  const [examRetry, setExamRetry] = useState(0);
+  const [leaderboardRetry, setLeaderboardRetry] = useState(0);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; requestController.current?.abort(); };
+  }, []);
 
 
   useEffect(() => {
-    if (!examId || !db) return;
-
+    if (!examId || !db) {
+      setExamError(createAppError(!examId ? 'APP-INVALID-INPUT' : 'APP-CONFIG-MISSING', ''));
+      setLoading(false);
+      return;
+    }
+    let active = true;
     const examRef = doc(db, 'arenaExams', examId);
     const unsubExam = onSnapshot(examRef, (snapshot) => {
+      if (!active) return;
       if (snapshot.exists()) {
-        setExam({ id: snapshot.id, ...snapshot.data() } as ArenaExam);
+        const parsed = readArenaExam(snapshot.id, snapshot.data());
+        setExam(parsed);
+        setExamError(parsed ? null : createAppError('ARENA-DATA-INVALID', ''));
       } else {
-        toast({ variant: "destructive", title: uiMessage(currentLanguage.current, 'arena.exam_not_found') });
-        router.push('/arena');
+        setExam(null);
+        setExamError(createAppError('ARENA-NOT-FOUND', ''));
       }
       setLoading(false);
+    }, (error) => {
+      if (!active) return;
+      setExamError(arenaSubscriptionError(error));
+      setLoading(false);
     });
+    return () => { active = false; unsubExam(); };
+  }, [db, examId, examRetry]);
 
+  useEffect(() => {
+    if (!examId || !db) return;
+    let active = true;
     const leaderboardRef = collection(db, 'arenaExams', examId, 'attempts');
     const q = query(leaderboardRef, orderBy('score', 'desc'), limit(10));
     const unsubLeaderboard = onSnapshot(q, (snapshot) => {
-      const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ArenaAttempt[];
+      if (!active) return;
+      const parsed = snapshot.docs.map(item => readArenaAttempt(item.id, item.data()));
+      const data = parsed.filter((item): item is ArenaAttempt => item !== null);
+      setLeaderboardError(data.length !== parsed.length ? createAppError('ARENA-DATA-INVALID', '') : null);
       data.sort((a, b) => {
         if (b.score !== a.score) return b.score - a.score;
         return a.duration - b.duration;
       });
       setLeaderboard(data);
     }, (error) => {
-      console.error("Firestore Leaderboard Error:", error);
+      if (!active) return;
+      setLeaderboard([]);
+      setLeaderboardError(arenaSubscriptionError(error));
     });
 
-    return () => { unsubExam(); unsubLeaderboard(); };
-  }, [db, examId, router, toast]);
+    return () => { active = false; unsubLeaderboard(); };
+  }, [db, examId, leaderboardRetry]);
 
   const t: TranslationSet = translations[lang];
+  const copy = arenaDetailMessages[lang];
+  const startAttempt = () => {
+    if (!user) { router.push('/login'); return; }
+    if (!exam || examError || submitting.current) return;
+    pendingSubmission.current = null;
+    setLastResults(null);
+    setEarnedCoins(0);
+    setView('quiz');
+  };
 
   const handleFinishQuiz = async (results: Omit<QuizHistoryItem, 'date' | 'lang'>, analysis?: QuizAnalysis) => {
     if (!user) {
       showUnexpectedErrorToast('AUTH-REQUIRED', '', {}, lang);
       return false;
     }
-    if (!db || !exam || submitting.current) return false;
+    if (!mounted.current || !db || !exam || submitting.current) return false;
     submitting.current = true;
-    submissionId.current ??= crypto.randomUUID();
+    pendingSubmission.current ??= {
+      body: JSON.stringify({ answers: results.quizResults.map(result => result.userAnswer), duration: results.totalTime, requestId: crypto.randomUUID() }),
+      results: { ...results, ...(analysis ? { analysis } : {}), date: new Date().toISOString(), lang },
+    };
+    const pending = pendingSubmission.current;
+    const controller = new AbortController();
+    requestController.current = controller;
 
     try {
       const token = await user.getIdToken();
+      if (!mounted.current || controller.signal.aborted) return false;
       const response = await fetch(`/api/arena/${encodeURIComponent(examId)}/submit`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          answers: results.quizResults.map((result: { userAnswer: string }) => result.userAnswer),
-          duration: results.totalTime,
-          requestId: submissionId.current,
-        }),
+        body: pending.body,
+        signal: controller.signal,
       });
-      const submission = await response.json() as { score?: number; coinsAwarded?: number; isFirstAttempt?: boolean; error?: string };
-      if (!response.ok || typeof submission.coinsAwarded !== 'number') throw new Error(submission.error || 'Arena submission failed');
+      const submission: unknown = await response.json().catch(() => null);
+      if (!mounted.current || controller.signal.aborted) return false;
+      if (!response.ok) {
+        showErrorToast(arenaResponseError(submission, response.status), currentLanguage.current);
+        return false;
+      }
+      if (!submission || typeof submission !== 'object' || !('coinsAwarded' in submission)
+        || typeof submission.coinsAwarded !== 'number' || !Number.isFinite(submission.coinsAwarded)
+        || submission.coinsAwarded < 0 || !('isFirstAttempt' in submission) || typeof submission.isFirstAttempt !== 'boolean') {
+        showErrorToast(createAppError('APP-DATA-INVALID', ''), currentLanguage.current);
+        return false;
+      }
 
       setEarnedCoins(submission.coinsAwarded);
       if (submission.isFirstAttempt) toast({ title: t.firstAttemptBonus.toUpperCase() });
 
-      setLastResults(analysis ? { ...results, analysis } : results);
+      setLastResults(pending.results);
       setView('result');
       return true;
-    } catch (e) {
-      toast({ variant: "destructive", title: uiMessage(lang, "arena.could_not_save_attempt_please_retry") });
+    } catch (error) {
+      const code = error && typeof error === 'object' && 'code' in error ? error.code : null;
+      const authenticationFailure = typeof code === 'string' && code.startsWith('auth/') && code !== 'auth/network-request-failed';
+      if (mounted.current && !controller.signal.aborted) showErrorToast(createAppError(authenticationFailure ? 'AUTH-INVALID' : 'APP-NETWORK', ''), currentLanguage.current);
       return false;
     } finally {
       submitting.current = false;
@@ -132,7 +198,10 @@ export default function ArenaDetailPage() {
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-12 h-12 animate-spin text-primary" /></div>;
-  if (!exam) return null;
+  if (!exam) return <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+    {examError && <SubscriptionError error={examError} label={copy.exam} lang={lang} onRetry={() => setExamRetry(value => value + 1)} />}
+    <Button onClick={() => router.push('/arena')}>{t.backToArena}</Button>
+  </div>;
   const isLegacyExam = !isTrustedArenaExam(exam.questions || []);
 
   return (
@@ -149,6 +218,7 @@ export default function ArenaDetailPage() {
       />
 
       <main className="flex-1 main-container pt-24 md:pt-36 space-y-10 pb-20">
+        {examError && <SubscriptionError error={examError} label={copy.exam} lang={lang} onRetry={() => setExamRetry(value => value + 1)} />}
         {view === 'details' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-12 items-start">
             <div className="lg:col-span-2 space-y-8">
@@ -178,8 +248,8 @@ export default function ArenaDetailPage() {
 
                   <div className="pt-10 flex flex-col md:flex-row items-center gap-6">
                     <Button
-                      onClick={() => { if (!user) { router.push('/login'); return; } submissionId.current = null; setView('quiz'); }}
-                      disabled={isLegacyExam || authLoading}
+                      onClick={startAttempt}
+                      disabled={isLegacyExam || authLoading || !!examError}
                       className="w-full md:w-auto h-16 md:h-24 px-12 md:px-20 rounded-[1.5rem] md:rounded-[3rem] btn-duo bg-primary text-white font-headline font-black text-xl md:text-3xl uppercase tracking-widest border-4 border-white/20 gap-4"
                     >
                       <PlayCircle className="w-8 h-8 md:w-12 md:h-12" /> {isLegacyExam ? uiMessage(lang, "arena.legacy_exam_unavailable") : !user ? uiMessage(lang, 'arena.sign_in_to_start') : t.takeExam}
@@ -223,6 +293,7 @@ export default function ArenaDetailPage() {
               </div>
 
               <Card className="card-duo overflow-hidden border-border bg-card">
+                 {leaderboardError && <SubscriptionError error={leaderboardError} label={copy.leaderboard} lang={lang} onRetry={() => setLeaderboardRetry(value => value + 1)} />}
                  <div className="p-6 border-b-4 border-border/30 bg-muted/20">
                     <div className="grid grid-cols-12 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
                        <div className="col-span-2">{t.rank}</div>
@@ -232,7 +303,7 @@ export default function ArenaDetailPage() {
                     </div>
                  </div>
                  <div className="divide-y-2 divide-border/20">
-                    {leaderboard.length === 0 ? (
+                    {leaderboard.length === 0 && !leaderboardError ? (
                       <div className="p-12 text-center text-muted-foreground italic font-black uppercase text-xs opacity-50">{uiMessage(lang, "arena.no_results_yet")}</div>
                     ) : leaderboard.map((item, idx) => (
                       <div key={item.id} className={cn("p-4 md:p-6 grid grid-cols-12 items-center gap-2 md:gap-4 transition-all hover:bg-primary/5", item.userId === user?.uid && "bg-primary/10 border-y-2 border-primary/20")}>
@@ -267,13 +338,17 @@ export default function ArenaDetailPage() {
         )}
 
         {view === 'quiz' && (
-          <QuizView
-            t={t} lang={lang} config={exam.config}
-            initialQuestions={exam.questions}
-            onFinish={handleFinishQuiz}
-            onAskGuru={(msg) => console.log(msg)}
-            numericShortAnswers
-          />
+          <div className="space-y-4">
+            <p role="note">{copy.guru}</p>
+            <QuizView
+              t={t} lang={lang} config={exam.config}
+              initialQuestions={exam.questions}
+              onFinish={handleFinishQuiz}
+              onAskGuru={() => toast({ description: copy.guru })}
+              askGuruDisabledReason={copy.guru}
+              numericShortAnswers
+            />
+          </div>
         )}
 
         {view === 'result' && lastResults && (
@@ -288,8 +363,8 @@ export default function ArenaDetailPage() {
               <ResultView
                 t={t} lang={lang} results={lastResults}
                 onViewDashboard={() => router.push('/arena')}
-                onRetakeSame={() => setView('quiz')}
-                onRetakeNew={() => setView('quiz')}
+                onRetakeSame={startAttempt}
+                onRetakeNew={startAttempt}
                 isArena={true}
               />
               <div className="flex justify-center">
@@ -300,8 +375,17 @@ export default function ArenaDetailPage() {
            </div>
         )}
       </main>
+      {view === 'result' && lastResults && <AiChatbot t={t} lang={lang} results={lastResults} trigger={null} />}
     </div>
   );
+}
+
+function SubscriptionError({ error, label, lang, onRetry }: { error: AppError; label: string; lang: 'en' | 'vi'; onRetry: () => void }) {
+  return <div role="alert" className="p-4 space-y-3">
+    <p>{label} {error.code === 'ARENA-NOT-FOUND' ? uiMessage(lang, 'arena.exam_not_found') : translatedError(error.code, lang)}</p>
+    <p>{error.code}</p>
+    <Button onClick={onRetry}>{errorMessages[lang].retry}</Button>
+  </div>;
 }
 
 function DetailItem({ icon, label, value }: { icon: React.ReactNode, label: string, value: string }) {

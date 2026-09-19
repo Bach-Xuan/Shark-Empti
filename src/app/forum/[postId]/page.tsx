@@ -5,6 +5,8 @@ import { PageControls } from '@/components/page-controls';
 import { UiText } from "@/components/ui-text";
 import { usePagedCollection } from '@/hooks/use-paged-collection';
 import { formatForumDate } from '@/lib/date-format';
+import { readForumPost, readForumComment } from '@/lib/public-firestore-schema';
+import { deleteForumPost } from '@/lib/forum-client';
 import { uiMessage } from '@/lib/i18n';
 import { subjectOptions } from '@/lib/subjects';
 import { useMemo } from 'react';
@@ -60,7 +62,6 @@ import {
 arrayRemove,
 arrayUnion,
 collection,
-deleteDoc,
 doc,
 increment,
 onSnapshot,
@@ -119,29 +120,36 @@ export default function PostDetailPage() {
 
 
   useEffect(() => {
+    setPost(null);
+    setLoading(Boolean(postId && db));
     if (!postId || !db) return;
-
+    let active = true;
     const postRef = doc(db, 'posts', postId);
     const unsubPost = onSnapshot(postRef,
       (docSnap) => {
-        if (docSnap.exists()) {
-          setPost({ id: docSnap.id, ...docSnap.data() } as ForumPost);
+        if (!active) return;
+        const parsed = docSnap.exists() ? readForumPost(docSnap.id, docSnap.data()) : null;
+        setPost(parsed);
+        if (parsed) {
+          setLoading(false);
         } else {
           toast({ variant: "destructive", title: uiMessage(lang, "forum.post_not_found") });
           router.push('/forum');
         }
         setLoading(false);
       },
-      async () => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'get' }));
+      async cause => {
+        if (!active) return;
+        setPost(null);
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'get' }, cause));
         setLoading(false);
       }
     );
 
-    return () => { unsubPost(); };
+    return () => { active = false; unsubPost(); };
   }, [db, postId, router, toast, lang]);
-  const commentSource = useMemo(() => db ? query(collection(db, 'posts', postId, 'comments'), orderBy('createdAt', 'asc')) : null, [db, postId]);
-  const commentPage = usePagedCollection<ForumComment>(commentSource, (id, data) => ({ ...data, id } as ForumComment));
+  const commentSource = useMemo(() => db && post?.id === postId ? query(collection(db, 'posts', postId, 'comments'), orderBy('createdAt', 'asc')) : null, [db, postId, post?.id]);
+  const commentPage = usePagedCollection<ForumComment>(commentSource, readForumComment);
   const comments = commentPage.items;
 
   const t: TranslationSet = translations[lang];
@@ -215,10 +223,10 @@ export default function PostDetailPage() {
   };
 
   const handleDeletePost = async () => {
-    if (!user || !db || !post) return;
-    const postRef = doc(db, 'posts', post.id);
+    if (!user || !db || !postToDelete) return;
+    const postRef = doc(db, 'posts', postToDelete.id);
 
-    const result = await mutation.run(() => deleteDoc(postRef), cause => {
+    const result = await mutation.run(() => deleteForumPost(user, postToDelete.id), cause => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'delete' }, cause));
     });
     if (result.ok) { setPostToDelete(null);
@@ -270,8 +278,8 @@ export default function PostDetailPage() {
     updateDoc(postRef, {
       likedBy: hasLiked ? arrayRemove(user.uid) : arrayUnion(user.uid),
       likesCount: increment(hasLiked ? -1 : 1)
-    }).catch(async () => {
-      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'update', requestResourceData: { likedBy: user.uid } }));
+    }).catch(async cause => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'update', requestResourceData: { likedBy: user.uid } }, cause));
     });
   };
 
@@ -285,8 +293,8 @@ export default function PostDetailPage() {
     updateDoc(commRef, {
       likedBy: hasLiked ? arrayRemove(user.uid) : arrayUnion(user.uid),
       likesCount: increment(hasLiked ? -1 : 1)
-    }).catch(async () => {
-      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: commRef.path, operation: 'update', requestResourceData: { likedBy: user.uid } }));
+    }).catch(async cause => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: commRef.path, operation: 'update', requestResourceData: { likedBy: user.uid } }, cause));
     });
   };
 

@@ -32,8 +32,8 @@ export function useUserActivity() {
         }
         setLoading(false);
       },
-      async () => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: activityRef.path, operation: 'get' }));
+      async (cause) => {
+        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: activityRef.path, operation: 'get' }, cause));
         setLoading(false);
       }
     );
@@ -55,11 +55,11 @@ export function useUserActivity() {
     setDoc(activityRef, { 
       activeDays: newActiveDays, 
       updatedAt: serverTimestamp() 
-    }, { merge: true }).catch(async () => {
+    }, { merge: true }).catch(async (cause) => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({ 
         path: activityRef.path, 
         operation: 'write'
-      }));
+      }, cause));
     });
   }, [user, db, activity]);
 

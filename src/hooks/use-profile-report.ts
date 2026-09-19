@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
 import { useHistory } from './use-history';
-import { readRoadmapChecks } from '@/lib/roadmap-storage';
+import { useRoadmapChecks } from './use-roadmap-checks';
 import { calculateDashboardStats } from '@/lib/stats-utils';
 import type { TranslationSet } from '@/lib/translations';
 import type { Language } from '@/lib/types';
@@ -12,7 +12,7 @@ export function useProfileReport(user: { uid: string } | null, t: TranslationSet
   const [isReportSelectOpen, setIsReportSelectOpen] = useState(false);
   const [isReportViewOpen, setIsReportViewOpen] = useState(false);
   const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
-  const [roadmapStatus, setRoadmapStatus] = useState<Record<string, Record<number, boolean>>>({});
+  const { roadmapStatus } = useRoadmapChecks(user?.uid);
 
   // Report Filter States
   const [reportSearchQuery, setReportSearchQuery] = useState('');
@@ -20,8 +20,10 @@ export function useProfileReport(user: { uid: string } | null, t: TranslationSet
 
   // Load Roadmap Status
   useEffect(() => {
-    setRoadmapStatus(readRoadmapChecks(user?.uid));
-  }, [isReportSelectOpen, user?.uid]);
+    setSelectedSessionIds([]);
+    setIsReportSelectOpen(false);
+    setIsReportViewOpen(false);
+  }, [user?.uid]);
 
 
 
@@ -33,7 +35,7 @@ export function useProfileReport(user: { uid: string } | null, t: TranslationSet
 
   // Filter and Sort history for the selection list
   const filteredReportHistory = useMemo(() => {
-    let result = [...history];
+    let result = history.filter(session => !!session.id);
 
     if (reportSearchQuery.trim()) {
       const lowerQuery = reportSearchQuery.toLowerCase();

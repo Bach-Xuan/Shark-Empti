@@ -81,7 +81,7 @@ The repository is governed by `package-lock.json`; do not use pnpm or Yarn again
 |---|---|
 | Configure the Firebase browser client, sign in and access Firestore | Provide the complete six-field Firebase Web configuration for consistency. The current application initializes Auth and Firestore but not Storage or Messaging; `storageBucket` and `messagingSenderId` are carried as configuration fields rather than independently validated runtime prerequisites. Google provider and the relevant authorized domains remain required for Google sign-in. |
 | Generate quizzes, flashcards, practice, feedback and chatbot responses | `OPENROUTER_API_KEY`, three `FIREBASE_ADMIN_*` values and a signed-in user; production/canary creation additionally requires `AI_GENERATION_PROTOCOL_ENABLED=true` |
-| Submit Arena attempts; create/delete Forum comments outside the Emulator | Three `FIREBASE_ADMIN_*` values |
+| Create/submit Arena content; delete Forum posts; create/delete Forum comments outside the Emulator | Three `FIREBASE_ADMIN_*` values |
 | Local integration/E2E | JDK 21; Firebase CLI in dev dependencies; Playwright Chromium, WebKit and Firefox |
 
 [docs/CONFIGURATION.md](docs/CONFIGURATION.md) contains the complete process for obtaining every Firebase/OpenRouter value, mapping service-account JSON fields, enabling Google sign-in, creating Firestore, deploying Rules and configuring Vercel. Never expose `OPENROUTER_API_KEY` or `FIREBASE_ADMIN_*` through `NEXT_PUBLIC_*` variables.

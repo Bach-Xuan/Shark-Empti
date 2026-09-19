@@ -34,7 +34,7 @@ Sparkles,
 Target,
 XCircle
 } from 'lucide-react';
-import React,{ useCallback,useState } from 'react';
+import React,{ useCallback,useLayoutEffect,useRef,useState } from 'react';
 import FeatureHelp from './feature-help';
 
 const RequiredLabel = ({ children, icon }: { children: React.ReactNode, icon?: React.ReactNode }) => (
@@ -50,7 +50,13 @@ interface SetupViewProps extends BaseViewProps {
 export default function SetupView({ t, lang, onStart }: SetupViewProps) {
   const { toast } = useToast();
   const [isValidating, setIsValidating] = useState(false);
-  const [config, setConfig] = useState<QuizConfig>({
+  const validationVersion = useRef(0);
+  const pending = useRef(false);
+  const revokeValidation = useCallback(() => {
+    validationVersion.current++;
+    pending.current = false;
+  }, []);
+  const [config, updateConfig] = useState<QuizConfig>({
     subject: 'none',
     grade: 'none',
     topic: '',
@@ -60,6 +66,21 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
     numQuestions: '10',
     timeLimit: ''
   });
+
+  const setConfig = useCallback((next: QuizConfig) => {
+    validationVersion.current++;
+    pending.current = false;
+    setIsValidating(false);
+    updateConfig(next);
+  }, []);
+
+  // Locale/navigation ownership changes revoke every outstanding response.
+  useLayoutEffect(() => {
+    validationVersion.current++;
+    pending.current = false;
+    setIsValidating(false);
+    return revokeValidation;
+  }, [lang, onStart, revokeValidation]);
 
   const subjects = subjectOptions(t);
 
@@ -112,6 +133,7 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
+    if (pending.current) return;
     const num = parseInt(config.numQuestions);
 
     if (!config.topic || !config.type || !config.difficulty || isNaN(num) || num < 1 || num > 50) {
@@ -123,6 +145,9 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
       return;
     }
 
+    const version = ++validationVersion.current;
+    const snapshot = { ...config };
+    pending.current = true;
     setIsValidating(true);
     try {
       const result = await validateAcademicTopic({
@@ -131,6 +156,7 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
         grade: config.grade === 'none' ? undefined : config.grade,
         language: lang as 'en' | 'vi'
       });
+      if (version !== validationVersion.current) return;
       if (!result.ok) {
         showErrorToast(result.error, lang as 'en' | 'vi');
         return;
@@ -146,14 +172,17 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
         return;
       }
     } catch (err) {
-      console.error("Validation error:", err);
+      if (version !== validationVersion.current) return;
       showErrorToast(getAiError(err), lang as 'en' | 'vi');
       return;
     } finally {
-      setIsValidating(false);
+      if (version === validationVersion.current) {
+        pending.current = false;
+        setIsValidating(false);
+      }
     }
 
-    onStart(config);
+    if (version === validationVersion.current) onStart(snapshot);
   }, [config, lang, onStart, t, subjects, toast]);
 
 

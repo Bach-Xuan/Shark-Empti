@@ -302,7 +302,7 @@
           "type": "integer"
         }
       },
-      "description": "Post deletion currently does not cascade to comments; this map does not impose a retention or orphan-cleanup policy."
+      "description": "Authenticated server deletion atomically removes the parent and records an owner recovery tombstone, then recursively deletes descendants. Updated Rules gate comment reads on a live, non-tombstoned parent; legacy orphans are inaccessible but are not automatically migrated."
     },
     "ForumComment": {
       "title": "Forum comment",
@@ -419,10 +419,30 @@
           "description": "New receipts expire seven days after creation; legacy records may lack this field pending backfill."
         }
       },
-      "description": "Server hashes scope/UID/requestId to form the document ID. Admin dates are stored as Timestamp. Seven-day TTL and a field index exemption are declared in firestore.indexes.json; retained receipts remain replayable until asynchronous deletion. The 15 September 2026 check found TTL disabled; configuration application failed with IAM 403."
+      "description": "Server hashes scope/UID/requestId to form the document ID. Admin dates are stored as Timestamp. Seven-day TTL and a field index exemption are declared in firestore.indexes.json; retained receipts remain replayable until asynchronous deletion. A recorded check found TTL disabled; configuration application failed with IAM 403."
     }
   },
   "serverInterfaces": {
+    "arenaCreate": {
+      "method": "POST",
+      "path": "/api/arena",
+      "runtime": "nodejs",
+      "authentication": "Firebase ID token in Authorization: Bearer header",
+      "request": {
+        "title": "trimmed string, 1 to 200 characters",
+        "config": "complete Arena configuration; 1 to 50 questions and optional timer through 999 minutes",
+        "questions": "1 to 50 complete validated Arena questions; short-answer keys use the supported numeric format",
+        "requestId": "required UUID; enables idempotent replay"
+      },
+      "limits": {
+        "body": "900,000 UTF-8 bytes, enforced while streaming; Content-Length is not trusted"
+      },
+      "writes": [
+        "/arenaExams/{examId}",
+        "/_requestReceipts/{hash}"
+      ],
+      "description": "The server derives author identity from Admin Auth, validates the full configuration/question contract and commits the public exam with its receipt transactionally. Browser creation and update are denied by Rules."
+    },
     "arenaSubmit": {
       "method": "POST",
       "path": "/api/arena/{examId}/submit",
@@ -454,7 +474,11 @@
         "/posts/{postId}/comments/{commentId}",
         "/posts/{postId}.commentsCount",
         "/_requestReceipts/{hash} when requestId is supplied"
-      ]
+      ],
+      "limits": {
+        "body": "16,384 UTF-8 bytes, enforced while streaming; Content-Length is not trusted"
+      },
+      "description": "The transaction verifies a valid live parent and rejects an existing deletion tombstone before writing the comment and counter."
     },
     "forumCommentDelete": {
       "method": "DELETE",
@@ -466,6 +490,18 @@
         "/posts/{postId}.commentsCount"
       ],
       "description": "Deletion is transactional but does not currently use an idempotency receipt."
+    },
+    "forumPostDelete": {
+      "method": "DELETE",
+      "path": "/api/forum/{postId}",
+      "runtime": "nodejs",
+      "authentication": "Firebase ID token in Authorization: Bearer header; post author required",
+      "writes": [
+        "delete /posts/{postId}",
+        "/_forumDeletions/{postId}",
+        "recursive deletion of /posts/{postId}/comments descendants"
+      ],
+      "description": "The owner transaction removes public parent visibility and creates a persistent pending tombstone before Admin recursive deletion. Owner retry resumes a failed cascade; a completed tombstone makes retry idempotent and prevents post-ID reuse. No background cleanup worker or tombstone TTL exists."
     },
     "aiGenerationProtocol": {
       "transport": "Authenticated Next.js Route Handlers with a Firestore generation ledger",
@@ -529,11 +565,11 @@
     },
     "/posts/{postId}/comments/{commentId}": {
       "schema": "ForumComment",
-      "description": "Public comments; creation/deletion through Admin API, updates governed by Rules."
+      "description": "Comment reads and updates require a live, non-tombstoned parent. Creation/deletion use authenticated Admin APIs; client edits/likes require complete validated shape under Rules."
     },
     "/arenaExams/{examId}": {
       "schema": "ArenaExam",
-      "description": "Public exams; client writes governed by Rules."
+      "description": "Public exams validated by shared persisted readers. Creation uses the authenticated, schema-validating server API; direct client create/update is denied by Rules."
     },
     "/arenaExams/{examId}/attempts/{attemptId}": {
       "schema": "ArenaAttempt",
@@ -547,6 +583,9 @@
       "schema": "AiGenerationRecord",
       "description": "Admin-only short-lived AI generation state, validated input during processing and validated result for recovery; browser Rules explicitly deny access."
     },
+    "/_forumDeletions/{postId}": {
+      "description": "Server-written deletion recovery tombstone: authorId, pending/complete status, createdAt and optional completedAt. Owner-readable, no client writes, no TTL; retained to authorize cascade retries and prevent post ID reuse."
+    },
     "/_aiQuota/{scope}": {
       "schema": "AiQuotaRecord",
       "description": "Admin-only rolling budget and active-reservation state; browser Rules explicitly deny access."
@@ -555,7 +594,8 @@
   "localStorage": {
     "shark_lang": "Shared UI language preference: en or vi",
     "shark_theme": "Shared UI theme preference: light or dark",
-    "shark_roadmap_checks:{uid}": "UID-scoped boolean roadmap-check map",
+    "shark_roadmap_checks:v2:{uid}": "UID-scoped boolean map keyed by stored subject/grade/topic tuple and persisted bilingual recommendation pair; independent of locale and display order",
+    "shark_roadmap_checks:{uid}": "Legacy positional account map; retained unchanged, not automatically imported into v2",
     "shark_roadmap_checks": "Legacy unscoped key; retained but not automatically assigned to a user",
     "shark_chat_seen": "One-time AI chatbot introduction state",
     "shark_help_setup_seen": "One-time setup-view guidance state",

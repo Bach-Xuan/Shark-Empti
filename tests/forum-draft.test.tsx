@@ -17,7 +17,7 @@ vi.mock('@/firebase/error-emitter', () => ({ errorEmitter: { emit: mocks.emit } 
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn() }) }));
 vi.mock('firebase/firestore', () => ({
-  limit: vi.fn(), collection: () => 'posts', query: () => 'posts', orderBy: vi.fn(), serverTimestamp: () => 1, addDoc: mocks.write,
+  limit: vi.fn(), where: vi.fn(), collection: () => 'posts', query: () => 'posts', orderBy: vi.fn(), serverTimestamp: () => 1, addDoc: mocks.write,
   onSnapshot: (_ref: unknown, callback: (snapshot: unknown) => void) => { callback({ docs: [], size: 0 }); return vi.fn(); },
 }));
 beforeEach(() => vi.clearAllMocks());

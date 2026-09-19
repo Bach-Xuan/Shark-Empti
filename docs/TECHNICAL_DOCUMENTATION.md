@@ -62,7 +62,7 @@ Setup
   -> Dashboard statistics
 ```
 
-Playground generates and saves flashcard/practice sessions in user subcollections. Arena creates a public exam through a client Firestore write, then submits attempts through an authenticated Admin API. Forum post creation/edit/like/delete primarily use client Firestore under Rules; comment creation/deletion use an authenticated Admin API, while comment edit/like use client Rules.
+Playground generates and saves flashcard/practice sessions in user subcollections. Arena creation and attempt submission use authenticated Admin APIs. Forum post creation/edit/like use client Firestore under Rules; post cascade deletion and comment creation/deletion use authenticated Admin APIs, while comment edit/like use client Rules.
 
 ### 3.1. 📁 Firestore Paths
 
@@ -74,17 +74,18 @@ Playground generates and saves flashcard/practice sessions in user subcollection
 | `users/{uid}/activity/main` | `activeDays`, `updatedAt` | Owner read/write |
 | `users/{uid}/flashcards/{id}` | source, cards, ISO `createdAt` | Owner read/write |
 | `users/{uid}/practice/{id}` | concept, questions, answers, score, ISO `createdAt` | Owner read/write |
-| `posts/{postId}` | post, author, counters, likes, timestamps | Public read; constrained authenticated client mutations |
-| `posts/{postId}/comments/{commentId}` | comment, author, likes, timestamps | Public read; Admin create/delete; constrained client edit/like |
-| `arenaExams/{examId}` | title, config, questions, author, `totalAttempts` | Public read; constrained author create/update/delete |
+| `posts/{postId}` | post, author, counters, likes, timestamps | Public read; constrained client create/edit/like; Admin cascade delete |
+| `posts/{postId}/comments/{commentId}` | comment, author, likes, timestamps | Read only under a live, non-tombstoned parent; Admin create/delete; constrained client edit/like |
+| `arenaExams/{examId}` | title, config, questions, author, `totalAttempts` | Public read; authenticated server creation; owner client delete; browser create/update denied by Rules |
 | `arenaExams/{examId}/attempts/{attemptId}` | user, score, duration, timestamp | Public read; Admin create only |
 | `_requestReceipts/{hash}` | fingerprint, result, createdAt, expiresAt | Admin-only; no client grant |
 | `_aiGenerations/{generationId}` | owner, operation, fingerprint, validated input while active, attempt leases/outcomes, recoverable validated result/error, expiresAt | Admin-only; explicit client deny |
 | `_aiQuota/{scope}` | rolling-window usage, active generation reservations, expiresAt | Admin-only; explicit client deny |
+| `_forumDeletions/{postId}` | authorId, pending/complete status, timestamps | Owner read; Admin write; persistent recovery and ID-reuse protection |
 
-The `users/{uid}/history` reader uses Zod with defaults for selected legacy omissions; records with corrupt core shape are excluded from the view rather than modified/deleted. The profile reader also normalizes selected missing fields. Forum/Arena boundaries still contain direct casts and are not schema-validated merely because TypeScript compiles.
+The `users/{uid}/history` reader uses Zod with defaults for selected legacy omissions; records with corrupt core shape are excluded from the view rather than modified/deleted. The profile reader also normalizes selected missing fields. Forum/Arena feeds and detail views use the shared public Firestore schemas; Admin endpoints independently validate inputs and persisted parent/exam records before mutation or scoring.
 
-`activeDays` is a `YYYY-MM-DD -> boolean` map. It records the day the activity calendar runs, not proof of quiz completion. Roadmap checks, language, theme and one-time interface guidance state live in localStorage rather than Firestore. Current keys are `shark_roadmap_checks:{uid}`, the retained legacy key `shark_roadmap_checks`, `shark_lang`, `shark_theme`, `shark_chat_seen`, `shark_help_setup_seen`, `shark_help_dashboard_seen`, `shark_help_playground_seen` and `shark_help_forum_seen`.
+`activeDays` is a `YYYY-MM-DD -> boolean` map. It records the day the activity calendar runs, not proof of quiz completion. Roadmap checks, language, theme and one-time interface guidance state live in localStorage rather than Firestore. Current roadmap writes use `shark_roadmap_checks:v2:{uid}`. Topic identity is the lossless stored subject/grade/topic tuple; recommendation identity is its persisted bilingual text pair, not the display locale or list index. Exact duplicate pairs collapse; edited content creates a new task. The previous `shark_roadmap_checks:{uid}` and unscoped `shark_roadmap_checks` keys are retained unchanged but are not automatically imported because their positional/localized identities cannot be reliably matched. V2 completion starts empty. Other keys are `shark_lang`, `shark_theme`, `shark_chat_seen`, `shark_help_setup_seen`, `shark_help_dashboard_seen`, `shark_help_playground_seen` and `shark_help_forum_seen`.
 
 ### 3.2. 📅 Dates and Timestamps
 
@@ -97,8 +98,8 @@ The `users/{uid}/history` reader uses Zod with defaults for selected legacy omis
 
 - Quiz and practice await stable-ID saves before completion. Flashcard archival is awaited but failure leaves generated cards usable with an error notice.
 - An object containing nested `undefined` can be rejected by Firestore.
-- Post deletion does not cascade comments; orphan comments remain publicly readable under current Rules.
-- New receipts have seven-day `expiresAt` and remain replayable until asynchronous deletion. AI generations use a 24-hour local/staging retention hypothesis, while AI quota documents expire after their rolling-window recovery period. TTL field settings for all three internal collections are declared in `firestore.indexes.json`; deployed activation remains unverified. The 15 September 2026 metadata check found receipt TTL disabled and the posts index missing; an historical configuration attempt failed with IAM 403. `scripts/inspect-firestore.mjs` now reads the posts index and all three deployed TTL policies without modifying them. `scripts/receipt-retention.ts` independently inventories legacy receipts and backfills missing receipt expiry only with `--apply`.
+- Post deletion now uses an authenticated server cascade with an atomic parent-removal/tombstone transaction. Local Rules deny comment reads when the parent is absent or tombstoned, including pre-existing orphans. These protections require deployment of the updated Rules; old orphan records are not silently migrated or deleted by this code change.
+- New receipts have seven-day `expiresAt` and remain replayable until asynchronous deletion. AI generations use a 24-hour local/staging retention hypothesis, while AI quota documents expire after their rolling-window recovery period. TTL field settings for all three internal collections are declared in `firestore.indexes.json`; deployed activation remains unverified. A recorded metadata check found receipt TTL disabled and the posts index missing; an historical configuration attempt failed with IAM 403. `scripts/inspect-firestore.mjs` now reads the posts index and all three deployed TTL policies without modifying them. `scripts/receipt-retention.ts` independently inventories legacy receipts and backfills missing receipt expiry only with `--apply`.
 - `activeDays` writes the complete map from local state, so concurrent tabs/devices can overwrite one another's dates.
 
 These limitations are tracked in the audit; a descriptive data-map edit does not change finding status.
@@ -115,6 +116,8 @@ Outside the Emulator, `src/lib/firebase-admin.ts` initializes from `FIREBASE_ADM
 
 ### 4.3. 🏆 Arena Submit API
 
+`POST /api/arena` is the authenticated creation boundary. It validates the entire configuration and every question, including question-count consistency and numeric short-answer semantics, and derives author identity from Admin Auth. Direct browser exam creation/update is denied by Rules; an idempotency receipt protects retries of the same generated exam. Shared persisted-data readers reject unsafe records before rendering or scoring and tolerate missing nonessential legacy presentation metadata. Invalid records are excluded from mixed feeds with a visible error instead of failing the entire page.
+
 `POST /api/arena/{examId}/submit`
 
 ```ts
@@ -126,6 +129,8 @@ Outside the Emulator, `src/lib/firebase-admin.ts` initializes from `FIREBASE_ADM
 ```
 
 The server reads the exam in a transaction, rejects exams without a trusted numeric-answer contract, calculates score, creates an attempt, increments `totalAttempts`, increments coins and writes the receipt in the same transaction. The same UID/scope/requestId and fingerprint returns the saved result; the same ID with a different payload returns `409 APP-REQUEST-CONFLICT`.
+
+Initial start and both retake controls share attempt initialization. Transport retries retain the exact serialized answers, duration and request ID; a retake clears that snapshot and receives a new ID. Account/exam changes and unmount revoke pending client completions. Exam and leaderboard subscription failures retain localized safe diagnostics and offer resubscription. Guru assistance is disabled with an explanation during an Arena attempt and is available through the contextual chatbot after completion.
 
 Duration is currently only rounded and clamped to zero; it is not corroborated by a server-observed timer but participates in leaderboard tie-breaking. This remains an open integrity limitation.
 
@@ -139,7 +144,9 @@ Duration is currently only rounded and clamped to zero; it is not corroborated b
 
 Content is trimmed and constrained to 1–2,000 characters. The API verifies the token, obtains identity from Admin Auth, creates a comment and increments `commentsCount` in an idempotent transaction.
 
-`DELETE /api/forum/{postId}/comments?commentId={commentId}` verifies token, existence and `authorId`, then deletes the comment and decrements the counter transactionally. Delete has no request receipt; post deletion does not cascade its subcollection.
+`DELETE /api/forum/{postId}/comments?commentId={commentId}` verifies token, existence and `authorId`, then deletes the comment and decrements the counter transactionally. Comment creation validates the parent and rejects deletion-in-progress within its transaction.
+
+`DELETE /api/forum/{postId}` verifies ownership and atomically removes the parent while creating `_forumDeletions/{postId}`. Admin SDK recursive deletion then removes descendants in bounded bulk operations. The server retains a minimal tombstone (`authorId`, status and timestamps) to prevent ID reuse and authorize retries after partial failure. Only its owner can read the recovery record; clients cannot mutate it. Pending deletion is recoverable from the Forum interface; there is no background cleanup worker. Tombstones have no TTL by design because expiry would reopen ID reuse; administrators must not expire them without a replacement policy. No production cleanup is performed merely by deploying code.
 
 ### 4.5. 🚨 Safe Errors
 
@@ -169,7 +176,9 @@ Chat review context occurs once in the system message, prior conversation turns 
 
 `translations.ts` retains domain copy; `src/lib/i18n` retains common/error/UI messages. Tests enforce VI/EN key and interpolation parity. Brand names, error codes, model identifiers, scientific notation, LaTeX and user content are not automatically translated. Locale changes do not regenerate or translate history.
 
-Quick Notes retains a dirty draft across snapshots and reports success only after the write completes. Forum creation and coordinated edits/deletion use pending locks; editors retain drafts until persistence is confirmed. Setup academic validation has no complete generation/version guard, so a late response can start a quiz after context changes.
+Quick Notes retains a dirty draft across snapshots and reports success only after the write completes. Forum creation and coordinated edits/deletion use pending locks; editors retain drafts until persistence is confirmed. Setup academic validation uses a versioned configuration snapshot and a synchronous submit lock. Configuration, locale, callback ownership changes and unmount revoke older results, including late failures. This prevents stale client transitions; it does not claim cancellation of upstream AI work.
+
+Report selection and roadmap checkboxes have one semantic state-change owner. Printed reports use an independent body-level print surface rather than the dialog scroll area, with print-specific colors, unconstrained flow and page-break rules. Chart values are represented as tables in print. The opt-in `tests/report-print.browser.test.tsx` accepts `REPORT_PRINT_BROWSER=chrome|msedge|chromium|firefox|webkit`; Chromium PDF output goes to ignored `tmp/pdfs/`. Browser/PDF acceptance must be distinguished from DOM regression tests.
 
 Focus Shield:
 
@@ -177,10 +186,12 @@ Focus Shield:
 - requires a secure context (`https` or `localhost`) and camera permission;
 - dynamically imports TensorFlow runtime/model;
 - uses generation/start guards to reject late resources;
-- stops tracks, cancels animation frames and disposes the model during cleanup;
+- stops tracks, cancels animation frames, detaches video and disposes the owned model on stop and initialization/playback/inference failures;
+- presents localized recoverable failures and allows a fresh session on retry; the owned-resource lifecycle is covered by 55 focus/camera regression tests;
+- preserves the shared TensorFlow backend rather than globally disposing resources another consumer may own;
 - uses `tf.tidy` and an 800 ms inference throttle.
 
-The 15 September 2026 headed-Chromium check used the local HP Wide Vision HD Camera, produced 640 × 480 video in two start/stop cycles and verified all tracks ended. This does not establish other devices, lighting, permission revocation or exact minimum browser versions.
+A recorded headed-Chromium check used the local HP Wide Vision HD Camera, produced 640 × 480 video in two start/stop cycles and verified all tracks ended. This does not establish other devices, lighting, permission revocation or exact minimum browser versions.
 
 ## 7. 📦 Current Dependency Inventory
 
@@ -257,6 +268,7 @@ Do not add a dependency for behavior already supported by the platform/current N
 | Rules | `npm run test:rules` | Firestore Rules through Emulator |
 | Integration | `npm run test:integration` | Auth/Firestore Emulator and server APIs |
 | E2E | `npm run test:e2e` | Next dev or production server, demo Firebase, AI fixture; Chromium desktop/mobile, WebKit and Firefox |
+| Print layout | `REPORT_PRINT_BROWSER` plus `node node_modules/vitest/vitest.mjs run tests/report-print.browser.test.tsx` | Opt-in browser fixture; both languages/themes; Chromium PDF output; see configuration guide for PowerShell syntax |
 | Build | `npm run build` | Optimized Next artifact; no font-network dependency |
 | Production smoke | `npm run test:production` | Six page routes, referenced script chunks, bundle budgets and unauthenticated Arena/AI API behavior |
 | Bundle/performance | `npm run report:bundle`, `npm run report:performance` | Build inventory and synthetic dataset baseline; not browser interaction timing |
@@ -268,12 +280,14 @@ Do not add a dependency for behavior already supported by the platform/current N
 
 CI runs `npm ci → lint → typecheck → coverage → integration → build → install Chromium/WebKit/Firefox → development E2E → production E2E → bundle report → production HTTP smoke → synthetic performance baseline` on Ubuntu with Node 24/JDK 21. It does not currently run the dependency-audit command, a browser-performance measurement, or an emulator query-comparison command. The workflow configuration does not itself prove that a remote run has succeeded.
 
-The existence or success of a test suite does not establish remote CI, deployed Firestore indexes/Rules, production Vercel runtime, Safari/Firefox minimum versions, physical-camera behavior, live-provider reliability or current vulnerability applicability. Builds use local system font stacks and do not require Google Fonts.
+The existence or success of a test suite does not establish remote CI, deployed Firestore indexes/Rules, production Vercel runtime, Safari/Firefox minimum versions, physical-camera behavior, live-provider reliability or current vulnerability applicability. Those device/browser limits remain V02 validation scope; they do not change the completed Focus Shield lifecycle remediation recorded as F11. Builds use local system font stacks and do not require Google Fonts.
 
 ## 9. 📑 Implementation and Validation Evidence
 
 History versions 1 and 2 remain readable permanently; absent versions identify legacy records. Unknown future versions are rejected. Numeric quiz settings are validated separately from draft/persisted strings. `usePagedCollection` limits initial live subscriptions to 50 records and cursor-fetches older pages on demand. Statistics/search/report labels explicitly describe loaded-record scope. Current implementation status and operational validation gaps are tracked in [the audit report](AUDIT_REPORT.md).
 
-The 15 September 2026 local validation recorded lint/typecheck success, 106 unit/component tests across 30 files, seven integration tests, a successful production build and 7/7 corrected development WebKit cases. Production E2E passed 26/28 before the WebKit/toast corrections; the entire corrected production matrix remains pending. The previously inspected hosted run failed development WebKit and did not reach production E2E. After the 19 September M01 transport replacement, lint, typecheck, 88 unit/component tests across 32 files, and the production build passed. Firestore Emulator startup again failed before Rules/integration assertions with `failed to create a child event loop`, caused by an unavailable loopback selector on this host. These are dated, environment-bound results rather than a claim that every validation is currently reproducible.
+A historical local validation recorded lint/typecheck success, 106 unit/component tests across 30 files, seven integration tests, a successful production build and 7/7 corrected development WebKit cases. Production E2E passed 26/28 before the WebKit/toast corrections; the entire corrected production matrix remains pending. The previously inspected hosted run failed development WebKit and did not reach production E2E. Following the M01 transport replacement, lint, typecheck, 88 unit/component tests across 32 files, and the production build passed. Firestore Emulator startup again failed before Rules/integration assertions with `failed to create a child event loop`, caused by an unavailable loopback selector on this host. These are environment-bound results rather than a claim that every validation is currently reproducible.
 
-The 15 September dependency assessment recorded four moderate findings after the `qs` override was updated to 6.16.0. It is historical evidence only: the current audit script collects advisory data but neither enforces reviewed exceptions nor reads an exception-policy manifest. P04, V01, V02, V03, V04 and V05 remain open within the assigned scope. See [AUDIT_REPORT.md](AUDIT_REPORT.md) for individual criteria.
+Following the F02/F10/F11/F12 and D01/D04/D05/D07/D08/D09 implementation, the full local suite passed **268 tests in 46 files**; the two opt-in print tests in one additional file were skipped in that ordinary run. Whole-project ESLint, TypeScript and the optimized production build passed. The print fixture was run separately on Chrome, Firefox and WebKit: two language tests per engine, each exercising both themes, with real KaTeX styles/fonts; Chrome produced multipage PDFs, including a 13-page Vietnamese dark fixture. JSON parsing, manifest/lockfile consistency, Markdown links, audit-code inventory and `git diff --check` also passed. A fresh Emulator attempt with the local JDK 21, including an IPv4 preference, still failed in Java's loopback selector before Rules/integration assertions. No remote CI, production deployment, live AI or physical-camera verification was performed in this remediation batch.
+
+The historical dependency assessment recorded four moderate findings after the `qs` override was updated to 6.16.0. It is historical evidence only: the current audit script collects advisory data but neither enforces reviewed exceptions nor reads an exception-policy manifest. P04, V01, V02, V03, V04 and V05 remain open within the assigned scope. See [AUDIT_REPORT.md](AUDIT_REPORT.md) for individual criteria.

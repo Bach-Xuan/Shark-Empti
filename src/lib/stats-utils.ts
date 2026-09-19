@@ -6,6 +6,7 @@ QuizHistoryItem,
 
 import { uiMessage } from './i18n';
 import { TranslationSet } from "./translations";
+import { roadmapTopicId, roadmapRecommendations, type RoadmapRecommendation } from './roadmap-identity';
 
 export interface DashboardStats {
   totalAttempts: number;
@@ -14,10 +15,11 @@ export interface DashboardStats {
   radarData: Array<{ subject: string; A: number | null }>;
   barData: Array<{ name: string; count: number }>;
   processedGroupedInsights: Array<{
+    topicId: string;
     topic: string;
     strengths: string[];
     weaknesses: string[];
-    recommendations: string[];
+    recommendations: RoadmapRecommendation[];
     errorCount: number;
     totalQuestions: number;
     errorRate: number;
@@ -35,9 +37,10 @@ const ERROR_TYPES = [
 type ErrorType = (typeof ERROR_TYPES)[number];
 
 interface TopicInsight {
+  topic: string;
   strengths: string[];
   weaknesses: string[];
-  recommendations: string[];
+  recommendations: RoadmapRecommendation[];
   errorCount: number;
   totalQuestions: number;
 }
@@ -53,6 +56,7 @@ type SessionAnalysis = {
 } & Partial<Record<Language, LocalizedAnalysis>>;
 
 const createEmptyTopicInsight = (): TopicInsight => ({
+  topic: '',
   strengths: [],
   weaknesses: [],
   recommendations: [],
@@ -95,14 +99,18 @@ export function calculateDashboardStats(
 
   const topicInsights = new Map<string, TopicInsight>();
 
-  history.forEach(session => {
+  // Deterministic recency ordering also makes capped lists independent of fetch order.
+  [...history].sort((a, b) => a.date.localeCompare(b.date) ||
+    (a.id ?? JSON.stringify(a.config)).localeCompare(b.id ?? JSON.stringify(b.config))).forEach(session => {
     const topic =
       currentLang === "vi"
         ? session.config.topicVi || session.config.topic
         : session.config.topicEn || session.config.topic;
 
-    const currentTopic = topicInsights.get(topic) ?? createEmptyTopicInsight();
-    topicInsights.set(topic, currentTopic);
+    const topicId = roadmapTopicId(session.config);
+    const currentTopic = topicInsights.get(topicId) ?? createEmptyTopicInsight();
+    currentTopic.topic = topic;
+    topicInsights.set(topicId, currentTopic);
 
     currentTopic.totalQuestions += session.quizResults.length;
 
@@ -133,11 +141,11 @@ export function calculateDashboardStats(
 
     const analysis = (session.analysis as SessionAnalysis)[currentLang];
 
+    currentTopic.recommendations.push(...roadmapRecommendations(session, currentLang));
     if (!analysis) return;
 
     currentTopic.strengths.push(...(analysis.strengths || []));
     currentTopic.weaknesses.push(...(analysis.weaknesses || []));
-    currentTopic.recommendations.push(...(analysis.recommendations || []));
   });
 
   const averageMetrics: Record<keyof CognitiveMetrics, number | null> = {
@@ -149,11 +157,12 @@ export function calculateDashboardStats(
   });
 
   const processedGroupedInsights = Array.from(topicInsights.entries())
-    .map(([topic, data]) => ({
-      topic,
+    .map(([topicId, data]) => ({
+      topicId,
+      topic: data.topic,
       strengths: [...new Set(data.strengths)].slice(-3).reverse(),
       weaknesses: [...new Set(data.weaknesses)].slice(-3).reverse(),
-      recommendations: [...new Set(data.recommendations)].slice(-5).reverse(),
+      recommendations: [...new Map(data.recommendations.map(rec => [rec.id, rec])).values()].slice(-5).reverse(),
       errorCount: data.errorCount,
       totalQuestions: data.totalQuestions,
       errorRate:

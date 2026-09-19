@@ -3,21 +3,7 @@ import { useLanguageState } from '@/components/app-preferences';
 import { UiText } from "@/components/ui-text";
 import { uiMessage } from '@/lib/i18n';
 
-/**
- * @fileOverview Focus Shield feature - v1.15.1
- *
- * FIX v1.15.1 (restoration of the AI detection loop after minimization):
- *   Added isOpen and isMinimized to the dependency list of the useEffect
- *   that invokes startDetection. This ensures that, when the user expands the widget
- *   and the video element is mounted again, the detection logic restarts automatically
- *   instead of remaining permanently interrupted because the reference was null while minimized.
- *
- * Previous corrections:
- *   Use onloadedmetadata to invoke play() safely and prevent a race condition.
- *   Normalize pixel values to [-1, 1] in accordance with MobileNetV2 preprocess_input.
- */
-
-import type * as tf from "@tensorflow/tfjs";
+import { FocusTrackerSession, focusRecoveryCopy, type FocusState } from "./focus-tracker-session";
 import {
 AlertTriangle,
 Camera,
@@ -43,27 +29,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
-import { useToast } from "@/hooks/use-toast";
-import { showUnexpectedErrorToast } from "@/lib/error-toast";
 import {
 translations,
 TranslationSet,
 } from "@/lib/translations";
 import { cn } from "@/lib/utils";
 
-const MODEL_URL = "/models/focus-model/model.json";
-const MODEL_INPUT_SIZE = 224;
-
-type FocusStatus =
-  | "focused"
-  | "unfocused"
-  | "no-person"
-  | "error";
-
 export default function FocusTrackerWidget() {
   const pathname = usePathname();
-  const { toast } = useToast();
-
   const isAuthPage =
     pathname === "/login" ||
     pathname === "/register";
@@ -71,249 +44,56 @@ export default function FocusTrackerWidget() {
   const [lang] = useLanguageState();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
-  const [isActive, setIsActive] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
-  const [isModelLoading, setIsModelLoading] = useState(false);
-  const [modelError, setModelError] = useState<string | null>(null);
-  const [focusScore, setFocusScore] = useState(0);
-  const [status, setStatus] = useState<FocusStatus>("unfocused");
-
+  const [state, setState] = useState<FocusState>({ phase: 'idle', score: 0 });
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const modelRef = useRef<tf.LayersModel | tf.GraphModel | null>(null);
-  const runtimeRef = useRef<typeof import('@tensorflow/tfjs') | null>(null);
-  const generationRef = useRef(0);
-  const startingRef = useRef(false);
-  const requestRef = useRef<number | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const lastProcessingTime = useRef(0);
-
-  // Sync language
-
+  const sessionRef = useRef<FocusTrackerSession | null>(null);
+  const isActive = state.phase === 'active';
+  const isModelLoading = state.phase === 'starting';
+  const focusScore = state.score;
+  const status = focusScore > 65 ? 'focused' : focusScore > 15 ? 'unfocused' : 'no-person';
+  const copy = focusRecoveryCopy[lang];
+  const modelError = state.error ? copy[state.error] : null;
   const t: TranslationSet = translations[lang];
 
   const stopResources = useCallback(() => {
-    generationRef.current++;
-    modelRef.current?.dispose();
-    modelRef.current = null;
-    if (requestRef.current !== null) {
-      cancelAnimationFrame(requestRef.current);
-      requestRef.current = null;
-    }
-
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-
-    if (videoRef.current) {
-      videoRef.current.onloadedmetadata = null;
-      videoRef.current.srcObject = null;
-    }
+    sessionRef.current?.stop();
+    sessionRef.current = null;
   }, []);
+
+  const stopTracking = useCallback(() => {
+    stopResources();
+    setState({ phase: 'idle', score: 0 });
+  }, [stopResources]);
 
   useEffect(() => () => stopResources(), [stopResources]);
 
-  // Auto stop on auth pages
   useEffect(() => {
     if (isAuthPage) {
-      setIsActive(false);
+      stopTracking();
       setIsOpen(false);
-      stopResources();
     }
-  }, [isAuthPage, stopResources]);
+  }, [isAuthPage, stopTracking]);
 
-  const loadModel = async () => {
-    if (modelRef.current) return modelRef.current;
-    const generation = generationRef.current;
-
-    setIsModelLoading(true);
-    setModelError(null);
-
-    try {
-      const tf = await import('@tensorflow/tfjs');
-      runtimeRef.current = tf;
-      await tf.ready();
-      try {
-        await tf.setBackend('webgl');
-      } catch (e) {
-        await tf.setBackend('cpu');
-      }
-
-      let model: tf.LayersModel | tf.GraphModel | null = null;
-
-      // Try load as LayersModel first (Standard Keras)
-      try {
-        model = await tf.loadLayersModel(MODEL_URL);
-      } catch (err) {
-        console.warn("LayersModel failed, trying GraphModel fallback...");
-        model = await tf.loadGraphModel(MODEL_URL);
-      }
-
-      if (!model) throw new Error("Mô hình không thể khởi tạo");
-      if (generation !== generationRef.current) { model.dispose(); return null; }
-      modelRef.current = model;
-
-      // Warm up model
-      tf.tidy(() => {
-        const dummyInput = tf.zeros([1, MODEL_INPUT_SIZE, MODEL_INPUT_SIZE, 3]);
-        if (model instanceof tf.LayersModel) {
-          model.predict(dummyInput);
-        } else {
-          (model as tf.GraphModel).execute(dummyInput);
-        }
-      });
-
-      return model;
-    } catch (error) {
-      if (generation !== generationRef.current) return null;
-      stopResources();
-      console.error("Focus model error:", error);
-      showUnexpectedErrorToast(
-        "FOCUS-MODEL-LOAD-FAILED",
-        "The focus model could not be loaded.",
-        { model: MODEL_URL },
-        lang
-      );
-      setModelError(uiMessage(lang, "focus.ai_model_error_model_json_please_check"));
-      return null;
-    } finally {
-      setIsModelLoading(false);
+  const toggleTracking = () => {
+    if (isActive || isModelLoading) {
+      stopTracking();
+      return;
     }
+    stopResources();
+    const session = new FocusTrackerSession(next => {
+      if (sessionRef.current === session) setState(next);
+    });
+    sessionRef.current = session;
+    void session.start();
   };
 
-  const startDetection = useCallback(() => {
-    const processFrame = async (timestamp: number) => {
-      const tf = runtimeRef.current;
-      if (!tf) return;
-      if (!isActive || !videoRef.current || !modelRef.current) return;
-
-      // Throttle to 800ms
-      if (timestamp - lastProcessingTime.current < 800) {
-        requestRef.current = requestAnimationFrame(processFrame);
-        return;
-      }
-      lastProcessingTime.current = timestamp;
-
-      try {
-        if (videoRef.current.readyState < 2) {
-          requestRef.current = requestAnimationFrame(processFrame);
-          return;
-        }
-
-        const score = tf.tidy(() => {
-          const pixels = tf.browser.fromPixels(videoRef.current!);
-          const resized = tf.image.resizeBilinear(pixels, [MODEL_INPUT_SIZE, MODEL_INPUT_SIZE]);
-
-          // IMPORTANT: Scaled to [-1, 1] for MobileNetV2 compatibility
-          const normalized = resized
-            .toFloat()
-            .div(tf.scalar(127.5))
-            .sub(tf.scalar(1))
-            .expandDims(0);
-
-          let prediction;
-          if (modelRef.current instanceof tf.LayersModel) {
-            prediction = modelRef.current.predict(normalized) as tf.Tensor;
-          } else {
-            prediction = (modelRef.current as tf.GraphModel).execute(normalized) as tf.Tensor;
-          }
-
-          const data = prediction.dataSync();
-          // Assuming output[0] is the focus probability
-          return Math.max(0, Math.min(100, Math.round(data[0] * 100)));
-        });
-
-        setFocusScore(score);
-
-        // Logic based on training classes
-        if (score > 65) setStatus("focused");
-        else if (score > 15) setStatus("unfocused");
-        else setStatus("no-person");
-
-      } catch (error) {
-        stopResources();
-        setIsActive(false);
-        showUnexpectedErrorToast("FOCUS-MODEL-LOAD-FAILED", "The focus model could not be loaded.", {}, lang);
-        setModelError(uiMessage(lang, "focus.ai_model_error_model_json_please_check"));
-        return;
-      }
-
-      requestRef.current = requestAnimationFrame(processFrame);
-    };
-
-    requestRef.current = requestAnimationFrame(processFrame);
-  }, [isActive, lang, stopResources]);
-
-  const toggleTracking = async () => {
-    if (startingRef.current) { stopResources(); return; }
-    if (!isActive) {
-      startingRef.current = true;
-      const generation = generationRef.current;
-      const model = await loadModel();
-      if (!model) { startingRef.current = false; return; }
-
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: "user",
-            width: { ideal: 640 },
-            height: { ideal: 480 },
-          },
-        });
-
-        if (generation !== generationRef.current) { stream.getTracks().forEach(track => track.stop()); return; }
-        streamRef.current = stream;
-        setIsActive(true);
-        setIsOpen(true);
-        setIsMinimized(false);
-      } catch (err) {
-        stopResources();
-        console.error("Camera access failed:", err);
-        toast({
-          variant: "destructive",
-          title: t.cameraErrorTitle,
-          description: t.cameraErrorDesc,
-        });
-      } finally {
-        startingRef.current = false;
-      }
-    } else {
-      setIsActive(false);
-      stopResources();
-      setFocusScore(0);
-      setStatus("unfocused");
-    }
-  };
-
-  // Restart the detection loop when videoRef becomes available after isOpen or isMinimized changes.
+  // Minimization detaches playback/inference; expanding binds the retained stream again.
   useEffect(() => {
-    if (isActive && modelRef.current && videoRef.current) {
-      startDetection();
+    if (isActive && isOpen && !isMinimized && videoRef.current) {
+      return sessionRef.current?.attach(videoRef.current);
     }
-    return () => {
-      if (requestRef.current) {
-        cancelAnimationFrame(requestRef.current);
-        requestRef.current = null;
-      }
-    };
-  }, [isActive, startDetection, isOpen, isMinimized]); // Track isOpen and isMinimized so the loop resumes when the video is remounted.
-
-  // Attach or reattach the stream to <video> whenever the interface or preview is visible and active.
-  useEffect(() => {
-    const videoEl = videoRef.current;
-    if (isOpen && !isMinimized && isActive && streamRef.current && videoEl) {
-      if (videoEl.srcObject !== streamRef.current) {
-        videoEl.onloadedmetadata = () => {
-          videoEl.play().catch(() => {
-            stopResources();
-            setIsActive(false);
-            toast({ variant: "destructive", title: t.cameraErrorTitle, description: t.cameraErrorDesc });
-          });
-        };
-        videoEl.srcObject = streamRef.current;
-      }
-    }
-  }, [isOpen, isMinimized, isActive, stopResources, toast, t.cameraErrorTitle, t.cameraErrorDesc]);
+  }, [isActive, isOpen, isMinimized]);
 
   if (isAuthPage) return null;
 
@@ -333,7 +113,7 @@ export default function FocusTrackerWidget() {
             </div>
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="icon" aria-label={uiMessage(lang, 'focus.minimize')} onClick={() => setIsMinimized(true)} className="h-8 w-8 rounded-lg hover:bg-white/20 text-white"><Minus className="w-5 h-5" /></Button>
-              <Button variant="ghost" size="icon" aria-label={uiMessage(lang, "focus.stop_camera_and_close")} onClick={() => { setIsOpen(false); setIsActive(false); stopResources(); }} className="h-8 w-8 rounded-lg hover:bg-white/20 text-white"><X className="w-5 h-5" /></Button>
+              <Button variant="ghost" size="icon" aria-label={uiMessage(lang, "focus.stop_camera_and_close")} onClick={() => { setIsOpen(false); stopTracking(); }} className="h-8 w-8 rounded-lg hover:bg-white/20 text-white"><X className="w-5 h-5" /></Button>
             </div>
           </div>
 
@@ -352,13 +132,6 @@ export default function FocusTrackerWidget() {
                   <p className="text-[10px] font-black uppercase tracking-widest opacity-80 leading-relaxed">{t.systemReady}</p>
                 </div>
               )}
-              {modelError && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center bg-destructive/10 backdrop-blur-md text-destructive p-6 text-center">
-                  <AlertTriangle className="w-10 h-10 mb-2 animate-bounce" />
-                  <p className="text-[10px] font-black uppercase tracking-widest leading-relaxed">{modelError}</p>
-                  <Button variant="outline" size="sm" onClick={() => window.location.reload()} className="mt-4 h-8 rounded-xl font-black text-[9px] uppercase tracking-widest border-2 border-destructive/20 text-destructive bg-white"><UiText id="reload" /></Button>
-                </div>
-              )}
               {isModelLoading && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center bg-primary/20 backdrop-blur-md">
                   <Loader2 className="w-10 h-10 animate-spin text-primary" />
@@ -366,13 +139,22 @@ export default function FocusTrackerWidget() {
               )}
             </div>
 
+            {modelError && (
+              <div role="alert" className="rounded-xl border-2 border-destructive/30 p-3 text-destructive">
+                <AlertTriangle className="mb-2 h-5 w-5" />
+                <p className="text-sm">{modelError}</p>
+                <Button variant="outline" size="sm" onClick={toggleTracking} className="mt-3">{copy.retry}</Button>
+              </div>
+            )}
+            {isModelLoading && <p role="status" className="text-sm">{copy.starting}</p>}
+
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="flex flex-col">
                   <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{t.trackingMode}</span>
                   <span className="text-xs font-bold">{isActive ? t.aiMonitorActive : t.systemPaused}</span>
                 </div>
-                <Switch aria-label={t.trackingMode} checked={isActive} onCheckedChange={toggleTracking} disabled={isModelLoading} />
+                <Switch aria-label={t.trackingMode} checked={isActive || isModelLoading} onCheckedChange={toggleTracking} />
               </div>
 
               <div className="grid grid-cols-2 gap-3">

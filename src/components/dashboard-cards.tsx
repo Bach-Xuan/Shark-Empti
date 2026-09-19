@@ -70,7 +70,7 @@ export function DashboardMetricCard({ title, value, icon, highlight, onExpand }:
 }
 
 export function DashboardInsightList({ title, icon, data, type, t, onCopy, isCopied, onAction, onExpandRoadmap, roadmapStatus, toggleCheck }: {
-  title: string, icon: React.ReactNode, data: DashboardStats['processedGroupedInsights'], type: 'insights' | 'feedback', t: TranslationSet, onCopy: () => void, isCopied: boolean, onAction?: (concept: string, type: 'practice' | 'flashcards') => void, onExpandRoadmap?: () => void, roadmapStatus?: Record<string, Record<number, boolean>>, toggleCheck?: (topic: string, index: number) => void
+  title: string, icon: React.ReactNode, data: DashboardStats['processedGroupedInsights'], type: 'insights' | 'feedback', t: TranslationSet, onCopy: () => void, isCopied: boolean, onAction?: (concept: string, type: 'practice' | 'flashcards') => void, onExpandRoadmap?: () => void, roadmapStatus?: Record<string, Record<string, boolean>>, toggleCheck?: (topicId: string, recommendationId: string) => void
 }) {
   return (
     <Card className={cn(
@@ -118,11 +118,11 @@ export function DashboardInsightList({ title, icon, data, type, t, onCopy, isCop
         {data.length > 0 ? (
           <div className="space-y-6 md:space-y-16 pb-4 md:pb-10">
             {data.map((group, idx) => {
-              const topicChecks = (roadmapStatus && roadmapStatus[group.topic]) || {};
-              const isTopicDone = type === 'feedback' && group.recommendations.length > 0 && group.recommendations.every((_: string, i: number) => !!topicChecks[i]);
+              const topicChecks = (roadmapStatus && roadmapStatus[group.topicId]) || {};
+              const isTopicDone = type === 'feedback' && group.recommendations.length > 0 && group.recommendations.every(rec => !!topicChecks[rec.id]);
 
               return (
-                <div key={idx} className="space-y-4 md:space-y-10 animate-in fade-in slide-in-from-left-4 duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
+                <div key={group.topicId} className="space-y-4 md:space-y-10 animate-in fade-in slide-in-from-left-4 duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
                   <div className={cn("flex items-center justify-between gap-2 md:gap-4 pb-2 md:pb-4 border-b-2 md:border-b-[4px]", type === 'insights' ? 'border-orange-500/10' : 'border-primary/10')}>
                     <h3 className={cn(
                       "font-headline font-black text-[10px] md:text-2xl uppercase tracking-tight whitespace-normal break-words flex-1 transition-all text-left",
@@ -183,16 +183,23 @@ export function DashboardInsightList({ title, icon, data, type, t, onCopy, isCop
                         )}
                       </>
                     ) : (
-                      group.recommendations.map((r: string, i: number) => {
-                        const isDone = !!topicChecks[i];
+                      group.recommendations.map(r => {
+                        const isDone = !!topicChecks[r.id];
                         return (
                           <div
-                            key={i}
+                            key={r.id}
+                            role="checkbox"
+                            tabIndex={0}
+                            aria-checked={isDone}
+                            aria-label={r.text}
+                            onKeyDown={event => {
+                              if (event.key === ' ') { event.preventDefault(); toggleCheck?.(group.topicId, r.id); }
+                            }}
                             className={cn(
                               "p-3 md:p-10 bg-card rounded-xl md:rounded-[2.5rem] border-2 md:border-[4px] flex gap-3 md:gap-8 animate-in zoom-in-95 duration-300 hover:shadow-lg transition-all group/item hover:-translate-y-1 relative cursor-pointer",
                               isDone ? "bg-muted/10 border-border" : "border-primary/10"
                             )}
-                            onClick={() => toggleCheck && toggleCheck(group.topic, i)}
+                            onClick={() => toggleCheck?.(group.topicId, r.id)}
                           >
                             {roadmapStatus && (
                               <div className="absolute top-2 md:top-4 right-2 md:right-4 opacity-40 group-hover/item:opacity-100 transition-opacity">
@@ -213,7 +220,7 @@ export function DashboardInsightList({ title, icon, data, type, t, onCopy, isCop
                               "text-[9px] md:text-xl font-bold leading-relaxed whitespace-normal break-words transition-all text-left",
                               isDone ? "line-through text-muted-foreground italic opacity-60" : "text-foreground"
                             )}>
-                              <LatexText text={r} />
+                              <LatexText text={r.text} />
                             </div>
                           </div>
                         );

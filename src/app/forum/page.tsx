@@ -4,6 +4,8 @@ import { PageControls } from '@/components/page-controls';
 import { UiText } from "@/components/ui-text";
 import { usePagedCollection } from '@/hooks/use-paged-collection';
 import { formatForumDate } from '@/lib/date-format';
+import { readForumPost } from '@/lib/public-firestore-schema';
+import { deleteForumPost } from '@/lib/forum-client';
 import { uiMessage } from '@/lib/i18n';
 import { subjectOptions } from '@/lib/subjects';
 import { useMemo as usePageMemo } from 'react';
@@ -61,13 +63,13 @@ addDoc,
 arrayRemove,
 arrayUnion,
 collection,
-deleteDoc,
 doc,
 increment,
 orderBy,
 query,
 serverTimestamp,
-updateDoc
+updateDoc,
+where
 } from 'firebase/firestore';
 import {
 BookOpen,
@@ -119,8 +121,16 @@ export default function ForumPage() {
 
 
   const source = usePageMemo(() => db ? query(collection(db, 'posts'), ...(sortType === 'mostLiked' ? [orderBy('likesCount', 'desc'), orderBy('createdAt', 'desc')] : [orderBy('createdAt', sortType === 'oldest' ? 'asc' : 'desc')])) : null, [db, sortType]);
-  const page = usePagedCollection<ForumPost>(source, (id, data) => ({ ...data, id } as ForumPost));
+  const page = usePagedCollection<ForumPost>(source, readForumPost);
   const { items: posts, loading } = page;
+  const deletionSource = usePageMemo(() => db && user ? query(collection(db, '_forumDeletions'), where('authorId', '==', user.uid), where('status', '==', 'pending')) : null, [db, user]);
+  const deletions = usePagedCollection(deletionSource, (id, data) => data.authorId === user?.uid && data.status === 'pending' ? id : null);
+  const resumeDeletion = async (id: string) => {
+    if (!user) return;
+    await mutation.run(() => deleteForumPost(user, id), cause => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `posts/${id}`, operation: 'delete' }, cause));
+    });
+  };
 
   const t: TranslationSet = translations[lang];
 
@@ -218,7 +228,7 @@ export default function ForumPage() {
     if (!user || !db || !postToDelete) return;
 
     const postRef = doc(db, 'posts', postToDelete.id);
-    const result = await mutation.run(() => deleteDoc(postRef), cause => {
+    const result = await mutation.run(() => deleteForumPost(user, postToDelete.id), cause => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'delete' }, cause));
     });
     if (result.ok) { setPostToDelete(null);
@@ -259,8 +269,8 @@ export default function ForumPage() {
     updateDoc(postRef, {
       likedBy: hasLiked ? arrayRemove(user.uid) : arrayUnion(user.uid),
       likesCount: increment(hasLiked ? -1 : 1)
-    }).catch(async () => {
-      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'update', requestResourceData: { userId: user.uid } }));
+    }).catch(async cause => {
+      errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'update', requestResourceData: { userId: user.uid } }, cause));
     });
   };
 
@@ -317,6 +327,13 @@ export default function ForumPage() {
 
       <main className="flex-1 main-container pt-24 md:pt-36 space-y-6 md:space-y-10 pb-20 px-2 sm:px-4">
       <PageControls lang={lang} {...page} />
+      {deletions.items.length > 0 && <Card className="p-4 space-y-3" role="status">
+        <p>{lang === 'vi' ? 'Bài viết đã được ẩn. Hãy thử lại để hoàn tất xóa dữ liệu còn lại.' : 'Your posts are hidden. Retry to finish deleting the remaining data.'}</p>
+        {deletions.items.map(id => <Button key={id} disabled={mutation.pending} onClick={() => void resumeDeletion(id)}>
+          {lang === 'vi' ? 'Tiếp tục xóa' : 'Resume deletion'} ({id})
+        </Button>)}
+        <PageControls lang={lang} {...deletions} />
+      </Card>}
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 md:gap-6 border-b-[3px] md:border-b-[5px] border-border/30 pb-6 md:pb-8">
           <div className="space-y-1">
             <h1 className="text-2xl sm:text-4xl md:text-7xl font-headline font-black text-primary uppercase tracking-tighter flex items-center gap-2.5 md:gap-4">

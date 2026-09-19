@@ -3,6 +3,7 @@ import { useLanguageState,useThemeState } from '@/components/app-preferences';
 import { PageControls } from '@/components/page-controls';
 import { usePagedCollection } from '@/hooks/use-paged-collection';
 import { formatStoredDate } from '@/lib/date-format';
+import { readArenaExam, arenaConfigSchema } from '@/lib/public-firestore-schema';
 import { uiMessage } from '@/lib/i18n';
 import { quizLabel } from '@/lib/quiz-labels';
 import { useMemo as usePageMemo } from 'react';
@@ -23,16 +24,14 @@ DialogTitle,
 import { Tabs,TabsContent,TabsList,TabsTrigger } from "@/components/ui/tabs";
 import { useDoc,useFirestore,useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { showErrorToast,showUnexpectedErrorToast } from '@/lib/error-toast';
-import { validateQuizConfig } from '@/lib/quiz-config';
+import { showErrorToast } from '@/lib/error-toast';
+import { arenaResponseError } from '@/lib/arena-detail';
 import { translations,TranslationSet } from '@/lib/translations';
 import { ArenaExam,QuizConfig } from '@/lib/types';
 import {
-addDoc,
 collection,
 orderBy,
-query,
-serverTimestamp
+query
 } from 'firebase/firestore';
 import {
 CalendarDays,
@@ -47,7 +46,7 @@ Sparkles,
 Trophy
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export default function ArenaPage() {
   const { user } = useUser();
@@ -62,19 +61,46 @@ export default function ArenaPage() {
 
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const creating = useRef(false);
+  const pendingExam = useRef<{ key: string; body: string } | null>(null);
+  const creationVersion = useRef(0);
+  const saveRequest = useRef<AbortController | null>(null);
+  useEffect(() => {
+    creating.current = false;
+    pendingExam.current = null;
+    setIsCreating(false);
+    creationVersion.current++;
+    const version = creationVersion;
+    const request = saveRequest;
+    return () => { version.current++; request.current?.abort(); };
+  }, [user?.uid]);
+  const changeCreateDialog = (open: boolean) => {
+    if (!open) {
+      creationVersion.current++;
+      saveRequest.current?.abort();
+      creating.current = false;
+      setIsCreating(false);
+    }
+    setIsCreateDialogOpen(open);
+  };
 
 
   const source = usePageMemo(() => db ? query(collection(db, 'arenaExams'), orderBy('createdAt', 'desc')) : null, [db]);
-  const page = usePagedCollection<ArenaExam>(source, (id, data) => ({ ...data, id } as ArenaExam));
+  const page = usePagedCollection<ArenaExam>(source, readArenaExam);
   const { items: exams, loading } = page;
 
   const t: TranslationSet = translations[lang];
 
   const handleCreateExam = async (config: QuizConfig) => {
-    if (!user || !db) return;
-
+    if (!user || !db || creating.current) return;
+    creating.current = true;
+    const version = creationVersion.current;
+    const current = () => version === creationVersion.current;
     setIsCreating(true);
     try {
+      const validated = arenaConfigSchema.parse(config);
+      const key = JSON.stringify([user.uid, lang, validated]);
+      if (pendingExam.current?.key !== key) {
       // 1. Generate questions ONCE at creation time
       const result = await generateQuestions({
         subject: config.subject === 'none' ? undefined : config.subject,
@@ -83,10 +109,11 @@ export default function ArenaPage() {
         excludeNotes: config.excludeNotes,
         type: config.type,
         difficulty: config.difficulty,
-        numQuestions: validateQuizConfig(config).numQuestions,
+        numQuestions: Number(validated.numQuestions),
         language: lang as 'en' | 'vi',
         arenaMode: true,
       });
+      if (!current()) return;
 
       if (!result.ok) {
         showErrorToast(result.error, lang);
@@ -100,24 +127,37 @@ export default function ArenaPage() {
       // 2. Save everything including questions to Firestore
       const examData = {
         title: config.topic,
-        config,
+        config: validated,
         questions: result.data.questions,
-        authorId: user.uid,
-        authorName: user.displayName || 'Learner',
-        authorPhoto: user.photoURL || '',
-        createdAt: serverTimestamp(),
-        totalAttempts: 0
+        requestId: crypto.randomUUID(),
       };
-
-      const docRef = await addDoc(collection(db, 'arenaExams'), examData);
+      pendingExam.current = { key, body: JSON.stringify(examData) };
+      }
+      let token: string;
+      try { token = await user.getIdToken(); }
+      catch { throw { code: 'AUTH-REQUIRED' }; }
+      if (!current()) return;
+      const controller = new AbortController();
+      saveRequest.current = controller;
+      const response = await fetch('/api/arena', {
+        method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: pendingExam.current.body,
+      });
+      const payload: unknown = await response.json().catch(() => null);
+      if (!current()) return;
+      if (!response.ok) { showErrorToast(arenaResponseError(payload, response.status), lang); return; }
+      if (!payload || typeof payload !== 'object' || !('id' in payload) || typeof payload.id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(payload.id)) {
+        throw { code: 'APP-DATA-INVALID' };
+      }
+      pendingExam.current = null;
       setIsCreateDialogOpen(false);
       toast({ title: uiMessage(lang, "arena.arena_exam_created") });
-      router.push(`/arena/${docRef.id}`);
+      router.push(`/arena/${payload.id}`);
     } catch (e) {
-      console.error(e);
-      showUnexpectedErrorToast('ARENA-CREATE-FAILED', uiMessage(lang, "arena.failed_to_create_the_arena_exam"), {}, lang);
+      if (current()) showErrorToast(arenaResponseError(e instanceof Error && e.name === 'ZodError' ? { code: 'APP-INVALID-INPUT' } : e, 0), lang);
     } finally {
-      setIsCreating(false);
+      if (current()) { creating.current = false; setIsCreating(false); saveRequest.current = null; }
     }
   };
 
@@ -250,7 +290,7 @@ export default function ArenaPage() {
         </Tabs>
       </main>
 
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+      <Dialog open={isCreateDialogOpen} onOpenChange={changeCreateDialog}>
         <DialogContent className="max-w-5xl w-[95vw] max-h-[90vh] overflow-y-auto rounded-[2.5rem] border-4 border-border shadow-2xl p-0 bg-card custom-scrollbar">
            <DialogHeader className="sr-only">
              <DialogTitle>{t.createArenaExam}</DialogTitle>

@@ -9,7 +9,7 @@ vi.mock('firebase/firestore', () => ({ collection: () => ({ path: 'demo' }), doc
 vi.mock('@/lib/error-toast', () => ({ showErrorToast: vi.fn(), showUnexpectedErrorToast: vi.fn() }));
 vi.mock('@/components/feature-help', () => ({ default: () => null }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
-const weakPoints = [{ topic: 'Addition', errorCount: 1, totalQuestions: 1, errorRate: 100, strengths: [], weaknesses: [], recommendations: [] }];
+const weakPoints = [{ topicId: 'addition', topic: 'Addition', errorCount: 1, totalQuestions: 1, errorRate: 100, strengths: [], weaknesses: [], recommendations: [] }];
 function view(tab: 'flashcards' | 'practice') {
   return render(<PlaygroundView t={translations.en} lang="en" weakPoints={weakPoints} totalAttempts={1} totalErrors={1} initialConfig={{ tab, concept: 'Addition' }} onAskGuru={() => {}} />);
 }

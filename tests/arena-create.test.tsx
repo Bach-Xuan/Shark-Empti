@@ -1,0 +1,80 @@
+import ArenaPage from '@/app/arena/page';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { translations } from '@/lib/translations';
+const config = { subject: 'math', grade: '12', topic: 'Algebra', type: 'Mixed', difficulty: 'Mixed', numQuestions: '1', timeLimit: '999' };
+const mocks = vi.hoisted(() => ({ generate: vi.fn(), fetch: vi.fn(), toast: vi.fn(), push: vi.fn(), error: vi.fn(), uid: 'owner' }));
+vi.mock('@/components/navigation', () => ({ default: () => null }));
+vi.mock('@/components/ui-text', () => ({ UiText: () => null }));
+vi.mock('@/components/setup-view', () => ({ default: ({ onStart }: { onStart: (config: unknown) => void }) => <button onClick={() => onStart(config)}>Generate</button> }));
+vi.mock('@/components/app-preferences', () => ({ useLanguageState: () => ['en', vi.fn()], useThemeState: () => ['light', vi.fn()] }));
+vi.mock('@/firebase', () => ({ useUser: () => ({ user: { uid: mocks.uid, getIdToken: async () => 'token' } }), useFirestore: () => 'db', useDoc: () => ({ data: null }) }));
+vi.mock('@/hooks/use-paged-collection', () => ({ usePagedCollection: () => ({ items: [], loading: false, hasMore: false, loadMore: vi.fn() }) }));
+vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));
+vi.mock('@/lib/error-toast', () => ({ showErrorToast: mocks.error }));
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push }) }));
+vi.mock('@/ai/client-flows', () => ({ generateQuestions: mocks.generate }));
+vi.mock('firebase/firestore', () => ({ collection: vi.fn(), query: vi.fn(), orderBy: vi.fn() }));
+const generated = { ok: true, data: { questions: [{ question: '2+2?', correct: '4', type: 'Short Answer', explanation: 'Addition' }] } };
+beforeEach(() => { mocks.uid = 'owner'; mocks.fetch.mockReset(); mocks.generate.mockReset(); vi.stubGlobal('fetch', mocks.fetch); });
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.clearAllMocks(); });
+function start() {
+  const view = render(<ArenaPage />);
+  fireEvent.click(screen.getByRole('button', { name: translations.en.createArenaExam }));
+  fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
+  return view;
+}
+it('retries a failed save with the identical request ID and generated payload without regenerating', async () => {
+  vi.spyOn(console, 'error').mockImplementation(() => {});
+  vi.stubGlobal('fetch', mocks.fetch);
+  mocks.generate.mockResolvedValue({ ok: true, data: { questions: [{ question: '2+2?', correct: '4', type: 'Short Answer', explanation: 'Addition' }] } });
+  mocks.fetch.mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({ code: 'APP-CONFIG-MISSING' }) }).mockResolvedValueOnce({ ok: true, json: async () => ({ id: 'saved' }) });
+  render(<ArenaPage />);
+  fireEvent.click(screen.getByRole('button', { name: translations.en.createArenaExam }));
+  fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
+  await waitFor(() => expect(mocks.fetch).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Generate' })).toBeTruthy());
+  fireEvent.click(screen.getByRole('button', { name: 'Generate' }));
+  await waitFor(() => expect(mocks.push).toHaveBeenCalledWith('/arena/saved'));
+  expect(mocks.generate).toHaveBeenCalledTimes(1);
+  expect(mocks.fetch.mock.calls[0][1].body).toBe(mocks.fetch.mock.calls[1][1].body);
+  expect(JSON.parse(mocks.fetch.mock.calls[0][1].body)).toMatchObject({ config: { timeLimit: '999' }, requestId: expect.any(String) });
+  expect(mocks.error).toHaveBeenCalledWith(expect.objectContaining({ code: 'APP-CONFIG-MISSING' }), 'en');
+});
+it('discards late generation on an account change before saving', async () => {
+  let finish!: (value: unknown) => void;
+  mocks.generate.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+  const view = start();
+  mocks.uid = 'other'; view.rerender(<ArenaPage />);
+  await act(async () => finish(generated));
+  expect(mocks.fetch).not.toHaveBeenCalled();
+  expect(mocks.push).not.toHaveBeenCalled();
+});
+it('does not save after closing the generation dialog', async () => {
+  let finish!: (value: unknown) => void;
+  mocks.generate.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+  start();
+  fireEvent.keyDown(document, { key: 'Escape' });
+  await act(async () => finish(generated));
+  expect(mocks.fetch).not.toHaveBeenCalled();
+});
+it('ignores a late save response and aborts the browser request on unmount', async () => {
+  let finish!: (value: unknown) => void;
+  mocks.generate.mockResolvedValue(generated);
+  mocks.fetch.mockReturnValue(new Promise(resolve => { finish = resolve; }));
+  const view = start();
+  await waitFor(() => expect(mocks.fetch).toHaveBeenCalled());
+  const signal: AbortSignal = mocks.fetch.mock.calls[0][1].signal;
+  view.unmount();
+  await act(async () => finish({ ok: true, json: async () => ({ id: 'saved' }) }));
+  expect(signal.aborted).toBe(true);
+  expect(mocks.push).not.toHaveBeenCalled();
+  expect(mocks.toast).not.toHaveBeenCalled();
+});
+it('rejects malformed success identifiers before navigation', async () => {
+  mocks.generate.mockResolvedValue(generated);
+  mocks.fetch.mockResolvedValue({ ok: true, json: async () => ({ id: '../private' }) });
+  start();
+  await waitFor(() => expect(mocks.error).toHaveBeenCalledWith(expect.objectContaining({ code: 'APP-DATA-INVALID' }), 'en'));
+  expect(mocks.push).not.toHaveBeenCalled();
+});

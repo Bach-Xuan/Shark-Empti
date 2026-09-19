@@ -5,7 +5,7 @@ import { copyTextToClipboard } from '@/lib/clipboard';
 import { showUnexpectedErrorToast } from '@/lib/error-toast';
 import { uiMessage } from '@/lib/i18n';
 import { errorCategoryLabel } from '@/lib/quiz-labels';
-import { readRoadmapChecks,writeRoadmapChecks } from '@/lib/roadmap-storage';
+import { useRoadmapChecks } from '@/hooks/use-roadmap-checks';
 
 import { LatexText } from '@/components/latex-text';
 import { UiText } from "@/components/ui-text";
@@ -49,7 +49,7 @@ TrendingUp,
 XCircle,
 Zap
 } from 'lucide-react';
-import { useCallback,useEffect,useMemo,useRef,useState } from 'react';
+import { useCallback,useMemo,useRef,useState } from 'react';
 import {
 Bar,
 BarChart,
@@ -109,7 +109,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
   const [isErrorsOpen, setIsErrorsOpen] = useState(false);
   const [isRoadmapOpen, setIsRoadmapOpen] = useState(false);
 
-  const [roadmapStatus, setRoadmapStatus] = useState<Record<string, Record<number, boolean>>>({});
+  const { roadmapStatus, toggleCheck } = useRoadmapChecks(user?.uid);
 
   const dashboardStats = useMemo(() => stats === undefined ? calculateDashboardStats(history, t, lang) : stats, [stats, history, t, lang]);
 
@@ -125,23 +125,6 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
     ).sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime());
   }, [history, lang]);
 
-  useEffect(() => {
-    const sync = () => setRoadmapStatus(readRoadmapChecks(user?.uid));
-    sync(); window.addEventListener('storage', sync);
-    return () => window.removeEventListener('storage', sync);
-  }, [user?.uid]);
-
-  const toggleCheck = (topic: string, index: number) => {
-    const newStatus = {
-      ...roadmapStatus,
-      [topic]: {
-        ...(roadmapStatus[topic] || {}),
-        [index]: !roadmapStatus[topic]?.[index]
-      }
-    };
-    setRoadmapStatus(newStatus);
-    writeRoadmapChecks(user?.uid, newStatus);
-  };
 
   const getStartTime = (finishDate: string, durationSeconds: number) => {
     const finish = new Date(finishDate);
@@ -166,7 +149,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
           if (group.strengths.length) copyText += `${t.strengths.toUpperCase()}:\n${group.strengths.map(s => `• ${s}`).join('\n')}\n`;
           if (group.weaknesses.length) copyText += `${t.weaknesses.toUpperCase()}:\n${group.weaknesses.map(w => `• ${w}`).join('\n')}\n`;
         } else {
-          copyText += `${t.recommendations.toUpperCase()}:\n${group.recommendations.map(r => `• ${r}`).join('\n')}\n`;
+          copyText += `${t.recommendations.toUpperCase()}:\n${group.recommendations.map(r => `• ${r.text}`).join('\n')}\n`;
         }
         copyText += '\n';
       });
@@ -532,11 +515,11 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                    <div className="absolute left-2 md:left-3.5 top-0 bottom-0 w-1.5 md:w-2 bg-muted/50 rounded-full" />
 
                    {dashboardStats?.processedGroupedInsights.map((group, gIdx) => {
-                      const topicChecks = roadmapStatus[group.topic] || {};
-                      const isTopicDone = group.recommendations.length > 0 && group.recommendations.every((_, i) => !!topicChecks[i]);
+                      const topicChecks = roadmapStatus[group.topicId] || {};
+                      const isTopicDone = group.recommendations.length > 0 && group.recommendations.every(rec => !!topicChecks[rec.id]);
 
                       return (
-                        <div key={gIdx} className="relative group/topic animate-in slide-in-from-left-4 duration-500" style={{ animationDelay: `${gIdx * 100}ms` }}>
+                        <div key={group.topicId} className="relative group/topic animate-in slide-in-from-left-4 duration-500" style={{ animationDelay: `${gIdx * 100}ms` }}>
                           <div className={cn(
                             "absolute -left-[1.85rem] md:-left-[2.85rem] top-0 w-8 h-8 md:w-12 md:h-12 rounded-full border-[4px] md:border-[6px] z-10 flex items-center justify-center transition-all duration-500",
                             isTopicDone ? "bg-green-500 border-green-200 scale-110 shadow-lg" : "bg-card border-muted-foreground/20"
@@ -558,31 +541,31 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                               {group.recommendations.map((rec, rIdx) => (
-                                  <div
-                                    key={rIdx}
+                               {group.recommendations.map(rec => (
+                                  <label
+                                    key={rec.id}
                                     className={cn(
                                       "flex items-start gap-4 p-4 md:p-6 rounded-xl md:rounded-2xl border-2 transition-all group/rec cursor-pointer active:translate-y-0.5",
-                                      topicChecks[rIdx]
+                                      topicChecks[rec.id]
                                         ? "bg-muted/10 border-border opacity-60"
                                         : "bg-card border-primary/5 hover:border-primary/20 hover:shadow-md"
                                     )}
-                                    onClick={() => toggleCheck(group.topic, rIdx)}
                                   >
                                     <div className="mt-1 shrink-0">
                                       <Checkbox
-                                        checked={!!topicChecks[rIdx]}
-                                        onCheckedChange={() => toggleCheck(group.topic, rIdx)}
+                                        checked={!!topicChecks[rec.id]}
+                                        onCheckedChange={() => toggleCheck(group.topicId, rec.id)}
+                                        aria-label={rec.text}
                                         className="w-5 h-5 md:w-6 md:h-6 border-2"
                                       />
                                     </div>
                                     <p className={cn(
                                       "text-[10px] md:text-lg font-bold leading-relaxed transition-all text-left",
-                                      topicChecks[rIdx] ? "line-through text-muted-foreground italic" : "text-foreground"
+                                      topicChecks[rec.id] ? "line-through text-muted-foreground italic" : "text-foreground"
                                     )}>
-                                      <LatexText text={rec} />
+                                      <LatexText text={rec.text} />
                                     </p>
-                                  </div>
+                                  </label>
                                ))}
                             </div>
                           </div>

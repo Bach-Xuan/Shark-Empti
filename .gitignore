@@ -9,6 +9,7 @@ out/
 build/
 dist/
 /reports/
+/tmp/pdfs/
 
 node_modules/
 jspm_packages/
