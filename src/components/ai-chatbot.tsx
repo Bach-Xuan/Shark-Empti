@@ -259,7 +259,7 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
       {!isOpen && (
         <Button
           size="lg"
-          onClick={() => setIsOpen(true)}
+          aria-label={t.askShark} onClick={() => setIsOpen(true)}
           className="h-16 w-16 md:h-20 md:w-20 rounded-2xl md:rounded-[2rem] shadow-[0_10px_30px_-5px_rgba(255,107,0,0.4)] btn-duo pointer-events-auto transition-all hover:scale-110 active:scale-95 bg-primary text-white border-[3px] md:border-[4px] border-white/20 group relative overflow-hidden"
         >
           <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity animate-pulse" />

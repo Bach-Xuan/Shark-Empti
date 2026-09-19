@@ -2,6 +2,8 @@ import PlaygroundView from '@/components/playground-view';
 import { translations } from '@/lib/translations';
 import { act,cleanup,fireEvent,render,screen,waitFor } from '@testing-library/react';
 import { afterEach,expect,it,vi } from 'vitest';
+import userEvent from '@testing-library/user-event';
+import { uiMessage } from '@/lib/i18n';
 const mocks = vi.hoisted(() => ({ validate: vi.fn(), flashcards: vi.fn(), practice: vi.fn(), write: vi.fn() }));
 vi.mock('@/ai/client-flows', () => ({ validateAcademicTopic: mocks.validate, generateFlashcards: mocks.flashcards, generatePractice: mocks.practice }));
 vi.mock('@/firebase', () => ({ useUser: () => ({ user: { uid: 'first' } }), useFirestore: () => ({}) }));
@@ -10,6 +12,25 @@ vi.mock('@/lib/error-toast', () => ({ showErrorToast: vi.fn(), showUnexpectedErr
 vi.mock('@/components/feature-help', () => ({ default: () => null }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 const weakPoints = [{ topicId: 'addition', topic: 'Addition', errorCount: 1, totalQuestions: 1, errorRate: 100, strengths: [], weaknesses: [], recommendations: [] }];
+it('flips a flashcard with Enter and Space, hiding the inactive face from assistive technology', async () => {
+  mocks.validate.mockResolvedValue({ ok: true, data: { isValid: true } });
+  mocks.flashcards.mockResolvedValue({ ok: true, data: { cards: [{ front: '2+2', back: '4' }] } });
+  mocks.write.mockResolvedValue({ id: 'saved' });
+  view('flashcards');
+  fireEvent.click(screen.getByRole('button', { name: translations.en.startLearning }));
+  const card = await screen.findByRole('button', { name: uiMessage('en', 'playgroundview.tap_to_reveal') });
+  const keyboard = userEvent.setup();
+  card.focus();
+  await keyboard.keyboard('{Enter}');
+  expect(card.getAttribute('aria-pressed')).toBe('true');
+  expect(screen.getByText('2+2').closest('[aria-hidden]')?.getAttribute('aria-hidden')).toBe('true');
+  await keyboard.keyboard(' ');
+  expect(card.getAttribute('aria-pressed')).toBe('false');
+  await keyboard.tab();
+  expect(document.activeElement).not.toBe(card);
+  await keyboard.tab({ shift: true });
+  expect(document.activeElement).toBe(card);
+});
 function view(tab: 'flashcards' | 'practice') {
   return render(<PlaygroundView t={translations.en} lang="en" weakPoints={weakPoints} totalAttempts={1} totalErrors={1} initialConfig={{ tab, concept: 'Addition' }} onAskGuru={() => {}} />);
 }

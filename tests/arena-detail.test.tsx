@@ -8,7 +8,7 @@ type Listener = { ref: string; next: (snapshot: unknown) => void; error: (error:
 const mocks = vi.hoisted(() => ({
   user: { uid: 'player', getIdToken: async () => 'fixture' } as { uid: string; getIdToken: () => Promise<string> } | null,
   lang: 'en' as 'en' | 'vi', examId: 'exam', db: 'database' as string | null, listeners: [] as Listener[], initialError: '' as string, holdSnapshot: false,
-  request: vi.fn(), toast: vi.fn(), errorToast: vi.fn(), push: vi.fn(), chat: vi.fn(),
+  request: vi.fn(), startRequest: vi.fn(), toast: vi.fn(), errorToast: vi.fn(), push: vi.fn(), chat: vi.fn(),
   finish: null as null | ((result: typeof history) => Promise<boolean>),
 }));
 vi.mock('@/components/navigation', () => ({ default: () => null }));
@@ -20,7 +20,7 @@ vi.mock('@/lib/error-toast', () => ({ showErrorToast: mocks.errorToast, showUnex
 const router = { push: mocks.push };
 vi.mock('next/navigation', () => ({ useParams: () => ({ examId: mocks.examId }), useRouter: () => router }));
 vi.mock('firebase/firestore', () => ({
-  doc: () => 'exam', collection: () => 'attempts', query: () => 'attempts', orderBy: vi.fn(), limit: vi.fn(),
+  doc: () => 'exam', collection: () => 'attempts', query: () => 'attempts', orderBy: vi.fn(), limit: vi.fn(), where: vi.fn(), documentId: () => '__name__',
   onSnapshot: (ref: string, next: Listener['next'], error: Listener['error']) => {
     const stop = vi.fn(); mocks.listeners.push({ ref, next, error, stop });
     if (mocks.initialError === ref) error({ code: 'permission-denied', message: 'secret SDK message' });
@@ -41,17 +41,49 @@ function examSnapshot(data: unknown = { title: 'Test exam', authorId: 'author', 
   return { id: mocks.examId, exists: () => true, data: () => data };
 }
 function receipt() { return new Response(JSON.stringify({ coinsAwarded: 100, isFirstAttempt: false })); }
-async function start() { fireEvent.click(await screen.findByRole('button', { name: /Start Challenge|Bắt đầu/i })); }
+async function start() { await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Start Challenge|Bắt đầu/i })); }); }
 async function finish(result = history) { let saved = false; await act(async () => { saved = await mocks.finish!(result); }); return saved; }
 function listener(ref: string) { return mocks.listeners.filter(item => item.ref === ref).at(-1)!; }
 beforeEach(() => {
   vi.clearAllMocks(); mocks.listeners = []; mocks.initialError = ''; mocks.lang = 'en'; mocks.examId = 'exam'; mocks.finish = null; mocks.db = 'database'; mocks.holdSnapshot = false;
   mocks.user = { uid: 'player', getIdToken: async () => 'fixture' };
   mocks.request.mockImplementation(async () => receipt());
+  mocks.startRequest.mockImplementation(async (_url: string, init: RequestInit) => new Response(init.body as string));
   mocks.chat.mockResolvedValue({ ok: true, data: { aiResponse: 'Review explanation' } });
-  localStorage.clear(); vi.stubGlobal('fetch', mocks.request);
+  localStorage.clear(); vi.stubGlobal('fetch', (url: string, init: RequestInit) => url.endsWith('/start') ? mocks.startRequest(url, init) : mocks.request(url, init));
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+it('waits for server start, suppresses duplicate starts and retries response loss with the same clock ID', async () => {
+  render(<ArenaDetailPage />);
+  let reject!: (error: Error) => void;
+  mocks.startRequest.mockImplementationOnce(() => new Promise((_, fail) => { reject = fail; }));
+  const button = screen.getByRole('button', { name: /Start Challenge/i });
+  await act(async () => { fireEvent.click(button); fireEvent.click(button); });
+  expect(mocks.startRequest).toHaveBeenCalledTimes(1);
+  expect(screen.queryByRole('button', { name: 'Mock Guru' })).toBeNull();
+  await act(async () => reject(new Error('lost response')));
+  await start();
+  expect(mocks.startRequest.mock.calls[1][1].body).toBe(mocks.startRequest.mock.calls[0][1].body);
+  expect(screen.getByRole('button', { name: 'Mock Guru' })).toBeTruthy();
+});
+it('replaces an expired start ID on the next user retry', async () => {
+  mocks.startRequest.mockResolvedValueOnce(new Response(JSON.stringify({ code: 'APP-REQUEST-CONFLICT' }), { status: 409 }));
+  render(<ArenaDetailPage />); await start();
+  expect(screen.queryByRole('button', { name: 'Mock Guru' })).toBeNull();
+  await start();
+  expect(mocks.startRequest.mock.calls[1][1].body).not.toBe(mocks.startRequest.mock.calls[0][1].body);
+});
+it('ignores a delayed start response after the account changes', async () => {
+  let resolve!: (response: Response) => void;
+  mocks.startRequest.mockImplementationOnce(() => new Promise(done => { resolve = done; }));
+  const view = render(<ArenaDetailPage />); await start();
+  const init = mocks.startRequest.mock.calls[0][1];
+  mocks.user = { uid: 'other', getIdToken: async () => 'other-token' }; view.rerender(<ArenaDetailPage />);
+  expect(init.signal.aborted).toBe(true);
+  await act(async () => resolve(new Response(init.body)));
+  expect(screen.queryByRole('button', { name: 'Mock Guru' })).toBeNull();
+});
 
 it('freezes ID, answers and duration for retry, suppresses concurrent saves, and gives every retake a new ID', async () => {
   render(<ArenaDetailPage />); await start();
@@ -64,9 +96,9 @@ it('freezes ID, answers and duration for retry, suppresses concurrent saves, and
   await act(async () => { reject(new Error('disconnected')); await first; });
   expect(await finish({ ...history, totalTime: 99, quizResults: [{ ...history.quizResults[0], userAnswer: '3' }] })).toBe(true);
   expect(mocks.request.mock.calls[1][1].body).toBe(mocks.request.mock.calls[0][1].body);
-  expect(JSON.parse(mocks.request.mock.calls[1][1].body).duration).toBe(1);
-  fireEvent.click(screen.getByRole('button', { name: 'Retake same' })); await finish();
-  fireEvent.click(screen.getByRole('button', { name: 'Retake new' })); await finish();
+  expect(JSON.parse(mocks.request.mock.calls[1][1].body).duration).toBeUndefined();
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Retake same' })); }); await finish();
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Retake new' })); }); await finish();
   expect(new Set([0, 2, 3].map(index => JSON.parse(mocks.request.mock.calls[index][1].body).requestId)).size).toBe(3);
 });
 
@@ -87,8 +119,8 @@ it.each(['account', 'exam', 'unmount'] as const)('ignores a late submission afte
 
 it('does not start a request after account change while obtaining a token', async () => {
   let resolve!: (token: string) => void;
-  mocks.user!.getIdToken = () => new Promise(done => { resolve = done; });
   const view = render(<ArenaDetailPage />); await start();
+  mocks.user!.getIdToken = () => new Promise(done => { resolve = done; });
   let pending!: Promise<boolean>; await act(async () => { pending = mocks.finish!(history); });
   mocks.user = null; view.rerender(<ArenaDetailPage />);
   await act(async () => { resolve('old-token'); expect(await pending).toBe(false); });
@@ -96,8 +128,8 @@ it('does not start a request after account change while obtaining a token', asyn
 });
 
 it.each([['auth/user-token-expired', 'AUTH-INVALID'], ['auth/network-request-failed', 'APP-NETWORK']])('classifies token failure %s without exposing SDK text', async (code, expected) => {
-  mocks.user!.getIdToken = async () => { throw { code, message: 'private auth context' }; };
   render(<ArenaDetailPage />); await start();
+  mocks.user!.getIdToken = async () => { throw { code, message: 'private auth context' }; };
   expect(await finish()).toBe(false);
   expect(mocks.errorToast).toHaveBeenCalledWith({ code: expected, message: '', values: {} }, 'en');
   expect(mocks.request).not.toHaveBeenCalled();

@@ -30,7 +30,7 @@ MessageSquare,
 Sparkles,
 Target
 } from 'lucide-react';
-import React,{ useEffect,useRef,useState } from 'react';
+import React,{ useEffect,useId,useRef,useState } from 'react';
 
 export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: { t: TranslationSet, lang: Language, weakPoints: DashboardStats['processedGroupedInsights'], totalAttempts: number, initialConcept?: string }) {
   const { user } = useUser();
@@ -43,6 +43,7 @@ export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, init
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
+  const cardId = useId();
   const pending = useRef(false);
   const mounted = useRef(false);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
@@ -180,43 +181,43 @@ export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, init
 
         <div className="relative h-[300px] sm:h-[400px] md:h-[500px] perspective-2000">
           <div className="w-full h-full transition-all duration-300 hover:-translate-y-2">
-            <div
+            <button type="button" aria-pressed={isFlipped} aria-describedby={`${cardId}-${isFlipped ? 'back' : 'front'}`} aria-label={isFlipped ? uiMessage(lang, "playgroundview.reverse") : uiMessage(lang, "playgroundview.tap_to_reveal")}
               onClick={() => setIsFlipped(!isFlipped)}
               className={cn(
-                "w-full h-full relative preserve-3d transition-transform duration-700 cursor-pointer",
+                "w-full h-full relative preserve-3d transition-transform duration-700 cursor-pointer rounded-[1.2rem] md:rounded-[3rem] focus-visible:outline-4 focus-visible:outline-primary focus-visible:outline-offset-4",
                 isFlipped && "rotate-y-180"
               )}
             >
               {/* Front Side */}
-              <div className="absolute inset-0 backface-hidden p-6 md:p-12 flex flex-col items-center justify-center text-center bg-card border-[3px] md:border-[5px] border-border rounded-[1.2rem] md:rounded-[3rem] shadow-duo group">
-                <div className="w-10 h-10 md:w-16 md:h-16 rounded-xl md:rounded-[1.2rem] bg-primary/10 flex items-center justify-center border-[2px] md:border-[3px] border-primary/20 shrink-0 mb-4 md:mb-6 group-hover:scale-110 transition-transform">
+              <span aria-hidden={isFlipped} className="absolute inset-0 backface-hidden p-6 md:p-12 flex flex-col items-center justify-center text-center bg-card border-[3px] md:border-[5px] border-border rounded-[1.2rem] md:rounded-[3rem] shadow-duo group">
+                <span className="w-10 h-10 md:w-16 md:h-16 rounded-xl md:rounded-[1.2rem] bg-primary/10 flex items-center justify-center border-[2px] md:border-[3px] border-primary/20 shrink-0 mb-4 md:mb-6 group-hover:scale-110 transition-transform">
                   <MessageSquare className="w-5 h-5 md:w-8 md:h-8 text-primary" />
-                </div>
-                <div className="flex-1 flex flex-col justify-center w-full min-h-0 overflow-y-auto custom-scrollbar px-2">
-                  <h3 className="text-lg sm:text-2xl md:text-3xl font-headline font-black leading-tight text-foreground uppercase tracking-tight">
+                </span>
+                <span className="flex-1 flex flex-col justify-center w-full min-h-0 overflow-y-auto custom-scrollbar px-2">
+                  <span id={`${cardId}-front`} className="text-lg sm:text-2xl md:text-3xl font-headline font-black leading-tight text-foreground uppercase tracking-tight">
                     <LatexText text={card.front} />
-                  </h3>
-                </div>
-                <p className="text-[7px] md:text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40 animate-pulse mt-3 md:mt-4">
+                  </span>
+                </span>
+                <span className="text-[7px] md:text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40 animate-pulse mt-3 md:mt-4">
                   {uiMessage(lang, "playgroundview.tap_to_reveal")}
-                </p>
-              </div>
+                </span>
+              </span>
 
               {/* Back Side */}
-              <div className="absolute inset-0 backface-hidden rotate-y-180 p-6 md:p-12 flex flex-col items-center justify-center text-center bg-primary/5 border-[3px] md:border-[5px] border-primary/30 rounded-[1.2rem] md:rounded-[3rem] shadow-duo">
-                <div className="w-10 h-10 md:w-16 md:h-16 rounded-xl md:rounded-[1.2rem] bg-primary/20 flex items-center justify-center border-[2px] md:border-[3px] border-primary/30 shrink-0 mb-4 md:mb-6">
+              <span aria-hidden={!isFlipped} className="absolute inset-0 backface-hidden rotate-y-180 p-6 md:p-12 flex flex-col items-center justify-center text-center bg-primary/5 border-[3px] md:border-[5px] border-primary/30 rounded-[1.2rem] md:rounded-[3rem] shadow-duo">
+                <span className="w-10 h-10 md:w-16 md:h-16 rounded-xl md:rounded-[1.2rem] bg-primary/20 flex items-center justify-center border-[2px] md:border-[3px] border-primary/30 shrink-0 mb-4 md:mb-6">
                   <Sparkles className="w-5 h-5 md:w-8 md:h-8 text-primary" />
-                </div>
-                <div className="flex-1 flex flex-col justify-center w-full min-h-0 overflow-y-auto custom-scrollbar px-2 italic">
-                  <div className="text-sm sm:text-lg md:text-2xl font-bold leading-relaxed text-foreground whitespace-pre-wrap">
+                </span>
+                <span className="flex-1 flex flex-col justify-center w-full min-h-0 overflow-y-auto custom-scrollbar px-2 italic">
+                  <span id={`${cardId}-back`} className="text-sm sm:text-lg md:text-2xl font-bold leading-relaxed text-foreground whitespace-pre-wrap">
                     <LatexText text={card.back} />
-                  </div>
-                </div>
-                <p className="text-[7px] md:text-[10px] font-black uppercase tracking-[0.3em] text-primary opacity-60 mt-3 md:mt-4">
+                  </span>
+                </span>
+                <span className="text-[7px] md:text-[10px] font-black uppercase tracking-[0.3em] text-primary opacity-60 mt-3 md:mt-4">
                   {uiMessage(lang, "playgroundview.reverse")}
-                </p>
-              </div>
-            </div>
+                </span>
+              </span>
+            </button>
           </div>
         </div>
 
@@ -342,4 +343,3 @@ export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, init
     </Card>
   );
 }
-

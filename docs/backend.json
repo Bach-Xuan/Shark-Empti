@@ -394,12 +394,49 @@
           "type": "number"
         },
         "duration": {
-          "type": "number"
+          "type": "number",
+          "description": "Server-observed elapsed seconds for timingVersion 1."
+        },
+        "timingVersion": {
+          "type": "integer",
+          "const": 1,
+          "description": "Absent on legacy attempts, which are excluded from the timed leaderboard."
         },
         "createdAt": {
           "$ref": "#/$defs/FirestoreTimestamp"
         }
       }
+    },
+    "ArenaSession": {
+      "title": "Private Arena timing session",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string"
+        },
+        "examId": {
+          "type": "string"
+        },
+        "startedAtMs": {
+          "type": "integer",
+          "description": "Server-observed Unix milliseconds; start retries preserve this value."
+        },
+        "examFingerprint": {
+          "type": "string"
+        },
+        "answerFingerprint": {
+          "type": "string",
+          "description": "Written only after the session is consumed."
+        },
+        "result": {
+          "type": "object",
+          "description": "Stored submission response for idempotent replay after session consumption."
+        },
+        "expiresAt": {
+          "$ref": "#/$defs/FirestoreTimestamp"
+        }
+      },
+      "description": "User/exam-bound server start, question fingerprint, consumed answer fingerprint/result and 24-hour expiry. Admin only."
     },
     "RequestReceipt": {
       "title": "Idempotency receipt",
@@ -443,6 +480,14 @@
       ],
       "description": "The server derives author identity from Admin Auth, validates the full configuration/question contract and commits the public exam with its receipt transactionally. Browser creation and update are denied by Rules."
     },
+    "arenaStart": {
+      "method": "POST",
+      "path": "/api/arena/{examId}/start",
+      "authentication": "Firebase ID token in Authorization: Bearer header",
+      "request": { "requestId": "required UUID" },
+      "writes": ["/_arenaSessions/{hash}"],
+      "description": "Server-observed start; retries preserve the original clock. User/exam-bound with a question fingerprint and 24-hour logical expiry."
+    },
     "arenaSubmit": {
       "method": "POST",
       "path": "/api/arena/{examId}/submit",
@@ -450,16 +495,16 @@
       "authentication": "Firebase ID token in Authorization: Bearer header",
       "request": {
         "answers": "string[]; maximum 500 entries, each maximum 2000 characters",
-        "duration": "optional finite number; rounded and clamped to zero; currently client-supplied",
-        "requestId": "optional UUID; enables idempotent replay"
+        "requestId": "required UUID of an acknowledged start"
       },
       "writes": [
         "/arenaExams/{examId}/attempts/{attemptId}",
         "/arenaExams/{examId}.totalAttempts",
         "/users/{uid}.sharkCoins",
-        "/_requestReceipts/{hash} when requestId is supplied"
+        "/_requestReceipts/{hash}",
+        "/_arenaSessions/{hash}"
       ],
-      "description": "Score, attempt creation, attempt count, reward and receipt are committed in one Admin transaction. Client-supplied duration is not a trusted server measurement."
+      "description": "Derives elapsed time from the server session. Score, attempt, reward, consumed session and receipt commit atomically. Client duration is ignored. Only timingVersion 1 attempts rank, ordered by score DESC, duration ASC, document ID ASC before limit 10."
     },
     "forumCommentCreate": {
       "method": "POST",
@@ -549,7 +594,7 @@
     },
     "/users/{uid}/activity/main": {
       "schema": "UserActivity",
-      "description": "Private active-day map read/written by useUserActivity."
+      "description": "Owner-only activity. Each write merges precisely one activeDays date leaf and updatedAt; account snapshots are isolated."
     },
     "/users/{uid}/flashcards/{id}": {
       "schema": "FlashcardSession",
@@ -574,6 +619,10 @@
     "/arenaExams/{examId}/attempts/{attemptId}": {
       "schema": "ArenaAttempt",
       "description": "Public leaderboard attempts; server-created."
+    },
+    "/_arenaSessions/{hash}": {
+      "schema": "ArenaSession",
+      "description": "Admin-only server timing; expiresAt TTL declared, production activation must be verified."
     },
     "/_requestReceipts/{hash}": {
       "schema": "RequestReceipt",

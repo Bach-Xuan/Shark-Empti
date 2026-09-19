@@ -137,7 +137,7 @@ export function DashboardInsightList({ title, icon, data, type, t, onCopy, isCop
                           variant="outline"
                           onClick={() => onAction(group.topic, 'flashcards')}
                           className="h-7 w-7 md:h-10 md:w-10 p-0 rounded-lg md:rounded-xl border-2 hover:bg-primary/5 bg-card btn-duo shadow-none flex items-center justify-center"
-                          title={t.reviewWithFlashcards}
+                          aria-label={t.reviewWithFlashcards} title={t.reviewWithFlashcards}
                         >
                           <Gamepad2 className="w-4 h-4 md:w-5 md:h-5" />
                         </Button>
@@ -145,7 +145,7 @@ export function DashboardInsightList({ title, icon, data, type, t, onCopy, isCop
                           size="sm"
                           onClick={() => onAction(group.topic, 'practice')}
                           className="h-7 w-7 md:h-10 md:w-10 p-0 rounded-lg md:rounded-xl bg-primary text-white border-2 border-white/20 btn-duo shadow-none flex items-center justify-center"
-                          title={t.fixMyWeakness}
+                          aria-label={t.fixMyWeakness} title={t.fixMyWeakness}
                         >
                           <Zap className="w-4 h-4 md:w-5 md:h-5" />
                         </Button>

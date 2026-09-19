@@ -50,7 +50,7 @@ export default function FeatureHelp({ title, items, helpTitle, storageKey }: Fea
           <TooltipTrigger asChild>
             <DialogTrigger asChild>
               <Button
-                variant="ghost"
+                aria-label={`${helpTitle}: ${title}`} variant="ghost"
                 size="icon"
                 className="h-6 w-6 md:h-8 md:w-8 rounded-full hover:bg-primary/10 transition-all border-2 border-transparent active:scale-90"
               >

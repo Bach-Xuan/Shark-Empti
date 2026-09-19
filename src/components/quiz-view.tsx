@@ -431,7 +431,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
                 <div className="text-xs md:text-lg text-primary font-black mt-4 flex items-start gap-3 md:gap-4 bg-primary/10 p-4 md:p-6 rounded-2xl md:rounded-3xl border-[3px] border-primary/20 animate-in zoom-in-95 duration-300">
                   <Sparkles className="w-5 h-5 md:w-8 md:h-8 shrink-0 mt-0.5 text-primary" />
                   <div className="text-foreground">
-                    <span className="text-primary/70 uppercase text-[9px] md:text-10px tracking-widest block mb-1">{t.sharkFeedback}</span>
+                    <span className="text-primary/70 uppercase text-[9px] md:text-[10px] tracking-widest block mb-1">{t.sharkFeedback}</span>
                     <div className="whitespace-normal break-words">
                       <LatexText text={currentFeedback.aiFeedback} />
                     </div>

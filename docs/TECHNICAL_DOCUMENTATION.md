@@ -77,7 +77,8 @@ Playground generates and saves flashcard/practice sessions in user subcollection
 | `posts/{postId}` | post, author, counters, likes, timestamps | Public read; constrained client create/edit/like; Admin cascade delete |
 | `posts/{postId}/comments/{commentId}` | comment, author, likes, timestamps | Read only under a live, non-tombstoned parent; Admin create/delete; constrained client edit/like |
 | `arenaExams/{examId}` | title, config, questions, author, `totalAttempts` | Public read; authenticated server creation; owner client delete; browser create/update denied by Rules |
-| `arenaExams/{examId}/attempts/{attemptId}` | user, score, duration, timestamp | Public read; Admin create only |
+| `arenaExams/{examId}/attempts/{attemptId}` | user, score, server duration, timing version, timestamp | Public read; Admin create only |
+| `_arenaSessions/{hash}` | UID, exam, server start, question fingerprint, consumed result, expiry | Admin only; 24-hour logical expiry |
 | `_requestReceipts/{hash}` | fingerprint, result, createdAt, expiresAt | Admin-only; no client grant |
 | `_aiGenerations/{generationId}` | owner, operation, fingerprint, validated input while active, attempt leases/outcomes, recoverable validated result/error, expiresAt | Admin-only; explicit client deny |
 | `_aiQuota/{scope}` | rolling-window usage, active generation reservations, expiresAt | Admin-only; explicit client deny |
@@ -89,7 +90,7 @@ The `users/{uid}/history` reader uses Zod with defaults for selected legacy omis
 
 ### 3.2. 📅 Dates and Timestamps
 
-- Profile, notes, posts, comments, Arena exams/attempts, receipts, AI generations and AI quota records mainly use native Firestore/server timestamps.
+- Profile, notes, posts, comments, Arena exams/attempts, Arena timing sessions, receipts, AI generations and AI quota records mainly use native Firestore/server timestamps.
 - Quiz history, flashcards and practice sessions currently write ISO strings.
 - `StoredDate`/format adapters accept the persisted representations needed by the UI.
 - Never change date representation or backfill production data by editing `backend.json` alone.
@@ -99,8 +100,8 @@ The `users/{uid}/history` reader uses Zod with defaults for selected legacy omis
 - Quiz and practice await stable-ID saves before completion. Flashcard archival is awaited but failure leaves generated cards usable with an error notice.
 - An object containing nested `undefined` can be rejected by Firestore.
 - Post deletion now uses an authenticated server cascade with an atomic parent-removal/tombstone transaction. Local Rules deny comment reads when the parent is absent or tombstoned, including pre-existing orphans. These protections require deployment of the updated Rules; old orphan records are not silently migrated or deleted by this code change.
-- New receipts have seven-day `expiresAt` and remain replayable until asynchronous deletion. AI generations use a 24-hour local/staging retention hypothesis, while AI quota documents expire after their rolling-window recovery period. TTL field settings for all three internal collections are declared in `firestore.indexes.json`; deployed activation remains unverified. A recorded metadata check found receipt TTL disabled and the posts index missing; an historical configuration attempt failed with IAM 403. `scripts/inspect-firestore.mjs` now reads the posts index and all three deployed TTL policies without modifying them. `scripts/receipt-retention.ts` independently inventories legacy receipts and backfills missing receipt expiry only with `--apply`.
-- `activeDays` writes the complete map from local state, so concurrent tabs/devices can overwrite one another's dates.
+- New receipts have seven-day `expiresAt` and remain replayable until asynchronous deletion. AI generations use a 24-hour local/staging retention hypothesis, while AI quota documents expire after their rolling-window recovery period. Arena timing sessions have a 24-hour logical lifetime. TTL field settings for all four internal collections are declared in `firestore.indexes.json`; deployed activation remains unverified. A recorded metadata check found receipt TTL disabled and the posts index missing; an historical configuration attempt failed with IAM 403. `scripts/inspect-firestore.mjs` reads posts/Arena index metadata and all four deployed TTL policies without modifying them. `scripts/receipt-retention.ts` independently inventories legacy receipts and backfills missing receipt expiry only with `--apply`.
+- `activeDays` writes use an explicit mask for the current date leaf and `updatedAt`, independently of cached maps. Emulator tests cover stale-device ordering and offline reconciliation; the day is still based on the user's local calendar.
 
 These limitations are tracked in the audit; a descriptive data-map edit does not change finding status.
 
@@ -114,25 +115,28 @@ The client uses `GoogleAuthProvider` with popup sign-in. Successful sign-in merg
 
 Outside the Emulator, `src/lib/firebase-admin.ts` initializes from `FIREBASE_ADMIN_PROJECT_ID`, `FIREBASE_ADMIN_CLIENT_EMAIL` and `FIREBASE_ADMIN_PRIVATE_KEY`. In the Emulator, both Auth and Firestore host variables must exist and the project must start with `demo-`. Admin SDK bypasses Firestore Rules; API code owns authorization and validation.
 
-### 4.3. 🏆 Arena Submit API
+### 4.3. 🏆 Arena Start and Submit APIs
 
 `POST /api/arena` is the authenticated creation boundary. It validates the entire configuration and every question, including question-count consistency and numeric short-answer semantics, and derives author identity from Admin Auth. Direct browser exam creation/update is denied by Rules; an idempotency receipt protects retries of the same generated exam. Shared persisted-data readers reject unsafe records before rendering or scoring and tolerate missing nonessential legacy presentation metadata. Invalid records are excluded from mixed feeds with a visible error instead of failing the entire page.
+
+`POST /api/arena/{examId}/start` accepts `{ requestId: string }` (UUID). It creates a private, user/exam-bound session with a server clock and a question fingerprint. Retrying a start retains the original clock. Sessions expire after 24 hours. The client enters the quiz only after start acknowledgement.
 
 `POST /api/arena/{examId}/submit`
 
 ```ts
 {
   answers: string[];       // maximum 500; each string maximum 2,000 characters
-  duration?: number;       // finite; currently supplied by the client
-  requestId?: string;      // UUID; current client sends it for idempotent retry
+  requestId: string;       // UUID from the authenticated start request; required
 }
 ```
 
 The server reads the exam in a transaction, rejects exams without a trusted numeric-answer contract, calculates score, creates an attempt, increments `totalAttempts`, increments coins and writes the receipt in the same transaction. The same UID/scope/requestId and fingerprint returns the saved result; the same ID with a different payload returns `409 APP-REQUEST-CONFLICT`.
 
-Initial start and both retake controls share attempt initialization. Transport retries retain the exact serialized answers, duration and request ID; a retake clears that snapshot and receives a new ID. Account/exam changes and unmount revoke pending client completions. Exam and leaderboard subscription failures retain localized safe diagnostics and offer resubscription. Guru assistance is disabled with an explanation during an Arena attempt and is available through the contextual chatbot after completion.
+Initial start and both retake controls share attempt initialization. Transport retries retain the exact serialized answers and request ID; a retake clears that snapshot and receives a new ID. Account/exam changes and unmount revoke pending client completions. Exam and leaderboard subscription failures retain localized safe diagnostics and offer resubscription. Guru assistance is disabled with an explanation during an Arena attempt and is available through the contextual chatbot after completion.
 
-Duration is currently only rounded and clamped to zero; it is not corroborated by a server-observed timer but participates in leaderboard tie-breaking. This remains an open integrity limitation.
+Elapsed seconds are derived from server-observed start and submission receipt times, rounded upward with a one-second minimum; client `duration` values are ignored. The interval includes transport and any feedback processing before submission, not just active answering. An absent, expired, mismatched or revised-exam session is rejected; the consumed session and receipt prevent duplicate attempts and rewards. This establishes timing authority, not proof that a participant did not pre-read public exam questions.
+
+Only attempts with `timingVersion: 1` enter the leaderboard. The Firestore query orders score descending, duration ascending and document ID ascending before `limit(10)`. Legacy attempts remain stored without retroactive timing claims. The matching index and session TTL policy are declared locally; production readiness must be checked separately. The 50-coin pioneer bonus belongs to the first successful submission globally for each exam, as stated in both locales.
 
 ### 4.4. 💬 Forum Comment API
 
@@ -273,7 +277,7 @@ Do not add a dependency for behavior already supported by the platform/current N
 | Production smoke | `npm run test:production` | Six page routes, referenced script chunks, bundle budgets and unauthenticated Arena/AI API behavior |
 | Bundle/performance | `npm run report:bundle`, `npm run report:performance` | Build inventory and synthetic dataset baseline; not browser interaction timing |
 | Dependency assessment | `npm run audit:dependencies` | Current lockfile query against npm's advisory endpoint; writes a report and has no checked-in exception policy |
-| Infrastructure metadata | `node scripts/inspect-firestore.mjs` | Read-only deployed posts index and receipt/AI TTL inspection |
+| Infrastructure metadata | `node scripts/inspect-firestore.mjs` | Read-only deployed posts/Arena index and receipt/AI/Arena-session TTL inspection |
 | Receipt expiry inventory | `node --conditions=react-server --env-file=.env --import tsx scripts/receipt-retention.ts` | Read-only by default; `--apply` only backfills missing expiry values |
 | Browser/camera/query comparison | No checked-in command | Historical evidence is not reproducible from this checkout |
 | Live AI adapter | `npm run ai:smoke` | Live OpenRouter and operation schemas; quota/cost possible; does not exercise auth, ledger or recovery |

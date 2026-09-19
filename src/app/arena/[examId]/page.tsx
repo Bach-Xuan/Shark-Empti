@@ -19,16 +19,13 @@ import { Card } from '@/components/ui/card';
 import { useFirestore,useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { isTrustedArenaExam } from '@/lib/arena-scoring';
+import { arenaLeaderboardQuery } from '@/lib/arena-leaderboard';
 import { translations,TranslationSet } from '@/lib/translations';
 import { ArenaAttempt,ArenaExam,QuizAnalysis,QuizHistoryItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import {
-collection,
 doc,
-limit,
 onSnapshot,
-orderBy,
-query
 } from 'firebase/firestore';
 import {
 ArrowLeft,
@@ -70,6 +67,10 @@ function ArenaDetailSession({ examId }: { examId: string }) {
   const [earnedCoins, setEarnedCoins] = useState(0);
   const pendingSubmission = useRef<{ body: string; results: QuizHistoryItem } | null>(null);
   const submitting = useRef(false);
+  const starting = useRef(false);
+  const [isStarting, setIsStarting] = useState(false);
+  const pendingStart = useRef<string | null>(null);
+  const activeAttempt = useRef<string | null>(null);
   const mounted = useRef(false);
   const requestController = useRef<AbortController | null>(null);
   const [examError, setExamError] = useState<AppError | null>(null);
@@ -112,17 +113,12 @@ function ArenaDetailSession({ examId }: { examId: string }) {
   useEffect(() => {
     if (!examId || !db) return;
     let active = true;
-    const leaderboardRef = collection(db, 'arenaExams', examId, 'attempts');
-    const q = query(leaderboardRef, orderBy('score', 'desc'), limit(10));
+    const q = arenaLeaderboardQuery(db, examId);
     const unsubLeaderboard = onSnapshot(q, (snapshot) => {
       if (!active) return;
       const parsed = snapshot.docs.map(item => readArenaAttempt(item.id, item.data()));
       const data = parsed.filter((item): item is ArenaAttempt => item !== null);
       setLeaderboardError(data.length !== parsed.length ? createAppError('ARENA-DATA-INVALID', '') : null);
-      data.sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
-        return a.duration - b.duration;
-      });
       setLeaderboard(data);
     }, (error) => {
       if (!active) return;
@@ -135,13 +131,46 @@ function ArenaDetailSession({ examId }: { examId: string }) {
 
   const t: TranslationSet = translations[lang];
   const copy = arenaDetailMessages[lang];
-  const startAttempt = () => {
+  const startAttempt = async () => {
+    if (authLoading) return;
     if (!user) { router.push('/login'); return; }
-    if (!exam || examError || submitting.current) return;
-    pendingSubmission.current = null;
-    setLastResults(null);
-    setEarnedCoins(0);
-    setView('quiz');
+    if (!exam || examError || submitting.current || starting.current) return;
+    starting.current = true;
+    setIsStarting(true);
+    pendingStart.current ??= crypto.randomUUID();
+    const requestId = pendingStart.current;
+    const controller = new AbortController();
+    requestController.current = controller;
+    try {
+      const token = await user.getIdToken();
+      if (!mounted.current || controller.signal.aborted) return;
+      const response = await fetch(`/api/arena/${encodeURIComponent(examId)}/start`, {
+        method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId }), signal: controller.signal,
+      });
+      const body: unknown = await response.json().catch(() => null);
+      if (!mounted.current || controller.signal.aborted) return;
+      if (!response.ok) {
+        if (response.status === 409) pendingStart.current = null;
+        showErrorToast(arenaResponseError(body, response.status), currentLanguage.current);
+        return;
+      }
+      if (!body || typeof body !== 'object' || !('requestId' in body) || body.requestId !== requestId) {
+        showErrorToast(createAppError('APP-DATA-INVALID', ''), currentLanguage.current);
+        return;
+      }
+      activeAttempt.current = requestId;
+      pendingStart.current = null;
+      pendingSubmission.current = null;
+      setLastResults(null);
+      setEarnedCoins(0);
+      setView('quiz');
+    } catch {
+      if (mounted.current && !controller.signal.aborted) showErrorToast(createAppError('APP-NETWORK', ''), currentLanguage.current);
+    } finally {
+      starting.current = false;
+      if (mounted.current) setIsStarting(false);
+    }
   };
 
   const handleFinishQuiz = async (results: Omit<QuizHistoryItem, 'date' | 'lang'>, analysis?: QuizAnalysis) => {
@@ -149,10 +178,10 @@ function ArenaDetailSession({ examId }: { examId: string }) {
       showUnexpectedErrorToast('AUTH-REQUIRED', '', {}, lang);
       return false;
     }
-    if (!mounted.current || !db || !exam || submitting.current) return false;
+    if (!mounted.current || !db || !exam || !activeAttempt.current || submitting.current) return false;
     submitting.current = true;
     pendingSubmission.current ??= {
-      body: JSON.stringify({ answers: results.quizResults.map(result => result.userAnswer), duration: results.totalTime, requestId: crypto.randomUUID() }),
+      body: JSON.stringify({ answers: results.quizResults.map(result => result.userAnswer), requestId: activeAttempt.current }),
       results: { ...results, ...(analysis ? { analysis } : {}), date: new Date().toISOString(), lang },
     };
     const pending = pendingSubmission.current;
@@ -249,7 +278,7 @@ function ArenaDetailSession({ examId }: { examId: string }) {
                   <div className="pt-10 flex flex-col md:flex-row items-center gap-6">
                     <Button
                       onClick={startAttempt}
-                      disabled={isLegacyExam || authLoading || !!examError}
+                      disabled={isStarting || isLegacyExam || authLoading || !!examError}
                       className="w-full md:w-auto h-16 md:h-24 px-12 md:px-20 rounded-[1.5rem] md:rounded-[3rem] btn-duo bg-primary text-white font-headline font-black text-xl md:text-3xl uppercase tracking-widest border-4 border-white/20 gap-4"
                     >
                       <PlayCircle className="w-8 h-8 md:w-12 md:h-12" /> {isLegacyExam ? uiMessage(lang, "arena.legacy_exam_unavailable") : !user ? uiMessage(lang, 'arena.sign_in_to_start') : t.takeExam}
@@ -291,6 +320,7 @@ function ArenaDetailSession({ examId }: { examId: string }) {
                 <Medal className="w-6 h-6 md:w-10 md:h-10 text-primary" />
                 <h2 className="text-xl md:text-4xl font-headline font-black text-foreground uppercase tracking-tight">{t.leaderboard}</h2>
               </div>
+              <p className="px-2 text-sm text-muted-foreground">{copy.ranking}</p>
 
               <Card className="card-duo overflow-hidden border-border bg-card">
                  {leaderboardError && <SubscriptionError error={leaderboardError} label={copy.leaderboard} lang={lang} onRetry={() => setLeaderboardRetry(value => value + 1)} />}

@@ -18,6 +18,7 @@ import { translations,TranslationSet } from '@/lib/translations';
 import { Language } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Check,Languages,Loader2,Moon,Sun } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import React,{ useEffect } from 'react';
 
@@ -95,7 +96,7 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
         isVisible ? "translate-y-0" : "-translate-y-full"
       )}>
         <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
-          <div className="flex items-center gap-2 md:gap-3 cursor-pointer group active:scale-95 transition-all" onClick={() => router.push('/')}>
+          <Link href="/" aria-label={t.home} className="flex items-center gap-2 md:gap-3 cursor-pointer group active:scale-95 transition-all">
             <LogoComponent className="w-8 h-8 md:w-10 md:h-10 transition-all group-hover:scale-110" />
             <div className="flex flex-col">
               <div className="flex items-baseline gap-1.5 md:gap-2">
@@ -106,11 +107,11 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
                 {t.appTagline}
               </span>
             </div>
-          </div>
+          </Link>
           <div className="flex items-center gap-3">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="rounded-2xl hover:bg-muted h-10 px-3 md:h-12 md:px-5 border-[3px] border-transparent hover:border-border transition-all btn-duo bg-card">
+                <Button aria-label={uiMessage(lang, "navigation.language")} variant="ghost" className="rounded-2xl hover:bg-muted h-10 px-3 md:h-12 md:px-5 border-[3px] border-transparent hover:border-border transition-all btn-duo bg-card">
                   <Languages className="w-5 h-5 text-primary" />
                   <span className="text-xs font-black uppercase tracking-widest hidden md:inline">
                     {uiMessage(lang, "auth.english")}
@@ -129,7 +130,7 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Button variant="ghost" size="icon" onClick={toggleTheme} className="rounded-2xl hover:bg-muted h-10 w-10 md:h-12 md:w-12 border-[3px] border-transparent hover:border-border transition-all btn-duo bg-card">
+            <Button aria-label={uiMessage(lang, "navigation.toggle_theme")} variant="ghost" size="icon" onClick={toggleTheme} className="rounded-2xl hover:bg-muted h-10 w-10 md:h-12 md:w-12 border-[3px] border-transparent hover:border-border transition-all btn-duo bg-card">
               {theme === 'light' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5 text-primary" />}
             </Button>
           </div>

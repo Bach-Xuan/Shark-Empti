@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useLanguageState,useThemeState } from '@/components/app-preferences';
 import { PageControls } from '@/components/page-controls';
 import { usePagedCollection } from '@/hooks/use-paged-collection';
@@ -228,8 +229,8 @@ export default function ArenaPage() {
                 {exams.map((exam) => (
                   <Card
                     key={exam.id}
-                    className="card-duo p-6 md:p-10 hover:-translate-y-2 cursor-pointer transition-all bg-card border-border/50 group"
-                    onClick={() => router.push(`/arena/${exam.id}`)}
+                    className="card-duo p-6 md:p-10 hover:-translate-y-2 transition-all bg-card border-border/50 group"
+
                   >
                     <div className="space-y-6">
                       <div className="flex items-start justify-between gap-4">
@@ -242,7 +243,7 @@ export default function ArenaPage() {
                       </div>
 
                       <h2 className="text-xl md:text-3xl font-headline font-black text-foreground uppercase tracking-tight group-hover:text-primary transition-colors line-clamp-2">
-                        {exam.title}
+                        <Link href={`/arena/${exam.id}`} className="focus-visible:outline-2 focus-visible:outline-primary">{exam.title}</Link>
                       </h2>
 
                       <div className="grid grid-cols-2 gap-3">

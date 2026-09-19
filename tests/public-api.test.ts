@@ -85,7 +85,7 @@ describe('public server boundaries', () => {
   });
   it('rejects corrupt persisted exam before scoring, counter updates, or rewards', async () => {
     rows.set('arenaExams/exam', { authorId: 'owner', questions: [null], totalAttempts: 'bad' });
-    expect((await submitExam(request({ answers: ['4'] }), examParams)).status).toBe(409);
+    expect((await submitExam(request({ answers: ['4'], requestId: crypto.randomUUID() }), examParams)).status).toBe(409);
     expect([...rows.keys()]).toEqual(['posts/post', 'arenaExams/exam']);
   });
   it('rejects corrupt parents before comment creation or deletion and handles absent parents', async () => {

@@ -394,12 +394,12 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
           </CardTitle>
           <div className="flex gap-2 md:gap-4 shrink-0">
             {!isEditingNotes && personalNotes && (
-              <Button variant="outline" size="sm" onClick={() => handleCopySection('notes')} className="btn-duo font-black h-10 w-10 md:h-14 md:w-14 p-0 rounded-xl md:rounded-2xl border-2 md:border-[3px] flex items-center justify-center bg-card shadow-none">
+              <Button aria-label={t.copy} variant="outline" size="sm" onClick={() => handleCopySection('notes')} className="btn-duo font-black h-10 w-10 md:h-14 md:w-14 p-0 rounded-xl md:rounded-2xl border-2 md:border-[3px] flex items-center justify-center bg-card shadow-none">
                 {activeCopiedId === 'notes' ? <Check className="w-4 h-4 md:w-6 md:h-6 text-green-500" /> : <Copy className="w-4 h-4 md:w-6 md:h-6" />}
               </Button>
             )}
             {!isEditingNotes && (
-              <Button variant="outline" size="sm" onClick={() => { setTempNotesContent(personalNotes); setIsEditingNotes(true); }} className="btn-duo font-black h-10 w-10 md:h-14 md:w-14 p-0 rounded-xl md:rounded-2xl border-2 md:border-[3px] text-primary flex items-center justify-center bg-card shadow-none">
+              <Button aria-label={t.edit} variant="outline" size="sm" onClick={() => { setTempNotesContent(personalNotes); setIsEditingNotes(true); }} className="btn-duo font-black h-10 w-10 md:h-14 md:w-14 p-0 rounded-xl md:rounded-2xl border-2 md:border-[3px] text-primary flex items-center justify-center bg-card shadow-none">
                 <Pencil className="w-4 h-4 md:w-6 md:h-6" />
               </Button>
             )}
@@ -536,7 +536,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                                 <LatexText text={group.topic} />
                               </h4>
                               {isTopicDone && (
-                                <span className="text-[8px] md:text-10px font-black uppercase text-green-500 tracking-widest animate-pulse"><UiText id="completed" /></span>
+                                <span className="text-[8px] md:text-[10px] font-black uppercase text-green-500 tracking-widest animate-pulse"><UiText id="completed" /></span>
                               )}
                             </div>
 
@@ -592,33 +592,33 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                 const sessionTopic = lang === 'vi' ? (item.config.topicVi || item.config.topic) : (item.config.topicEn || item.config.topic);
                 return (
                   <Card key={idx} className="card-duo overflow-hidden border-border bg-card hover:border-primary/30 transition-all duration-300 shadow-none">
-                    <div
-                      className="p-3 md:p-8 flex items-center justify-between cursor-pointer group"
+                    <button type="button" aria-expanded={expandedAttemptIdx === idx}
+                      className="w-full p-3 md:p-8 flex items-center justify-between cursor-pointer group"
                       onClick={() => toggleAttemptExpand(idx)}
                     >
-                      <div className="flex items-center gap-3 md:gap-6 flex-1 min-w-0">
-                        <div className="w-8 h-8 md:w-14 md:h-14 rounded-lg md:rounded-2xl bg-muted flex flex-col items-center justify-center border-2 border-border shrink-0">
+                      <span className="flex items-center gap-3 md:gap-6 flex-1 min-w-0">
+                        <span className="w-8 h-8 md:w-14 md:h-14 rounded-lg md:rounded-2xl bg-muted flex flex-col items-center justify-center border-2 border-border shrink-0">
                           <span className="text-[6px] md:text-[10px] font-black uppercase tracking-tighter opacity-60">
                             {new Date(item.date).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', { month: 'short' })}
                           </span>
                           <span className="text-xs md:text-xl font-black leading-none">{new Date(item.date).getDate()}</span>
-                        </div>
-                        <div className="flex flex-col gap-0.5 md:gap-1 min-w-0 flex-1 text-left">
-                          <h4 className="font-headline font-black text-[10px] md:text-xl uppercase tracking-tight text-foreground whitespace-normal break-words leading-tight">
+                        </span>
+                        <span className="flex flex-col gap-0.5 md:gap-1 min-w-0 flex-1 text-left">
+                          <span className="font-headline font-black text-[10px] md:text-xl uppercase tracking-tight text-foreground whitespace-normal break-words leading-tight">
                             <LatexText text={sessionTopic} />
-                          </h4>
-                          <div className="flex items-center gap-2 md:gap-3">
+                          </span>
+                          <span className="flex items-center gap-2 md:gap-3">
                             <span className="text-[6px] md:text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1">
                               <Clock className="w-2 md:w-3 h-2 md:h-3" /> {getStartTime(item.date, item.totalTime)}
                             </span>
                             <span className="text-[6px] md:text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-1">
                               <Target className="w-2 md:w-3 h-2 md:h-3" /> {item.quizResults.filter(r => r.isCorrect).length}/{item.quizResults.length}
                             </span>
-                          </div>
-                        </div>
-                      </div>
+                          </span>
+                        </span>
+                      </span>
                       {expandedAttemptIdx === idx ? <ChevronUp className="w-3 h-3 md:w-6 md:h-6 text-primary shrink-0" /> : <ChevronDown className="w-3 h-3 md:w-6 md:h-6 text-muted-foreground shrink-0" />}
-                    </div>
+                    </button>
                     {expandedAttemptIdx === idx && (
                       <div className="px-4 md:px-8 pb-4 md:pb-8 pt-1 space-y-6 md:space-y-10 border-t-2 md:border-t-[4px] border-border/50 animate-in slide-in-from-top-2 duration-300">
                         <div className="grid grid-cols-2 gap-2 md:gap-4 mt-4">
@@ -714,18 +714,18 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                   <div className="flex flex-col gap-3 md:gap-6">
                     <div className="flex flex-col gap-2 md:gap-3 flex-1 min-w-0 text-left">
                       <div className="flex flex-wrap items-center gap-1.5 md:gap-3">
-                        <div className="px-2 md:px-4 py-1 md:py-2 bg-destructive text-white rounded-lg md:rounded-2xl text-[6px] md:text-10px font-black uppercase tracking-widest border-2 border-white/20 shadow-duo flex items-center gap-1 md:gap-1.5">
+                        <div className="px-2 md:px-4 py-1 md:py-2 bg-destructive text-white rounded-lg md:rounded-2xl text-[6px] md:text-[10px] font-black uppercase tracking-widest border-2 border-white/20 shadow-duo flex items-center gap-1 md:gap-1.5">
                           <AlertCircle className="w-2 md:w-3 h-2 md:h-3" /> {errorCategoryLabel(error.errorCategory, t, lang)}
                         </div>
-                        <div className="px-2 md:px-4 py-1 md:py-2 bg-primary/10 text-primary rounded-lg md:rounded-2xl text-[6px] md:text-10px font-black uppercase tracking-widest border-2 border-primary/20 flex items-center gap-1 md:gap-1.5">
+                        <div className="px-2 md:px-4 py-1 md:py-2 bg-primary/10 text-primary rounded-lg md:rounded-2xl text-[6px] md:text-[10px] font-black uppercase tracking-widest border-2 border-primary/20 flex items-center gap-1 md:gap-1.5">
                           <Target className="w-2 md:w-3 h-2 md:h-3" /> <LatexText text={error.topic} />
                         </div>
                         {error.section && (
-                          <div className="px-2 md:px-4 py-1 md:py-2 bg-muted text-muted-foreground rounded-lg md:rounded-2xl text-[6px] md:text-10px font-black uppercase tracking-widest border-2 border-border/50 flex items-center gap-1 md:gap-1.5">
+                          <div className="px-2 md:px-4 py-1 md:py-2 bg-muted text-muted-foreground rounded-lg md:rounded-2xl text-[6px] md:text-[10px] font-black uppercase tracking-widest border-2 border-border/50 flex items-center gap-1 md:gap-1.5">
                             <BookOpen className="w-2 md:w-3 h-2 md:h-3" /> {error.section}
                           </div>
                         )}
-                        <span className="text-[6px] md:text-10px font-black uppercase text-muted-foreground tracking-widest ml-auto">
+                        <span className="text-[6px] md:text-[10px] font-black uppercase text-muted-foreground tracking-widest ml-auto">
                           {formatStoredDate(error.sessionDate, lang)}
                         </span>
                       </div>

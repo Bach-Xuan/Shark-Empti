@@ -46,6 +46,7 @@ service cloud.firestore {
     // Server-controlled transport state. Browser access is always denied.
     match /_aiGenerations/{document=**} { allow read, write: if false; }
     match /_aiQuota/{document=**} { allow read, write: if false; }
+    match /_arenaSessions/{document=**} { allow read, write: if false; }
     // Minimal owner-visible recovery queue; only the server can mutate tombstones.
     match /_forumDeletions/{postId} {
       allow read: if owner(resource.data.authorId);

@@ -376,7 +376,7 @@ export default function PostDetailPage() {
               {user?.uid === post.authorId && (
                 <DropdownMenu modal={false}>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="h-9 w-9 md:h-12 md:w-12 rounded-xl hover:bg-muted">
+                    <Button aria-label={lang === 'vi' ? 'Tùy chọn' : 'More options'} variant="ghost" size="icon" className="h-9 w-9 md:h-12 md:w-12 rounded-xl hover:bg-muted">
                       <MoreVertical className="w-5 h-5 md:w-6 md:h-6 text-muted-foreground" />
                     </Button>
                   </DropdownMenuTrigger>
@@ -407,7 +407,7 @@ export default function PostDetailPage() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
-              <button onClick={togglePostLike} className={cn("flex items-center gap-1.5 md:gap-3 group transition-all active:scale-90", post.likedBy?.includes(user?.uid || '') ? "text-red-500" : "text-muted-foreground hover:text-red-500")}>
+              <button aria-label={lang === 'vi' ? 'Thích bài viết' : 'Like post'} aria-pressed={post.likedBy?.includes(user?.uid || '') ?? false} onClick={togglePostLike} className={cn("flex items-center gap-1.5 md:gap-3 group transition-all active:scale-90", post.likedBy?.includes(user?.uid || '') ? "text-red-500" : "text-muted-foreground hover:text-red-500")}>
                 <Heart className={cn("w-5 h-5 md:w-8 md:h-8", post.likedBy?.includes(user?.uid || '') && "fill-current")} />
                 <span className="text-base md:text-xl font-black">{post.likesCount}</span>
               </button>
@@ -443,7 +443,7 @@ export default function PostDetailPage() {
                         {user?.uid === comment.authorId && (
                           <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 md:h-9 md:w-9 rounded-lg hover:bg-muted">
+                              <Button aria-label={lang === 'vi' ? 'Tùy chọn' : 'More options'} variant="ghost" size="icon" className="h-7 w-7 md:h-9 md:w-9 rounded-lg hover:bg-muted">
                                 <MoreVertical className="w-4 h-4 md:w-5 md:h-5 text-muted-foreground" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -472,7 +472,7 @@ export default function PostDetailPage() {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         )}
-                        <button onClick={() => toggleCommentLike(comment)} className={cn("flex items-center gap-1.5 md:gap-2 group transition-all active:scale-90", comment.likedBy?.includes(user?.uid || '') ? "text-red-500" : "text-muted-foreground hover:text-red-500")}>
+                        <button aria-label={lang === 'vi' ? 'Thích bình luận' : 'Like comment'} aria-pressed={comment.likedBy?.includes(user?.uid || '') ?? false} onClick={() => toggleCommentLike(comment)} className={cn("flex items-center gap-1.5 md:gap-2 group transition-all active:scale-90", comment.likedBy?.includes(user?.uid || '') ? "text-red-500" : "text-muted-foreground hover:text-red-500")}>
                           <Heart className={cn("w-3.5 h-3.5 md:w-4 md:h-4", comment.likedBy?.includes(user?.uid || '') && "fill-current")} /><span className="text-[10px] md:text-xs font-black">{comment.likesCount}</span>
                         </button>
                       </div>

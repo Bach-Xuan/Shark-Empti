@@ -2,8 +2,8 @@ import { createAppError, type AppError, type ErrorValue } from '@/lib/app-error'
 import type { Language } from '@/lib/types';
 
 export const arenaDetailMessages = {
-  en: { exam: 'The exam could not be loaded.', leaderboard: 'The leaderboard could not be loaded.', guru: 'Ask Guru is available for review after you finish this Arena challenge.' },
-  vi: { exam: 'Không thể tải bài thi.', leaderboard: 'Không thể tải bảng xếp hạng.', guru: 'Bạn có thể hỏi Guru để ôn tập sau khi hoàn thành thử thách Arena này.' },
+  en: { exam: 'The exam could not be loaded.', leaderboard: 'The leaderboard could not be loaded.', ranking: 'Only completed attempts with verified timing are ranked. Earlier attempts without verified timing are excluded.', guru: 'Ask Guru is available for review after you finish this Arena challenge.' },
+  vi: { exam: 'Không thể tải bài thi.', leaderboard: 'Không thể tải bảng xếp hạng.', ranking: 'Chỉ xếp hạng các lượt đã hoàn thành có thời gian được xác thực. Các lượt cũ chưa có thời gian được xác thực không được xếp hạng.', guru: 'Bạn có thể hỏi Guru để ôn tập sau khi hoàn thành thử thách Arena này.' },
 } satisfies Record<Language, Record<string, string>>;
 
 /** Only public diagnostic fields cross into UI; raw server/SDK messages never do. */

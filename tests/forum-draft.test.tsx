@@ -3,7 +3,7 @@ import { uiMessage } from '@/lib/i18n';
 import { translations } from '@/lib/translations';
 import { act,cleanup,fireEvent,render,screen,waitFor } from '@testing-library/react';
 import { afterEach,beforeEach,expect,it,vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ write: vi.fn(), toast: vi.fn(), emit: vi.fn() }));
+const mocks = vi.hoisted(() => ({ write: vi.fn(), toast: vi.fn(), emit: vi.fn(), user: { uid: 'author' } as { uid: string } | null, loading: false }));
 vi.mock('@/components/navigation', () => ({ default: () => null }));
 vi.mock('@/components/feature-help', () => ({ default: () => null }));
 vi.mock('@/components/activity-calendar', () => ({ default: () => null }));
@@ -11,7 +11,7 @@ vi.mock('@/components/quick-notes', () => ({ default: () => null }));
 vi.mock('@/components/latex-toolbar', () => ({ LatexQuickToolbar: () => null }));
 vi.mock('@/components/ui-text', () => ({ UiText: () => null }));
 vi.mock('@/components/app-preferences', () => ({ useLanguageState: () => ['en', vi.fn()], useThemeState: () => ['light', vi.fn()] }));
-vi.mock('@/firebase', () => ({ useUser: () => ({ user: { uid: 'author' } }), useFirestore: () => 'database' }));
+vi.mock('@/firebase', () => ({ useUser: () => ({ user: mocks.user, loading: mocks.loading }), useFirestore: () => 'database' }));
 vi.mock('@/firebase/firestore/use-user-notes', () => ({ useUserNotes: () => ({ notes: '', updateNotes: vi.fn() }) }));
 vi.mock('@/firebase/error-emitter', () => ({ errorEmitter: { emit: mocks.emit } }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));
@@ -20,7 +20,7 @@ vi.mock('firebase/firestore', () => ({
   limit: vi.fn(), where: vi.fn(), collection: () => 'posts', query: () => 'posts', orderBy: vi.fn(), serverTimestamp: () => 1, addDoc: mocks.write,
   onSnapshot: (_ref: unknown, callback: (snapshot: unknown) => void) => { callback({ docs: [], size: 0 }); return vi.fn(); },
 }));
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => { vi.clearAllMocks(); mocks.user = { uid: 'author' }; mocks.loading = false; });
 afterEach(cleanup);
 function createDraft() {
   render(<ForumPage />);
@@ -28,6 +28,25 @@ function createDraft() {
   fireEvent.change(screen.getByPlaceholderText(uiMessage('en', 'forum.enter_post_title')), { target: { value: 'My title' } });
   fireEvent.change(screen.getByPlaceholderText(translations.en.postContent), { target: { value: 'My draft' } });
 }
+it('blocks early draft entry until authentication restoration resolves', () => {
+  mocks.user = null; mocks.loading = true;
+  const view = render(<ForumPage />);
+  const create = screen.getByRole('button', { name: translations.en.createPost });
+  expect((create as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(create);
+  expect(screen.queryByRole('dialog')).toBeNull();
+  mocks.loading = false; mocks.user = { uid: 'restored' };
+  view.rerender(<ForumPage />);
+  fireEvent.click(screen.getByRole('button', { name: translations.en.createPost }));
+  expect(screen.getByRole('dialog')).toBeTruthy();
+});
+it('allows a resolved guest to compose but requires authentication to publish', () => {
+  mocks.user = null;
+  createDraft();
+  fireEvent.click(screen.getByRole('button', { name: translations.en.publish }));
+  expect(mocks.write).not.toHaveBeenCalled();
+  expect((screen.getByPlaceholderText(translations.en.postContent) as HTMLTextAreaElement).value).toBe('My draft');
+});
 it('waits for confirmation, blocks duplicate submissions, then closes the draft', async () => {
   let resolve!: () => void;
   mocks.write.mockReturnValue(new Promise<void>(done => { resolve = done; }));

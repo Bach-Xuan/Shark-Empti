@@ -15,7 +15,7 @@ vi.mock('@/lib/error-toast', () => ({ showErrorToast: vi.fn(), showUnexpectedErr
 const router = { push: mocks.push };
 vi.mock('next/navigation', () => ({ useParams: () => ({ examId: 'exam' }), useRouter: () => router }));
 vi.mock('firebase/firestore', () => ({
-  doc: () => 'exam', collection: () => 'attempts', query: () => 'attempts', orderBy: vi.fn(), limit: vi.fn(),
+  doc: () => 'exam', collection: () => 'attempts', query: () => 'attempts', orderBy: vi.fn(), limit: vi.fn(), where: vi.fn(), documentId: () => '__name__',
   onSnapshot: (ref: string, callback: (snapshot: unknown) => void) => {
     callback(ref === 'exam' ? { id: 'exam', exists: () => true, data: () => ({ title: 'Test exam', authorId: 'author', createdAt: null, config: history.config, questions: [question], totalAttempts: 0 }) } : { docs: [] });
     return vi.fn();
@@ -26,12 +26,12 @@ beforeEach(() => {
   vi.clearAllMocks(); mocks.user = { uid: 'player', getIdToken: async () => 'fixture' };
   mocks.feedback.mockResolvedValue({ ok: true, data: analysis });
   mocks.request.mockResolvedValue(new Response(JSON.stringify({ coinsAwarded: 100, isFirstAttempt: false })));
-  vi.stubGlobal('fetch', mocks.request);
+  vi.stubGlobal('fetch', (url: string, init: RequestInit) => url.endsWith('/start') ? Promise.resolve(new Response(init.body as string)) : mocks.request(url, init));
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 it('carries the first feedback through submission without another AI request', async () => {
   render(<ArenaDetailPage />);
-  fireEvent.click(await screen.findByRole('button', { name: /Start Challenge/i }));
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Start Challenge/i })); });
   fireEvent.click(screen.getByRole('button', { name: '4' }));
   expect((screen.getByRole('button', { name: /Ask Shark Guru/i }) as HTMLButtonElement).disabled).toBe(true);
   fireEvent.click(screen.getByRole('button', { name: /finish|results/i }));
@@ -50,7 +50,7 @@ it('directs a guest to login before a challenge starts', async () => {
 });
 it('discards the active challenge if authentication disappears before saving', async () => {
   const view = render(<ArenaDetailPage />);
-  fireEvent.click(await screen.findByRole('button', { name: /Start Challenge/i }));
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Start Challenge/i })); });
   mocks.user = null; view.rerender(<ArenaDetailPage />);
   await waitFor(() => expect(screen.getByRole('button', { name: /Sign in to start/i })).toBeTruthy());
   expect(screen.queryByRole('button', { name: '4' })).toBeNull();

@@ -25,6 +25,7 @@ Sun,
 Trophy,
 User as UserIcon
 } from 'lucide-react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import React from 'react';
 import { Logo as LogoComponent } from './logo';
@@ -55,7 +56,7 @@ const NavButton = ({ target, icon: Icon, label, view, setView }: { target: AppVi
         "w-4 h-4 md:w-6 md:h-6 transition-transform group-hover:scale-110",
         view === target && "animate-bounce-subtle"
       )} />
-      <span className="hidden xs:inline text-[9px] md:text-sm font-black">{label}</span>
+      <span className="hidden sm:inline text-[9px] md:text-sm font-black">{label}</span>
     </button>
   );
 }
@@ -124,7 +125,7 @@ export default function Navigation({ view, setView, lang, changeLang, theme, onT
       "fixed top-0 left-0 right-0 z-[100] w-full glass-morphism px-3 md:px-6 py-2.5 md:py-4 flex items-center justify-between select-none transition-all duration-500 border-b-[3px] md:border-b-[5px] border-border/30 overflow-hidden transform bg-background/80 backdrop-blur-xl",
       isVisible ? "translate-y-0" : "-translate-y-full"
     )}>
-      <div className="flex items-center gap-1.5 md:gap-4 cursor-pointer shrink-0 group active:scale-95 transition-all" onClick={() => { setView('setup'); router.push('/'); }}>
+      <Link href="/" aria-label={t.home} className="flex items-center gap-1.5 md:gap-4 cursor-pointer shrink-0 group active:scale-95 transition-all" onClick={() => setView('setup')}>
         <div className="relative">
           <LogoComponent className="w-6 h-6 md:w-11 md:h-11 transition-all group-hover:scale-110 duration-500" />
           <div className="absolute inset-0 bg-primary/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -138,7 +139,7 @@ export default function Navigation({ view, setView, lang, changeLang, theme, onT
             {t.appTagline}
           </span>
         </div>
-      </div>
+      </Link>
 
       <div className="flex items-center flex-1 justify-center px-2 md:px-6 overflow-hidden">
         <div className="flex items-center gap-0.5 md:gap-4 h-10 md:h-14 my-auto bg-muted/20 px-1.5 md:px-4 rounded-full border-2 md:border-[3px] border-border/20 overflow-x-auto no-scrollbar scroll-smooth">
@@ -200,7 +201,7 @@ export default function Navigation({ view, setView, lang, changeLang, theme, onT
             <div className="relative">
               <Avatar className="w-9 h-9 md:w-12 md:h-12 rounded-xl md:rounded-2xl border-2 md:border-[4px] border-primary/20 shadow-duo group-hover:border-primary transition-all duration-300">
                 <AvatarImage src={user.photoURL || ''} />
-                <AvatarFallback className="bg-primary/10 text-primary font-black text-[9px] md:sm">
+                <AvatarFallback className="bg-primary/10 text-primary font-black text-[9px] md:text-sm">
                   {user.email?.[0].toUpperCase()}
                 </AvatarFallback>
               </Avatar>

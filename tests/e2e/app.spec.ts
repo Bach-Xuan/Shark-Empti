@@ -86,7 +86,7 @@ test('Forum comment and Arena submission use real demo APIs', async ({ page }) =
   const db = getFirestore(getApps()[0] ?? initializeApp({ projectId: 'demo-shark-empti' }));
   const id = `browser-${test.info().project.name}`;
   await db.doc(`posts/${id}`).set({ title: 'Browser discussion', content: 'Addition practice', subject: 'math', authorId: 'fixture', authorName: 'Fixture', authorPhoto: '', createdAt: Timestamp.now(), likesCount: 0, likedBy: [], commentsCount: 0 });
-  await db.doc(`arenaExams/${id}`).set({ title: 'Browser exam', authorId: 'fixture', authorName: 'Fixture', authorPhoto: '', createdAt: Timestamp.now(), totalAttempts: 0, config: { topic: 'Addition', subject: 'math', grade: 'none', numQuestions: '1', difficulty: 'Easy', type: 'Multiple Choice', timeLimit: '' }, questions: [{ question: '2 + 2 = ?', correct: '4', options: ['4', '3'], type: 'Multiple Choice', difficulty: 'Easy', explanation: 'Addition', section: 'Addition' }] });
+  await db.doc(`arenaExams/${id}`).set({ title: 'Browser exam', authorId: 'fixture', authorName: 'Fixture', authorPhoto: '', createdAt: Timestamp.now(), totalAttempts: 0, config: { topic: 'Addition', subject: 'math', grade: 'none', numQuestions: '1', difficulty: 'Easy', type: 'Multiple Choice', timeLimit: '' }, questions: [{ question: '2 + 2 = ?', correct: '4', options: ['4', '3', '2', '1'], type: 'Multiple Choice', difficulty: 'Easy', explanation: 'Addition', section: 'Addition' }] });
   await signIn(page);
   await page.goto(`/forum/${id}`);
   let failOnce = true;
@@ -110,6 +110,10 @@ test('Forum comment and Arena submission use real demo APIs', async ({ page }) =
   await page.getByRole('button', { name: /finish|results/i }).click();
   await expect(page.getByRole('heading', { name: /100%/ })).toBeVisible();
   expect((await db.doc(`arenaExams/${id}`).get()).get('totalAttempts')).toBe(1);
+  const attempts = await db.collection(`arenaExams/${id}/attempts`).get();
+  expect(attempts.size).toBe(1);
+  expect(attempts.docs[0].get('timingVersion')).toBe(1);
+  expect(attempts.docs[0].get('duration')).toBeGreaterThanOrEqual(1);
 });
 for (const language of ['en', 'vi']) {
   test(`auth pages retain ${language} across navigation without loading TensorFlow`, async ({ page }) => {

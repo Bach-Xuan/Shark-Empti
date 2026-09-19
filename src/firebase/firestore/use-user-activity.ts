@@ -3,42 +3,40 @@
 
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
-import { doc,onSnapshot,serverTimestamp,setDoc } from 'firebase/firestore';
-import { useCallback,useEffect,useState } from 'react';
+import { doc,onSnapshot } from 'firebase/firestore';
+import { recordActiveDay } from './record-active-day';
+import { useCallback,useEffect,useMemo,useState } from 'react';
 import { useUser } from '../auth/use-user';
 import { useFirestore } from '../provider';
 
 export function useUserActivity() {
   const { user } = useUser();
   const db = useFirestore();
-  const [activity, setActivity] = useState<Record<string, boolean>>({});
-  const [loading, setLoading] = useState(true);
+  const [snapshot, setSnapshot] = useState<{ uid: string; days: Record<string, boolean>; loading: boolean } | null>(null);
+  const activity = useMemo(() => snapshot?.uid === user?.uid ? snapshot?.days ?? {} : {}, [snapshot, user?.uid]);
+  const loading = !!user && (snapshot?.uid !== user.uid || snapshot.loading);
 
   useEffect(() => {
     if (!user || !db) {
-      setLoading(false);
       return;
     }
 
     const activityRef = doc(db, 'users', user.uid, 'activity', 'main');
+    let active = true;
     const unsubscribe = onSnapshot(
       activityRef,
       (docSnap) => {
-        if (docSnap.exists()) {
-          setActivity(docSnap.data().activeDays || {});
-        } else {
-          // If first time, we'll initialize on track
-          setActivity({});
-        }
-        setLoading(false);
+        if (!active) return;
+        setSnapshot({ uid: user.uid, days: docSnap.exists() ? docSnap.data().activeDays || {} : {}, loading: false });
       },
       async (cause) => {
+        if (!active) return;
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: activityRef.path, operation: 'get' }, cause));
-        setLoading(false);
+        setSnapshot({ uid: user.uid, days: {}, loading: false });
       }
     );
 
-    return () => unsubscribe();
+    return () => { active = false; unsubscribe(); };
   }, [user, db]);
 
   const trackToday = useCallback(() => {
@@ -50,12 +48,8 @@ export function useUserActivity() {
     if (activity[todayKey]) return;
 
     const activityRef = doc(db, 'users', user.uid, 'activity', 'main');
-    const newActiveDays = { ...activity, [todayKey]: true };
     
-    setDoc(activityRef, { 
-      activeDays: newActiveDays, 
-      updatedAt: serverTimestamp() 
-    }, { merge: true }).catch(async (cause) => {
+    recordActiveDay(db, user.uid, todayKey).catch(async (cause) => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({ 
         path: activityRef.path, 
         operation: 'write'

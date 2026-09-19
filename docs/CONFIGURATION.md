@@ -187,7 +187,7 @@ npm run ai:health
 npm run ai:smoke
 ```
 
-- `ai:health` confirms that a key is present, calls the model catalogue and checks that all three fallback models are listed. The catalogue may return 200 for an invalid key, so this command **does not prove authentication, quota or inference**.
+- `ai:health` authenticates the supplied key through `GET /api/v1/key`, checks its reported spending cap, then checks all configured models in the public catalogue. A single 10-second deadline covers requests and response bodies. Diagnostics exclude credentials and upstream response bodies. Authentication and catalogue success **do not prove live inference, account credits or model-specific quota availability**. See the [current-key endpoint](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-key).
 - `ai:smoke` generates one real quiz and chatbot response through the live single-attempt OpenRouter adapter. It validates provider inference and operation schemas, but does not exercise Firebase authentication, the generation ledger, quota or browser recovery. It may consume quota and does not run in CI.
 - Never print the key for debugging. Inspect only variable names/presence and safe status/error codes.
 
@@ -218,6 +218,12 @@ Open `http://localhost:9002`. At minimum, verify:
 5. Arena submission and Forum comment APIs work when Admin credentials are present.
 
 Missing Admin credentials do not mean the Firebase Web config is invalid; they make Admin Route Handlers return `APP-CONFIG-MISSING`. A missing OpenRouter key produces `AI-CONFIG-MISSING` without preventing Firebase-only features from rendering.
+
+### Arena timing and ranking deployment
+
+Deploy the `attempts` composite index declared in `firestore.indexes.json` before releasing the new leaderboard query: `timingVersion ASC`, `score DESC`, `duration ASC`, and document ID `ASC`. Confirm that the index is ready on the target project; Emulator query success does not prove production index readiness. The UI reports query failures and offers retry.
+
+Arena starts create private `_arenaSessions` documents with a 24-hour logical lifetime and `expiresAt` TTL declaration. Activate the TTL policy in the target project to bound abandoned-session storage; expiry is enforced by API code even when TTL cleanup is delayed. Browser reads/writes are denied. Release the start API and matching client together: submissions require the UUID returned by the start request. Older attempts remain stored but are excluded from the new ranking because their elapsed time cannot be verified retroactively. No production index/TTL activation is implied by these local changes.
 
 ## 6. 🧪 Emulator and Test Execution
 
@@ -316,7 +322,7 @@ The recorded local fixture run passed on Chrome, Firefox and WebKit (two languag
 
 ### 9.2. 🧾 Receipt and AI-Ledger Retention and Index Operations
 
-New receipts carry `expiresAt` seven days after creation. AI generation and quota records also carry short-lived `expiresAt` fields. Deletion is asynchronous, and retained receipts remain replayable until deletion. Desired posts index and TTL field settings for `_requestReceipts`, `_aiGenerations` and `_aiQuota` are in `firestore.indexes.json`. From the repository root, `node scripts/inspect-firestore.mjs` loads the Admin identity from `.env`, reads the deployed posts index and all three TTL policies, and writes `reports/firestore-metadata.json`. It is read-only. This checkout contains no package command or source file that applies index or TTL configuration, so production changes require a separately authorized infrastructure workflow and subsequent verification.
+New receipts carry `expiresAt` seven days after creation. AI generation and quota records also carry short-lived `expiresAt` fields, and Arena timing sessions have a 24-hour logical lifetime. Deletion is asynchronous, and retained receipts remain replayable until deletion. Desired posts/Arena indexes and TTL field settings for `_requestReceipts`, `_aiGenerations`, `_aiQuota` and `_arenaSessions` are in `firestore.indexes.json`. From the repository root, `node scripts/inspect-firestore.mjs` loads the Admin identity from `.env`, reads the deployed posts/Arena indexes and all four TTL policies, and writes `reports/firestore-metadata.json`. It is read-only. This checkout contains no package command or source file that applies index or TTL configuration, so production changes require a separately authorized infrastructure workflow and subsequent verification.
 
 A historical inspection found the posts index missing and receipt TTL disabled. Application failed with IAM 403 at index creation, before TTL was applied; receipt inventory returned zero documents. For legacy data, `node --conditions=react-server --env-file=.env --import tsx scripts/receipt-retention.ts` inventories missing expiry values; adding `--apply` backfills them without directly deleting receipts. Its `alreadyExpired` counter concerns missing-expiry records whose calculated expiry is past, not every expired document.
 

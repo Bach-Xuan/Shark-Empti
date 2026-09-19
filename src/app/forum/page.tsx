@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useLanguageState,useThemeState } from '@/components/app-preferences';
 import { PageControls } from '@/components/page-controls';
 import { UiText } from "@/components/ui-text";
@@ -86,7 +87,7 @@ Search,
 Star,
 Trash2
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+
 import React,{ useMemo,useRef,useState } from 'react';
 
 import { LatexQuickToolbar } from '@/components/latex-toolbar';
@@ -96,7 +97,7 @@ export default function ForumPage() {
   const { user, loading: authLoading } = useUser();
   const db = useFirestore();
   const mutation = useMutation();
-  const router = useRouter();
+
   const { toast } = useToast();
 
   const [lang, setLang] = useLanguageState();
@@ -390,7 +391,7 @@ export default function ForumPage() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            <Dialog open={isCreateDialogOpen} onOpenChange={open => { if (!publishing.current) setIsCreateDialogOpen(open); }}>
+            <Dialog open={!authLoading && isCreateDialogOpen} onOpenChange={open => { if (!publishing.current && !authLoading) setIsCreateDialogOpen(open); }}>
               <Button disabled={authLoading} onClick={() => setIsCreateDialogOpen(true)} className="btn-duo h-9 md:h-12 px-3 md:px-6 rounded-xl md:rounded-2xl bg-primary text-white border-[2px] md:border-[3px] border-primary/20 font-black uppercase text-[9px] md:text-xs tracking-widest gap-1.5">
                 <Plus className="w-3.5 h-3.5 md:w-5 md:h-5" /> {t.createPost}
               </Button>
@@ -501,8 +502,8 @@ export default function ForumPage() {
             {filteredPosts.map((post) => (
               <Card
                 key={post.id}
-                className="card-duo p-4 md:p-8 hover:translate-y-[-4px] cursor-pointer transition-all bg-card border-border/50 group"
-                onClick={() => router.push(`/forum/${post.id}`)}
+                className="card-duo p-4 md:p-8 hover:translate-y-[-4px] transition-all bg-card border-border/50 group"
+
               >
                 <div className="flex gap-3 md:gap-6">
                   <Avatar className="w-9 h-9 md:w-16 md:h-16 rounded-xl md:rounded-2xl border-2 md:border-4 border-border shadow-duo group-hover:border-primary/30 transition-colors shrink-0">
@@ -517,7 +518,7 @@ export default function ForumPage() {
                           {getSubjectLabel(post.subject)}
                         </Badge>
                         <h2 className="text-[13px] sm:text-lg md:text-2xl font-headline font-black text-foreground uppercase tracking-tight truncate group-hover:text-primary transition-colors leading-tight">
-                          <LatexText text={post.title} />
+                          <Link href={`/forum/${post.id}`} className="focus-visible:outline-2 focus-visible:outline-primary"><LatexText text={post.title} /></Link>
                         </h2>
                       </div>
 
@@ -531,7 +532,7 @@ export default function ForumPage() {
                         {user?.uid === post.authorId && (
                           <DropdownMenu modal={false}>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-7 w-7 md:h-9 md:w-9 rounded-lg hover:bg-muted transition-colors">
+                              <Button aria-label={lang === 'vi' ? 'Tùy chọn' : 'More options'} variant="ghost" size="icon" className="h-7 w-7 md:h-9 md:w-9 rounded-lg hover:bg-muted transition-colors">
                                 <MoreVertical className="w-3.5 h-3.5 md:w-4 md:h-4 text-muted-foreground" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -573,6 +574,7 @@ export default function ForumPage() {
                       <span className="text-[7px] md:text-[10px] font-black text-primary uppercase tracking-widest truncate max-w-[80px] md:max-w-[150px]">{post.authorName}</span>
                       <div className="flex items-center gap-2 md:gap-6">
                         <button
+                          aria-label={lang === 'vi' ? 'Thích bài viết' : 'Like post'} aria-pressed={post.likedBy?.includes(user?.uid || '') ?? false}
                           onClick={(e) => toggleLike(e, post)}
                           className={cn(
                             "flex items-center gap-1 md:gap-2 group/heart transition-all active:scale-90",

@@ -28,14 +28,6 @@
 | D03 | Profile Snapshots Can Overwrite an Unsaved Biography Draft | Implemented; targeted regression verification pending | 19 September 2026 |
 | D06 | Forum Edit Drafts Are Discarded Before Write Confirmation | Implemented; targeted regression verification pending | 19 September 2026 |
 | D07 | Post Deletion Leaves Publicly Readable Orphaned Comments | Implemented locally; Emulator and deployed Rules verification pending | 19 September 2026 |
-| D11 | Invalid Responsive Utility Classes Produce No CSS Effect | Unresolved | 3 September 2026 |
-| D12 | Incomplete Keyboard Semantics and Accessible Naming | Unresolved | 3 September 2026 |
-| D13 | OpenRouter Health Check Does Not Authenticate the Supplied Key | Unresolved | 3 September 2026 |
-| D14 | Authentication Restoration Can Discard an Early Forum Draft | Unresolved | 3 September 2026 |
-| D15 | Client-Controlled Duration Compromises Arena Leaderboard Integrity | Unresolved | 12 September 2026 |
-| D16 | Arena Leaderboard Applies Its Result Limit Before the Duration Tie-Break | Unresolved | 12 September 2026 |
-| D17 | English Bonus Copy Misrepresents the Arena Reward Rule | Unresolved | 12 September 2026 |
-| D18 | Activity Tracking Can Lose Concurrent Day Updates | Unresolved | 12 September 2026 |
 | P04 | Idempotency Receipts Have No Defined Retention Bound | Implemented; production TTL/index activation blocked by IAM | 15 September 2026 |
 | V01 | Incomplete WebKit Validation | Partial; WebKit development passed, production matrix pending | 15 September 2026 |
 | V02 | Unverified Minimum Browser Versions and Physical-Camera Behaviour | Partial; historical physical-camera result is not reproducible from the current checkout; target matrix pending | 19 September 2026 |
@@ -66,6 +58,14 @@
 | D08 | Arena “Ask Guru” Action Has No User-Facing Effect | Resolved | 19 September 2026 |
 | D09 | Report Printing Is Constrained by the Dialog Scroll Container | Resolved | 19 September 2026 |
 | D10 | Duplicate Error Codes and English Text in Vietnamese Toasts | Resolved | 12 September 2026 |
+| D11 | Invalid Responsive Utility Classes Produce No CSS Effect | Resolved | 19 September 2026 |
+| D12 | Incomplete Keyboard Semantics and Accessible Naming | Resolved | 19 September 2026 |
+| D13 | OpenRouter Health Check Does Not Authenticate the Supplied Key | Resolved | 19 September 2026 |
+| D14 | Authentication Restoration Can Discard an Early Forum Draft | Resolved | 19 September 2026 |
+| D15 | Client-Controlled Duration Compromises Arena Leaderboard Integrity | Resolved | 19 September 2026 |
+| D16 | Arena Leaderboard Applies Its Result Limit Before the Duration Tie-Break | Resolved | 19 September 2026 |
+| D17 | English Bonus Copy Misrepresents the Arena Reward Rule | Resolved | 19 September 2026 |
+| D18 | Activity Tracking Can Lose Concurrent Day Updates | Resolved | 19 September 2026 |
 | N01 | Inconsistent Naming and File-Name Conventions | Resolved | 13 September 2026 |
 | N02 | Domain Types and Schemas Do Not Consistently Represent Their Lifecycle Stage | Resolved | 13 September 2026 |
 | N03 | Readability Debt and Potentially Unused Modules | Resolved | 13 September 2026 |
@@ -248,9 +248,9 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Historical mechanism:** Retake callbacks reused the earlier request ID, and retry could recompute duration under the same identifier.
 
-**Resolution:** Initial start and both retake paths share initialization. The first submission freezes the serialized answers, duration, request ID and result snapshot; transport retry reuses them exactly. Each new logical attempt clears that snapshot. Concurrent submits are locked, and account/exam changes or unmount revoke late completion.
+**Resolution:** Initial start and both retake paths share initialization. The first submission freezes the serialized answers, request ID and result snapshot; transport retry reuses them exactly. Each new logical attempt clears that snapshot and obtains a new server timing session. Concurrent submits are locked, and account/exam changes or unmount revoke late completion. Duration is server-derived under D15.
 
-**Evidence:** Component tests exercise both retakes, frozen retry bodies, concurrent calls and lifecycle changes; receipt transaction tests cover replay and conflicts. Duration trust and leaderboard tie-break ordering remain separate D15/D16 findings.
+**Evidence:** Component tests exercise both retakes, frozen retry bodies, concurrent calls and lifecycle changes; receipt transaction tests cover replay and conflicts. Duration authority and leaderboard tie-break ordering are separately covered by the resolved D15/D16 evidence.
 
 ### 🧩 D02 - LaTeX Corruption Caused by Redundant Escape Replacement
 
@@ -344,75 +344,83 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### 🧩 D11 - Invalid Responsive Utility Classes Produce No CSS Effect
 
-**Status:** Unresolved.
+**Status:** Resolved.
 
-**Description and context:** The current source still contains invalid utilities including `md:sm`, `md:lg`, `md:base`, `md:xs`, `md:text-10px`, and `xs:inline`; the `xs` breakpoint is not configured. These tokens do not express the likely intended responsive typography or visibility.
+**Original defect:** Profile, navigation, dashboard and quiz components contained invalid responsive typography tokens; navigation also referenced an unconfigured `xs` breakpoint.
 
-**Observed mechanism and consequence:** Tailwind emits no matching CSS rule for these tokens, so the browser silently retains the base style. The source can therefore appear to specify a responsive change that never occurs. Because the intended sizes cannot be recovered mechanically from invalid names, each occurrence requires local design interpretation.
+**Implemented correction:** Typography uses the appropriate `md:text-sm`, `md:text-lg`, `md:text-base`, `md:text-xs` and `md:text-[10px]` utilities. Navigation labels use the configured `sm` breakpoint; accessible names remain available when visual labels are hidden.
 
-**Risk and required verification:** Intent must be established per component rather than through a global replacement. Verification should inspect computed styles across breakpoints, long Vietnamese text, navigation visibility, and both themes.
+**Evidence and boundary:** Source scanning finds none of the identified invalid tokens. `tests/e2e/accessibility-responsive.spec.ts` checks emitted CSS at 390, 640, 768 and 1280 pixels, both themes and both locales, including Vietnamese probe text. Expectations respect the existing desktop root-font scaling. Desktop and mobile Chromium passed; this is not minimum-version browser certification.
 
 ### 🧩 D12 - Incomplete Keyboard Semantics and Accessible Naming
 
-**Status:** Unresolved.
+**Status:** Resolved.
 
-**Description and context:** The flashcard flip target remains a clickable `div` without button semantics, tab focus, or keyboard handling. Branding/navigation containers on several pages are likewise click-only, and some icon-only actions still rely on visual context rather than an explicit accessible name.
+**Original defect:** Flashcard flipping, branding and some card navigation depended on pointer-only containers; several icon-only controls lacked explicit action names.
 
-**Observed mechanism and consequence:** These elements are operable with a pointer but are absent from the normal keyboard interaction model or expose an incomplete role/name/value contract to assistive technology. The issue affects discoverability and equivalent operation; adding a role alone would remain insufficient without focus management and expected key behaviour.
+**Implemented correction:** Flashcards and expandable history headers are native buttons. Flashcards expose the pressed state, describe the visible card face and hide the inactive face from assistive technology. Branding and Forum/Arena titles are native links. Chat, language/theme, help, note, copy, topic-action and overflow controls have accessible names; like actions also expose their pressed state.
 
-**Risk and required verification:** Native interactive elements should be preferred. Acceptance should include Tab and Shift+Tab traversal, Enter and Space behaviour, accessible-name assertions, dialog focus return, automated scanning, and screen-reader testing when required.
+**Evidence and boundary:** Component tests exercise flashcard Enter/Space activation and Tab/Shift+Tab traversal. Browser tests check language-menu keyboard activation, Escape focus return, named controls and focused axe rules for names, nesting and ARIA validity in both locales/themes. These checks close the identified interaction defects; they are not a comprehensive screen-reader or WCAG certification.
 
 ### 🧩 D13 - OpenRouter Health Check Does Not Authenticate the Supplied Key
 
-**Status:** Unresolved.
+**Status:** Resolved.
 
-**Description and context:** The health script sends the key to the model-catalogue endpoint and treats HTTP 200 as success. Because catalogue metadata may be publicly available, an invalid key can pass; the script also lacks an explicit bounded timeout.
+**Original defect:** A public model-catalogue response could be interpreted as successful key authentication, and the health script had no explicit deadline.
 
-**Observed mechanism and consequence:** The script proves catalogue reachability and model presence, but its success message can be interpreted as evidence that the credential is valid for inference. A stalled network can also leave the process waiting according to ambient fetch behaviour. Authentication, quota, and structured generation remain entirely untested by this command.
+**Implemented correction:** The script first authenticates through `GET /api/v1/key`, validates returned key-limit metadata, then reads the public catalogue without credentials. A single ten-second abort deadline bounds both requests and response bodies. Diagnostics exclude upstream bodies, key material and raw network exceptions; authentication, catalogue presence and untested inference/account quota are explicitly distinguished.
 
-**Risk and required verification:** Metadata availability, credential authentication, and live inference are distinct checks and should remain separately reported. Tests should cover missing, invalid, revoked, and quota-limited credentials; absent models; network timeout; and credential redaction.
+**Evidence and boundary:** `tests/openrouter-health.test.ts` covers missing credentials, HTTP 401/403/402/429, exhausted spending caps, missing models, malformed metadata, timeout and redaction. No live credential or paid inference request was needed for these deterministic checks. The endpoint contract is documented in [OpenRouter's current-key reference](https://openrouter.ai/docs/api/api-reference/api-keys/get-current-key).
 
 ### 🧩 D14 - Authentication Restoration Can Discard an Early Forum Draft
 
-**Status:** Unresolved.
+**Status:** Resolved.
 
-**Description and context:** The Forum page allows draft interaction while authentication is unresolved. `FirebaseProvider` keys its child tree by `user.uid` or `anonymous`, so restoration from anonymous to an authenticated user remounts the page and discards local draft state.
+**Original defect:** An early draft could be entered before authentication restoration remounted the account-scoped page.
 
-**Observed mechanism and consequence:** The remount is intentional for account isolation, but the create control is not gated by the authentication-loading state. A user can therefore enter valid content during the anonymous render and lose it when the same session resolves moments later. The loss is deterministic under the relevant timing and produces no save or recovery opportunity.
+**Implemented correction:** The existing disabled create control is retained and the create dialog itself is gated by `authLoading`, including open-state transitions. Draft entry is unavailable while identity is unresolved. The provider's UID-keyed subtree continues to isolate account-owned state.
 
-**Risk and required verification:** User-owned editing should either be blocked until authentication resolves or use an explicit ownership-aware hydration policy. UID isolation must remain intact. Tests should cover genuine guests, restored sessions, account switching, early interaction, and rapid navigation.
+**Evidence and boundary:** `tests/forum-draft.test.tsx` verifies blocked early interaction, successful opening after restoration, guest composition without unauthorized publication, draft retention after write failure and duplicate-publication suppression. Resolved guests may compose, but drafts are not persisted across an explicit login/account switch; this preserves the existing ownership policy.
 
 ### 🧩 D15 - Client-Controlled Duration Compromises Arena Leaderboard Integrity
 
-**Status:** Unresolved.
+**Status:** Resolved.
 
-**Description and context:** The Arena submission API accepts `duration` directly from the authenticated client's JSON payload. Server-side processing verifies only that the value is finite, rounds it, and clamps negative values to zero. The stored duration is subsequently displayed and used as the client-side tie-break between attempts with equal scores. An ordinary authenticated client can therefore submit a duration of zero irrespective of the actual attempt duration and obtain the most favourable tie-break value.
+**Original defect:** Clients supplied the duration that determined equal-score ranking, allowing zero-time submissions unrelated to an observed attempt.
 
-**Risk and required verification:** This is a server-authority defect rather than a presentation discrepancy: a ranking-relevant value is accepted from an untrusted source without corroboration. The server should derive elapsed time from server-observed attempt state or apply a clearly documented integrity mechanism. Verification should include zero, negative, implausibly small, extremely large, missing, and replayed duration values, as well as equal-score ranking behaviour.
+**Implemented correction:** An authenticated start API records a private UID/exam-bound session and question fingerprint. The client waits for acknowledgement before showing the quiz; start retries retain the original clock. Submission requires that session, ignores client duration, derives elapsed seconds from server start/receipt times and commits the consumed session with the attempt/reward/receipt transaction. Sessions expire logically after 24 hours, with a declared TTL policy for storage cleanup. Only new `timingVersion: 1` attempts enter the timed leaderboard.
+
+**Evidence and boundary:** Emulator tests cover zero, negative, fractional, extremely large and missing client durations; absent/mismatched/expired sessions; concurrent starts and submissions; and replay after receipt deletion. Component tests cover response loss, duplicate starts, retakes and late responses after account changes. The interval includes network and pre-submission feedback latency; public exam content still permits pre-reading. Production TTL activation and release of the matching client/start API remain deployment responsibilities.
 
 ### 🧩 D16 - Arena Leaderboard Applies Its Result Limit Before the Duration Tie-Break
 
-**Status:** Unresolved.
+**Status:** Resolved.
 
-**Description and context:** Firestore retrieves attempts using `orderBy('score', 'desc')` and `limit(10)`. Only after those ten documents have been selected does the client sort equal scores by ascending duration. Consequently, when more than ten attempts share a score near the cutoff, a faster attempt may be excluded before the duration tie-break is evaluated. Reordering the already limited result set cannot recover an omitted qualifying attempt.
+**Original defect:** The database selected ten attempts before the client applied duration tie-breaking, excluding faster qualifying attempts at the score cutoff.
 
-**Risk and required verification:** The database query and the displayed ranking comparator must express the same total order, normally by adding duration as a secondary ordering field and provisioning the corresponding index. A deterministic final tie-break should also be defined. Verification should use more than ten equal-score attempts with deliberately varied durations and document identifiers.
+**Implemented correction:** The shared leaderboard query filters verified timing, orders by score descending, duration ascending and document ID ascending, and only then limits to ten. Client-side reordering is removed. `firestore.indexes.json` declares the exact composite index.
+
+**Evidence and boundary:** A Rules/Emulator test queries the production query builder against more than ten tied scores, including a duration tie and a legacy zero-time record, and verifies the exact winning IDs. The index must be provisioned and ready before production release; Emulator success does not establish its remote deployment state. Legacy records remain stored but are not retroactively assigned trusted timing.
 
 ### 🧩 D17 - English Bonus Copy Misrepresents the Arena Reward Rule
 
-**Status:** Unresolved.
+**Status:** Resolved.
 
-**Description and context:** The server awards the additional 50 coins only when the exam's global `totalAttempts` is zero; thus the bonus belongs to the first successful participant for that exam. The Vietnamese label describes a pioneer reward, whereas the English label states “First attempt bonus!”, which conventionally implies the current user's first attempt. The two locales therefore describe materially different eligibility rules.
+**Original defect:** English copy implied a per-user first-attempt bonus although the server awards the first successful submission globally for each exam.
 
-**Risk and required verification:** The English copy should state the implemented global rule, or the reward rule should be changed if the intended policy is per user. Product intent must be confirmed before implementation. Acceptance should compare the first global submission, another user's first submission, and a retake in both locales.
+**Implemented correction:** Both locales explicitly describe the first participant to complete that exam. The existing global reward rule is preserved.
+
+**Evidence:** An Emulator test submits the first global attempt, another user's first attempt and a retake. It verifies bonus flags `[true, false, false]` and equal-score coin awards `[150, 100, 100]`.
 
 ### 🧩 D18 - Activity Tracking Can Lose Concurrent Day Updates
 
-**Status:** Unresolved.
+**Status:** Resolved.
 
-**Description and context:** `trackToday` constructs a complete `activeDays` map from the component's last local snapshot and writes that map back with `setDoc(..., { merge: true })`. Firestore merge semantics apply to the top-level `activeDays` field; they do not merge independently changed nested keys when the entire map is supplied. Two tabs or devices operating from different snapshots can therefore overwrite one another's newly recorded dates.
+**Evidence correction:** The earlier claim that `setDoc(..., { merge: true })` necessarily replaces the whole nested map was too broad: Firestore can merge nested leaves. The prior code nevertheless unnecessarily resubmitted every locally cached date, obscuring its intended write boundary. Historical data loss must not be inferred solely from that earlier description.
 
-**Risk and required verification:** The write should target the individual date field atomically or use a transaction with an explicit conflict policy. A deterministic Emulator test should hold two stale snapshots, write distinct dates in opposite orders, and assert that both dates remain. Account changes and offline reconciliation should also be covered.
+**Implemented correction:** `recordActiveDay` writes only the current date and `updatedAt`, with an explicit `mergeFields` leaf mask. Account-tagged snapshots and revoked callbacks prevent old-account activity from entering a new session.
+
+**Evidence:** Emulator tests retain distinct dates written by two stale clients in both orders and reconcile an offline queued date after another device writes. Hook tests verify one-date payloads, account switching, ignored stale callbacks and no guest writes. Existing Rules continue to enforce owner-only access.
 
 ### 🧹 N01 - Inconsistent Naming and File-Name Conventions
 

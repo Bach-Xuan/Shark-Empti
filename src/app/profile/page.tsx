@@ -318,18 +318,18 @@ if (!authLoading && !user) {
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   <div className="flex items-center gap-2 bg-muted/50 px-4 py-1.5 rounded-full border-2 border-border/50 shadow-xs">
                     <Mail className="w-4 h-4 text-primary" />
-                    <span className="text-xs md:sm font-bold text-muted-foreground">{user.email}</span>
+                    <span className="text-xs md:text-sm font-bold text-muted-foreground">{user.email}</span>
                   </div>
 
                   <div className="flex items-center gap-2 bg-muted/30 px-4 py-1.5 rounded-full border-2 border-border/50 shadow-xs">
                     <CalendarDays className="w-4 h-4 text-primary" />
-                    <span className="text-xs md:sm font-bold text-muted-foreground">{t.memberSince}: {creationDate}</span>
+                    <span className="text-xs md:text-sm font-bold text-muted-foreground">{t.memberSince}: {creationDate}</span>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2 bg-card px-4 py-2 rounded-2xl border-4 border-border shadow-duo group transition-all hover:border-primary/50 active:translate-y-1 active:shadow-none">
                   <Fingerprint className="w-4 h-4 text-primary opacity-70" />
-                  <span className="text-[10px] md:xs font-black text-muted-foreground tracking-widest uppercase truncate max-w-[150px] md:max-w-none">
+                  <span className="text-[10px] md:text-xs font-black text-muted-foreground tracking-widest uppercase truncate max-w-[150px] md:max-w-none">
                     UID: {user.uid}
                   </span>
                   <Button
@@ -337,7 +337,7 @@ if (!authLoading && !user) {
                     size="icon"
                     onClick={copyToClipboard}
                     className="h-8 w-8 rounded-xl hover:bg-muted text-primary transition-all active:scale-90"
-                    title={t.copyUid}
+                    aria-label={t.copyUid} title={t.copyUid}
                   >
                     {isCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                   </Button>
@@ -349,7 +349,7 @@ if (!authLoading && !user) {
           <CardContent className="p-8 md:p-12 space-y-10">
             <div className="space-y-6">
               <div className="space-y-4">
-                <label className="text-[10px] md:xs font-black uppercase text-muted-foreground flex items-center gap-2">
+                <label className="text-[10px] md:text-xs font-black uppercase text-muted-foreground flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-primary" />
                   {uiMessage(lang, "profile.my_bio_notes")}
                 </label>
@@ -374,7 +374,7 @@ if (!authLoading && !user) {
                 <Button
                   onClick={() => setIsReportSelectOpen(true)}
                   disabled={history.length === 0}
-                  className="w-full h-16 rounded-2xl btn-duo bg-card text-primary font-black text-base md:lg uppercase tracking-[0.2em] flex items-center justify-center gap-4 border-4 border-primary/30 hover:bg-primary/5 group"
+                  className="w-full h-16 rounded-2xl btn-duo bg-card text-primary font-black text-base md:text-lg uppercase tracking-[0.2em] flex items-center justify-center gap-4 border-4 border-primary/30 hover:bg-primary/5 group"
                 >
                   <FileText className="w-6 h-6 group-hover:scale-110 transition-transform" />
                   {t.exportReport}
@@ -391,7 +391,7 @@ if (!authLoading && !user) {
 
         <Card className="card-duo p-6 md:p-8 bg-card hover:translate-y-[-4px]">
           <div className="space-y-4">
-            <label className="text-[10px] md:xs font-black uppercase text-muted-foreground flex items-center gap-3 tracking-[0.2em]">
+            <label className="text-[10px] md:text-xs font-black uppercase text-muted-foreground flex items-center gap-3 tracking-[0.2em]">
               <Search className="w-5 h-5 text-primary" />
               {uiMessage(lang, "profile.search_learner_by_uid")}
             </label>
@@ -419,7 +419,7 @@ if (!authLoading && !user) {
           <Button
             variant="outline"
             onClick={handleSignOut}
-            className="h-16 rounded-2xl btn-duo border-4 border-destructive/20 text-destructive font-black text-base md:lg uppercase tracking-wider flex items-center justify-center gap-3 px-12 hover:bg-destructive/5"
+            className="h-16 rounded-2xl btn-duo border-4 border-destructive/20 text-destructive font-black text-base md:text-lg uppercase tracking-wider flex items-center justify-center gap-3 px-12 hover:bg-destructive/5"
           >
             <LogOut className="w-6 h-6" />
             {uiMessage(lang, "profile.sign_out")}
@@ -484,11 +484,11 @@ if (!authLoading && !user) {
                           <LatexText text={topic} />
                         </span>
                         <div className="flex items-center gap-3 text-muted-foreground/60">
-                           <div className="flex items-center gap-1.5 text-[8px] md:text-10px font-black uppercase tracking-widest">
+                           <div className="flex items-center gap-1.5 text-[8px] md:text-[10px] font-black uppercase tracking-widest">
                              <Clock className="w-3 h-3" />
                              {formatSessionDate(item.date)}
                            </div>
-                           <div className="flex items-center gap-1.5 text-[8px] md:text-10px font-black uppercase tracking-widest text-primary/70">
+                           <div className="flex items-center gap-1.5 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-primary/70">
                              <CheckCircle2 className="w-3 h-3" />
                              {item.quizResults.filter(r => r.isCorrect).length}/{item.quizResults.length}
                            </div>
@@ -576,12 +576,12 @@ if (!authLoading && !user) {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                        <Card className="card-duo p-6 md:p-8 bg-green-500/5 border-green-500/20 shadow-none">
-                          <h4 className="text-sm md:lg font-black text-green-700 uppercase tracking-widest flex items-center gap-2 mb-4">
+                          <h4 className="text-sm md:text-lg font-black text-green-700 uppercase tracking-widest flex items-center gap-2 mb-4">
                             <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 stroke-[3px] shrink-0 mt-0.5" /> {t.strengths}
                           </h4>
                           <ul className="space-y-3">
                             {group.strengths.map((s, idx) => (
-                              <li key={idx} className="text-sm md:base font-bold italic leading-relaxed flex gap-2">
+                              <li key={idx} className="text-sm md:text-base font-bold italic leading-relaxed flex gap-2">
                                 <div className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0 mt-2" />
                                 <LatexText text={s} />
                               </li>
@@ -590,12 +590,12 @@ if (!authLoading && !user) {
                        </Card>
 
                        <Card className="card-duo p-6 md:p-8 bg-red-500/5 border-red-500/20 shadow-none">
-                          <h4 className="text-sm md:lg font-black text-red-700 uppercase tracking-widest flex items-center gap-2 mb-4">
+                          <h4 className="text-sm md:text-lg font-black text-red-700 uppercase tracking-widest flex items-center gap-2 mb-4">
                             <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" /> {t.weaknesses}
                           </h4>
                           <ul className="space-y-3">
                             {group.weaknesses.map((w, idx) => (
-                              <li key={idx} className="text-sm md:base font-bold italic leading-relaxed flex gap-2">
+                              <li key={idx} className="text-sm md:text-base font-bold italic leading-relaxed flex gap-2">
                                 <div className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0 mt-2" />
                                 <LatexText text={w} />
                               </li>
@@ -605,7 +605,7 @@ if (!authLoading && !user) {
                     </div>
 
                     <div className="space-y-6">
-                       <h4 className="text-sm md:lg font-black text-primary uppercase tracking-[0.2em] flex items-center gap-2 pl-2">
+                       <h4 className="text-sm md:text-lg font-black text-primary uppercase tracking-[0.2em] flex items-center gap-2 pl-2">
                          <BrainCircuit className="w-6 h-6" /> {t.recommendations}
                        </h4>
 
@@ -615,7 +615,7 @@ if (!authLoading && !user) {
                             {completedRecs.length > 0 ? completedRecs.map(r => (
                               <div key={r.id} className="flex items-start gap-3 p-4 rounded-xl bg-muted/10 border-2 border-green-500/20 opacity-70">
                                 <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 stroke-[3.5px] shrink-0 mt-0.5" />
-                                <p className="text-xs md:sm font-bold line-through"><LatexText text={r.text} /></p>
+                                <p className="text-xs md:text-sm font-bold line-through"><LatexText text={r.text} /></p>
                               </div>
                             )) : <p className="text-xs italic opacity-40 px-2">---</p>}
                          </div>
@@ -625,7 +625,7 @@ if (!authLoading && !user) {
                             {pendingRecs.length > 0 ? pendingRecs.map(r => (
                               <div key={r.id} className="flex items-start gap-3 p-4 rounded-xl bg-card border-2 border-orange-500/10 shadow-xs">
                                 <Circle className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
-                                <p className="text-xs md:sm font-bold"><LatexText text={r.text} /></p>
+                                <p className="text-xs md:text-sm font-bold"><LatexText text={r.text} /></p>
                               </div>
                             )) : <p className="text-xs italic opacity-40 px-2">---</p>}
                          </div>
@@ -666,12 +666,12 @@ if (!authLoading && !user) {
                   {searchResult?.displayName || uiMessage(lang, 'profile.learner')}
                 </h3>
                 <div className="flex flex-col items-center gap-2">
-                  <p className="text-[10px] md:xs font-black text-muted-foreground uppercase tracking-widest">
+                  <p className="text-[10px] md:text-xs font-black text-muted-foreground uppercase tracking-widest">
                     {uiMessage(lang, "profile.learner")}
                   </p>
                   <div className="flex items-center gap-2 bg-muted/40 px-3 py-1 rounded-full border border-border/50">
                     <CalendarDays className="w-3 h-3 text-primary/70" />
-                    <span className="text-[9px] md:text-10px font-bold text-muted-foreground">
+                    <span className="text-[9px] md:text-[10px] font-bold text-muted-foreground">
                       {t.memberSince}: {searchMemberSince}
                     </span>
                   </div>
@@ -679,7 +679,7 @@ if (!authLoading && !user) {
               </div>
 
               <div className="w-full space-y-4">
-                <div className="flex items-center gap-3 text-[10px] md:xs font-black uppercase text-muted-foreground tracking-widest px-2">
+                <div className="flex items-center gap-3 text-[10px] md:text-xs font-black uppercase text-muted-foreground tracking-widest px-2">
                   <Sparkles className="w-5 h-5 text-primary" />
                   {uiMessage(lang, "profile.learner_bio")}
                 </div>

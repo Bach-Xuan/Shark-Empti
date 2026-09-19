@@ -1,7 +1,9 @@
 import { assertFails,assertSucceeds,initializeTestEnvironment,RulesTestEnvironment } from '@firebase/rules-unit-testing';
-import { collection,deleteDoc,deleteField,doc,getDoc,getDocs,query,serverTimestamp,setDoc,updateDoc,where } from 'firebase/firestore';
+import { type Firestore,disableNetwork,enableNetwork,collection,deleteDoc,deleteField,doc,getDoc,getDocs,query,serverTimestamp,setDoc,updateDoc,where } from 'firebase/firestore';
 import fs from 'node:fs';
-import { afterAll,afterEach,beforeAll,describe,it } from 'vitest';
+import { afterAll,afterEach,beforeAll,describe,it,expect } from 'vitest';
+import { recordActiveDay } from '@/firebase/firestore/record-active-day';
+import { arenaLeaderboardQuery } from '@/lib/arena-leaderboard';
 
 let testEnv: RulesTestEnvironment;
 const validPost = () => ({ authorId: 'author', authorName: 'Author', authorPhoto: '', createdAt: serverTimestamp(), title: 'Math', content: 'Valid content', subject: 'math', likesCount: 0, likedBy: [], commentsCount: 0 });
@@ -17,6 +19,47 @@ afterEach(async () => testEnv?.clearFirestore());
 afterAll(async () => testEnv?.cleanup());
 
 describe('Firestore access policy', () => {
+  it('orders all tied Arena scores by duration and ID before limiting, excluding legacy timing', async () => {
+    await testEnv.withSecurityRulesDisabled(async context => {
+      const db = context.firestore();
+      for (let i = 0; i < 15; i++) await setDoc(doc(db, 'arenaExams/exam/attempts', `a${String(i).padStart(2, '0')}`), {
+        timingVersion: 1, score: 100, duration: 15 - i,
+      });
+      await setDoc(doc(db, 'arenaExams/exam/attempts/z-tie'), { timingVersion: 1, score: 100, duration: 1 });
+      await setDoc(doc(db, 'arenaExams/exam/attempts/legacy'), { score: 100, duration: 0 });
+    });
+    const result = await getDocs(arenaLeaderboardQuery(testEnv.unauthenticatedContext().firestore() as unknown as Firestore, 'exam'));
+    expect(result.docs.map(row => row.id)).toEqual(['a14', 'z-tie', 'a13', 'a12', 'a11', 'a10', 'a09', 'a08', 'a07', 'a06']);
+  });
+  it('denies browser access to server timing sessions', async () => {
+    const db = testEnv.authenticatedContext('learner').firestore();
+    await assertFails(setDoc(doc(db, '_arenaSessions/forged'), { startedAtMs: 0 }));
+    await assertFails(getDoc(doc(db, '_arenaSessions/forged')));
+  });
+  it.each([false, true])('preserves independently queued days from two stale clients (reverse=%s)', async reverse => {
+    const first = testEnv.authenticatedContext('learner').firestore() as unknown as Firestore;
+    const second = testEnv.authenticatedContext('learner').firestore() as unknown as Firestore;
+    await recordActiveDay(first, 'learner', '2026-09-01');
+    const firstSnapshot = (await getDoc(doc(first, 'users/learner/activity/main'))).data();
+    const secondSnapshot = (await getDoc(doc(second, 'users/learner/activity/main'))).data();
+    expect(firstSnapshot?.activeDays).toEqual(secondSnapshot?.activeDays);
+    const writes = [() => recordActiveDay(first, 'learner', '2026-09-02'), () => recordActiveDay(second, 'learner', '2026-09-03')];
+    for (const write of reverse ? writes.reverse() : writes) await write();
+    expect((await getDoc(doc(first, 'users/learner/activity/main'))).data()?.activeDays).toEqual({ '2026-09-01': true, '2026-09-02': true, '2026-09-03': true });
+    await assertFails(recordActiveDay(second, 'someone-else', '2026-09-04'));
+  });
+  it('merges an offline activity write after another device records a different day', async () => {
+    const first = testEnv.authenticatedContext('learner').firestore() as unknown as Firestore;
+    const second = testEnv.authenticatedContext('learner').firestore() as unknown as Firestore;
+    await recordActiveDay(first, 'learner', '2026-09-01');
+    await getDoc(doc(second, 'users/learner/activity/main'));
+    await disableNetwork(second);
+    const queued = recordActiveDay(second, 'learner', '2026-09-02');
+    await recordActiveDay(first, 'learner', '2026-09-03');
+    await enableNetwork(second);
+    await queued;
+    expect((await getDoc(doc(first, 'users/learner/activity/main'))).data()?.activeDays).toEqual({ '2026-09-01': true, '2026-09-02': true, '2026-09-03': true });
+  });
   it('allows signed-in profile reads but protects private learning history', async () => {
     await testEnv.withSecurityRulesDisabled(async context => {
       await setDoc(doc(context.firestore(), 'users', 'learner-a'), { displayName: 'Learner A' });
