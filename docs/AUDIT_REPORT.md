@@ -74,8 +74,6 @@
 
 ## 🔎 Detailed Findings
 
-Original mechanisms and verification criteria preserve the audit baseline; they are not fresh assertions that every historical code example remains present. Current implementation and dated evidence paragraphs supersede those descriptions. Findings outside the assigned N01–N03, S01–S04, P01–P04 and V01–V06 scope retain their prior acceptance status until separately verified.
-
 ### 🤖 M01 - Multi-Model AI Fallback Can Exceed a Single Transport Lifetime and Obscure Terminal Failures
 
 **Status:** Unresolved major finding.
