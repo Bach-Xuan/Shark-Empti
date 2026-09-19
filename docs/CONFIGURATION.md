@@ -284,17 +284,17 @@ The first E2E run uses the development server; the second uses the optimized bui
 
 Release also requires a current dependency audit, production Runtime/Function settings, deployed Firestore Rules and indexes, receipt TTL activation, the documented minimum browser targets, a physical camera and live OpenRouter validation. The build uses local system fonts and no longer downloads Google Fonts. Lists load 50 records initially and fetch older pages by cursor; search, statistics and reports cover loaded records.
 
-### 9.1. Dependency Assessment
+### 9.1. 🔍 Dependency Assessment
 
 `npm run audit:dependencies` sends resolved package names and versions to npm and prints JSON. It checks `config/dependency-audit-policy.json`; new, unreviewed or expired-exception findings fail validation. `npm run audit:dependencies -- --write-report` explicitly opts into a report file. The 15 September 2026 assessment reported four moderate, zero high and zero critical advisories after the `qs` 6.16.0 override. Four exact-version exceptions require review by 15 October 2026 or earlier if usage changes. V04 in [AUDIT_REPORT.md](AUDIT_REPORT.md) records applicability and scope.
 
-### 9.2. Receipt Retention and Index Operations
+### 9.2. 🧾 Receipt Retention and Index Operations
 
 New receipts carry `expiresAt` seven days after creation. Deletion is asynchronous, and retained receipts remain replayable until deletion. Desired posts index and receipt field settings are in `firestore.indexes.json`. From the repository root, `npm run firestore:retention` loads the Admin identity from `.env` and reads deployed metadata. With infrastructure authorization and sufficient Google IAM permissions, `npm run firestore:retention -- --apply` submits missing index creation and TTL/index-exemption changes. Verify completion of these asynchronous operations afterward.
 
 The 15 September inspection found the posts index missing and receipt TTL disabled. Application failed with IAM 403 at index creation, before TTL was applied; receipt inventory returned zero documents. For legacy data, `node --conditions=react-server --env-file=.env --import tsx scripts/receipt-retention.ts` inventories missing expiry values; adding `--apply` backfills them without directly deleting receipts. Its `alreadyExpired` counter concerns missing-expiry records whose calculated expiry is past, not every expired document.
 
-### 9.3. Local Measurements and Evidence Boundaries
+### 9.3. 📊 Local Measurements and Evidence Boundaries
 
 - `npm run test:browser-performance` requires an already-running isolated local production server. `PERFORMANCE_ORIGIN` defaults to `http://127.0.0.1:9002`. Three cold/warm samples per public route include navigation, bytes, heap and automated interaction timing; they do not establish real-user INP or historical improvement.
 - `npm run test:physical-camera` requires a local app, headed Chromium and real hardware. `CAMERA_TEST_ORIGIN` has the same default. Camera permission is granted for two capture/cleanup cycles; denial and revocation are not tested. The local HP camera passed at 640 × 480, while exact minimum browser versions and the wider device matrix remain unverified.

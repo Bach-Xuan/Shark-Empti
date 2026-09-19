@@ -174,7 +174,7 @@ Firestore transactions are used only to claim and finalize state. OpenRouter mus
 
 The generation protocol consists of three authenticated resources running on the Node.js runtime.
 
-#### `POST /api/ai/generations`
+#### 📨 `POST /api/ai/generations`
 
 Create or retrieve a generation using a client-created idempotency identifier:
 
@@ -198,7 +198,7 @@ type CreateGenerationResponse =
 
 Replaying the same `generationId`, owner, and fingerprint returns the current record. Reusing the identifier with a different fingerprint returns `409 APP-REQUEST-CONFLICT`.
 
-#### `POST /api/ai/generations/[generationId]/attempt`
+#### 🔁 `POST /api/ai/generations/[generationId]/attempt`
 
 Claim and execute exactly one next attempt. The request body contains neither a model identifier nor an attempt number:
 
@@ -216,11 +216,11 @@ type RunAttemptResponse =
 
 The client may request another attempt only after the server returns `retryable`, or after status recovery proves that an abandoned lease has become recoverable. The server enforces the aggregate retry budget regardless of the number of requests sent by the client.
 
-#### `GET /api/ai/generations/[generationId]`
+#### 🔎 `GET /api/ai/generations/[generationId]`
 
 Return the current state and any validated terminal result so the browser can recover after losing a response. The result is returned only to the authenticated owner.
 
-#### `DELETE /api/ai/generations/[generationId]`
+#### 🗑️ `DELETE /api/ai/generations/[generationId]`
 
 Record `cancel_requested` or `cancelled` and block new claims. This endpoint does not immediately delete the record. A running route must inspect cancellation before the upstream call when possible and again before finalization. A separate cancellation request cannot be assumed to propagate an `AbortSignal` reliably into an invocation running on another process or instance. Physical deletion is performed by TTL after the approved retention period.
 

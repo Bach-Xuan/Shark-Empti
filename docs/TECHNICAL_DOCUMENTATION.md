@@ -257,7 +257,7 @@ CI runs `npm ci → dependency audit → lint → typecheck → coverage → int
 
 The existence or success of a test suite does not establish remote CI, deployed Firestore indexes/Rules, production Vercel runtime, Safari/Firefox minimum versions, physical-camera behavior, live-provider reliability or current vulnerability applicability. Builds use local system font stacks and do not require Google Fonts.
 
-## 9. Implementation and Validation Evidence
+## 9. 📑 Implementation and Validation Evidence
 
 History versions 1 and 2 remain readable permanently; absent versions identify legacy records. Unknown future versions are rejected. Numeric quiz settings are validated separately from draft/persisted strings. `usePagedCollection` limits initial live subscriptions to 50 records and cursor-fetches older pages on demand. Statistics/search/report labels explicitly describe loaded-record scope. Current implementation status and operational validation gaps are tracked in [the audit report](AUDIT_REPORT.md).
 

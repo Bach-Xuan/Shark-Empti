@@ -76,7 +76,7 @@
 
 Original mechanisms and verification criteria preserve the audit baseline; they are not fresh assertions that every historical code example remains present. Current implementation and dated evidence paragraphs supersede those descriptions. Findings outside the assigned N01–N03, S01–S04, P01–P04 and V01–V06 scope retain their prior acceptance status until separately verified.
 
-### M01 - Multi-Model AI Fallback Can Exceed a Single Transport Lifetime and Obscure Terminal Failures
+### 🤖 M01 - Multi-Model AI Fallback Can Exceed a Single Transport Lifetime and Obscure Terminal Failures
 
 **Status:** Unresolved major finding.
 
@@ -96,7 +96,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Required verification before closure:** Add deterministic tests for the maximum attempt count, client cancellation, server timeout, browser transport loss, late responses, duplicate in-flight attempts, authentication and quota rejection, retry classification, global-state isolation, secret redaction, result recovery, and draft preservation. Compatibility tests must cover all seven public flow contracts and every caller while preserving existing semantic validation. Staging evidence must correlate a non-sensitive generation identifier across browser events and Function logs, demonstrate that each invocation contacts no more than one model, and confirm that an interrupted browser response does not initiate duplicate upstream work without first recovering server state. The finding may be closed only after the sequential multi-model fallback chain is absent from production entry points and all seven AI flows satisfy the target transport contract.
 
-### F01 - Missing Server-Side Authentication and Quota Enforcement for AI Actions
+### 🔥 F01 - Missing Server-Side Authentication and Quota Enforcement for AI Actions
 
 **Status:** Unresolved.
 
@@ -104,7 +104,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** Client-side authentication cannot protect a callable server entry point. Verification must cover absent, invalid, expired, and valid credentials; concurrent quota consumption; oversized inputs; sustained request bursts; every AI flow; and proof that rejected requests do not reach the upstream provider. Replacing Server Actions with a Route Handler does not resolve this defect unless the new entry point performs server-side authentication and enforces request budgets before any upstream attempt.
 
-### F02 - Inadequate Validation of Persisted and Legacy Firestore Data
+### 🔥 F02 - Inadequate Validation of Persisted and Legacy Firestore Data
 
 **Status:** Unresolved.
 
@@ -112,7 +112,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** The system requires schema-aware write rules, legacy-tolerant readers, and validation before rendering or scoring. Tests should address create and update operations, records with individually missing fields, mixed valid and invalid feeds, and API behaviour in the presence of malformed records.
 
-### F03 - Non-Durable History Persistence Caused by `undefined` Values and Unawaited Writes
+### 🔥 F03 - Non-Durable History Persistence Caused by `undefined` Values and Unawaited Writes
 
 **Status:** Unresolved.
 
@@ -120,7 +120,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** A failure may be reported after the UI has implied success, and a retry may duplicate data. A write DTO should omit absent properties, persistence should have explicit completion semantics, and validation should cover nested `undefined`, rejected writes, retry idempotency, reload, and history consistency.
 
-### F04 - Prototype-Key Collisions in Topic Aggregation
+### 🔥 F04 - Prototype-Key Collisions in Topic Aggregation
 
 **Status:** Resolved.
 
@@ -130,7 +130,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Scope and evidentiary boundary:** The correction applies to the aggregation layer that constructs dashboard topic and error summaries. It preserves ordinary topic labels without reserving JavaScript object-property names. Closure is supported by behavioural tests against the actual statistics utility; it does not imply that every consumer of externally supplied topic text has undergone equivalent schema validation.
 
-### F05 - Incorrect Denominators in Per-Skill Aggregate Scores
+### 🔥 F05 - Incorrect Denominators in Per-Skill Aggregate Scores
 
 **Status:** Resolved.
 
@@ -140,7 +140,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Scope and evidentiary boundary:** The revised calculation distinguishes an observed score of zero from the absence of a measurement and prevents malformed numeric values from contaminating an aggregate. The tests establish the mathematical contract for the dashboard utility. They do not certify the scientific validity of the six cognitive metrics or the upstream model's method of producing them.
 
-### F06 - Insufficient Semantic Validation of AI Inputs and Outputs
+### 🔥 F06 - Insufficient Semantic Validation of AI Inputs and Outputs
 
 **Status:** Resolved.
 
@@ -150,7 +150,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Scope and evidentiary boundary:** Validation is performed at the server-side flow boundary after parsing the model response, including relationships that cannot be expressed solely by a provider-facing JSON Schema. Invalid inputs and outputs receive controlled application errors rather than silent coercion. Closure concerns the documented semantic contract; it does not guarantee factual correctness, pedagogical quality, or provider availability.
 
-### F07 - Duplicate Forum Submission and Premature Draft Disposal
+### 🔥 F07 - Duplicate Forum Submission and Premature Draft Disposal
 
 **Status:** Resolved.
 
@@ -160,7 +160,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Scope and evidentiary boundary:** The verified workflow is the creation of a new Forum post. The pending state protects both repeated clicks and input mutation while a write is in flight, and failure leaves recoverable user content visible. The evidence does not extend to post or comment editing, deletion, offline conflict resolution, or cross-device draft synchronization.
 
-### F08 - Duplicate AI Feedback Generation for a Single Arena Attempt
+### 🔥 F08 - Duplicate AI Feedback Generation for a Single Arena Attempt
 
 **Status:** Resolved.
 
@@ -170,7 +170,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Scope and evidentiary boundary:** The correction establishes single ownership of the analysis generated during quiz completion and prevents the result view from initiating a redundant request when that analysis is available. The test exercises the real view boundary while mocking external AI transport. It does not establish that upstream feedback generation itself is reliable or semantically correct.
 
-### F09 - Inadequate Authentication Guarding and Retry Behaviour in Arena
+### 🔥 F09 - Inadequate Authentication Guarding and Retry Behaviour in Arena
 
 **Status:** Resolved.
 
@@ -180,7 +180,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Scope and evidentiary boundary:** The resolved behaviour concerns the Arena start and submission interface when no authenticated user is available or authentication is still being restored. It prevents an invalid client transition and provides a recoverable state. Server-side token validation remains the authoritative security boundary and is not replaced by these user-interface guards.
 
-### F10 - Unstable Business Identity for Roadmap Checklist Entries
+### 🔥 F10 - Unstable Business Identity for Roadmap Checklist Entries
 
 **Status:** Unresolved.
 
@@ -190,7 +190,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** Stable topic and task identifiers require an explicit legacy migration policy. Validation should cover both locales, reordered history, duplicate recommendations, account switching, and a migration dry run without assigning uncertain ownership.
 
-### F11 - Incomplete Model and Camera Cleanup Across Failure Paths
+### 🔥 F11 - Incomplete Model and Camera Cleanup Across Failure Paths
 
 **Status:** Unresolved.
 
@@ -200,7 +200,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** Fault injection is required for load, warm-up, inference, playback, permission, and late-resolution paths, with explicit assertions for animation frames, tensors, model resources, WebGL state, and media tracks. Physical-camera validation remains necessary.
 
-### F12 - Loss of Error State and Diagnostic Context Across Arena and API Boundaries
+### 🔥 F12 - Loss of Error State and Diagnostic Context Across Arena and API Boundaries
 
 **Status:** Unresolved.
 
@@ -208,7 +208,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** Error transport should preserve typed, safe diagnostics and provide retry or resubscription where applicable. Verification should distinguish initial and terminal subscription failures, authentication, request conflicts, malformed legacy data, configuration errors, permission denials, unavailable services, and both supported interface languages. Long-running AI transport failures require their own lifetime and cancellation analysis; correcting generic error mapping alone would not establish that such requests return a structured result before the browser or hosting platform terminates the connection.
 
-### F13 - Incomplete Localization and Accessible Naming in Identified Controls
+### 🔥 F13 - Incomplete Localization and Accessible Naming in Identified Controls
 
 **Status:** Resolved.
 
@@ -218,7 +218,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Scope and evidentiary boundary:** Closure applies to the catalog entries and controls specifically identified during the original review, including legacy difficulty labels and named icon actions. Static parity prevents locale-key drift, while browser-oriented assertions verify selected accessible names. Dynamic user content, third-party widget semantics, screen-reader behaviour, and unenumerated controls require separate acceptance evidence.
 
-### F14 - False-Positive Clipboard Success Notification
+### 🔥 F14 - False-Positive Clipboard Success Notification
 
 **Status:** Resolved.
 
@@ -228,7 +228,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Scope and evidentiary boundary:** The helper contract covers an absent API, a rejected write, and a successfully completed write without exposing clipboard content in diagnostics. The result view no longer infers success from invocation alone. Browser permission-policy differences and platform-specific clipboard restrictions remain environmental concerns, but they now produce a failure result rather than a false success message.
 
-### D01 - Arena Retakes Reuse the Previous Attempt Identifier
+### 🧩 D01 - Arena Retakes Reuse the Previous Attempt Identifier
 
 **Status:** Unresolved.
 
@@ -238,7 +238,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** All new-attempt paths should share one initialization operation, whereas transport retry for the same attempt must preserve the identifier and duration. Tests must distinguish new attempts, concurrent retries, stored receipts, and conflicting payloads.
 
-### D02 - LaTeX Corruption Caused by Redundant Escape Replacement
+### 🧩 D02 - LaTeX Corruption Caused by Redundant Escape Replacement
 
 **Status:** Resolved in the current source; no dedicated regression test was identified.
 
@@ -248,7 +248,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Scope and evidentiary boundary:** The source inspection establishes removal of the known destructive transformation between the structured AI response and the renderer. KaTeX parsing, malformed model output, and the visual correctness of complex mathematical notation are separate concerns. Because no dedicated regression fixture captures the original commands, the resolved status rests on the absence of the mechanism rather than a complete behavioural acceptance test.
 
-### D03 - Profile Snapshots Can Overwrite an Unsaved Biography Draft
+### 🧩 D03 - Profile Snapshots Can Overwrite an Unsaved Biography Draft
 
 **Status:** Unresolved.
 
@@ -258,7 +258,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** The component needs an explicit synchronization policy for pristine, dirty, saved, cancelled, and remotely updated states. Tests should include delayed snapshots, failed and successful saves, account changes, and unmounting.
 
-### D04 - Report-Selection Checkboxes Can Toggle Twice per Interaction
+### 🧩 D04 - Report-Selection Checkboxes Can Toggle Twice per Interaction
 
 **Status:** Unresolved.
 
@@ -268,7 +268,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** A single semantic control should own the state transition. Verification should cover direct checkbox clicks, label or row clicks, keyboard input, checked state, and accessible naming.
 
-### D05 - Stale Setup Validation Can Start a Quiz After Context Changes
+### 🧩 D05 - Stale Setup Validation Can Start a Quiz After Context Changes
 
 **Status:** Unresolved.
 
@@ -278,7 +278,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** Validation requires cancellation or lifetime/version control across every asynchronous boundary. Tests should cover overlapping requests, changed input, back navigation, unmounting, and late success or failure.
 
-### D06 - Forum Edit Drafts Are Discarded Before Write Confirmation
+### 🧩 D06 - Forum Edit Drafts Are Discarded Before Write Confirmation
 
 **Status:** Unresolved.
 
@@ -288,7 +288,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** Edit operations need the completion semantics already implemented for post creation: payload snapshotting, pending exclusion, confirmation before closure, and draft retention on failure. Tests should include delay, duplicate submission, rejection, retry, and limits.
 
-### D07 - Post Deletion Leaves Publicly Readable Orphaned Comments
+### 🧩 D07 - Post Deletion Leaves Publicly Readable Orphaned Comments
 
 **Status:** Unresolved.
 
@@ -298,7 +298,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** The product must first define cascade, soft-delete, or retention semantics. Rules, concurrent comment creation, idempotent retry, batch limits, cost, and legacy orphan handling must then be validated.
 
-### D08 - Arena “Ask Guru” Action Has No User-Facing Effect
+### 🧩 D08 - Arena “Ask Guru” Action Has No User-Facing Effect
 
 **Status:** Unresolved.
 
@@ -308,7 +308,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** Product policy must determine whether assistance is permitted in Arena. The implementation should then provide a complete accessible flow or remove/disable the affordance with a localized explanation.
 
-### D09 - Report Printing Is Constrained by the Dialog Scroll Container
+### 🧩 D09 - Report Printing Is Constrained by the Dialog Scroll Container
 
 **Status:** Unresolved.
 
@@ -318,7 +318,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** Print-specific layout rules should remove viewport overflow constraints and define page breaks. Verification requires multi-page PDF or print preview across supported browsers, charts, long Vietnamese content, and both themes.
 
-### D10 - Duplicate Error Codes and English Text in Vietnamese Toasts
+### 🧩 D10 - Duplicate Error Codes and English Text in Vietnamese Toasts
 
 **Status:** Resolved in the current source.
 
@@ -328,7 +328,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Scope and evidentiary boundary:** The formatter no longer infers error structure from human-readable display text, and only approved diagnostic fields are rendered. The tests cover specific and aggregate error codes in both locales. Closure does not imply that every caller preserves the most specific originating error; it establishes that correctly supplied typed metadata is formatted once and localized consistently.
 
-### D11 - Invalid Responsive Utility Classes Produce No CSS Effect
+### 🧩 D11 - Invalid Responsive Utility Classes Produce No CSS Effect
 
 **Status:** Unresolved.
 
@@ -338,7 +338,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** Intent must be established per component rather than through a global replacement. Verification should inspect computed styles across breakpoints, long Vietnamese text, navigation visibility, and both themes.
 
-### D12 - Incomplete Keyboard Semantics and Accessible Naming
+### 🧩 D12 - Incomplete Keyboard Semantics and Accessible Naming
 
 **Status:** Unresolved.
 
@@ -348,7 +348,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** Native interactive elements should be preferred. Acceptance should include Tab and Shift+Tab traversal, Enter and Space behaviour, accessible-name assertions, dialog focus return, automated scanning, and screen-reader testing when required.
 
-### D13 - OpenRouter Health Check Does Not Authenticate the Supplied Key
+### 🧩 D13 - OpenRouter Health Check Does Not Authenticate the Supplied Key
 
 **Status:** Unresolved.
 
@@ -358,7 +358,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** Metadata availability, credential authentication, and live inference are distinct checks and should remain separately reported. Tests should cover missing, invalid, revoked, and quota-limited credentials; absent models; network timeout; and credential redaction.
 
-### D14 - Authentication Restoration Can Discard an Early Forum Draft
+### 🧩 D14 - Authentication Restoration Can Discard an Early Forum Draft
 
 **Status:** Unresolved.
 
@@ -368,7 +368,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** User-owned editing should either be blocked until authentication resolves or use an explicit ownership-aware hydration policy. UID isolation must remain intact. Tests should cover genuine guests, restored sessions, account switching, early interaction, and rapid navigation.
 
-### D15 - Client-Controlled Duration Compromises Arena Leaderboard Integrity
+### 🧩 D15 - Client-Controlled Duration Compromises Arena Leaderboard Integrity
 
 **Status:** Unresolved.
 
@@ -376,7 +376,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** This is a server-authority defect rather than a presentation discrepancy: a ranking-relevant value is accepted from an untrusted source without corroboration. The server should derive elapsed time from server-observed attempt state or apply a clearly documented integrity mechanism. Verification should include zero, negative, implausibly small, extremely large, missing, and replayed duration values, as well as equal-score ranking behaviour.
 
-### D16 - Arena Leaderboard Applies Its Result Limit Before the Duration Tie-Break
+### 🧩 D16 - Arena Leaderboard Applies Its Result Limit Before the Duration Tie-Break
 
 **Status:** Unresolved.
 
@@ -384,7 +384,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** The database query and the displayed ranking comparator must express the same total order, normally by adding duration as a secondary ordering field and provisioning the corresponding index. A deterministic final tie-break should also be defined. Verification should use more than ten equal-score attempts with deliberately varied durations and document identifiers.
 
-### D17 - English Bonus Copy Misrepresents the Arena Reward Rule
+### 🧩 D17 - English Bonus Copy Misrepresents the Arena Reward Rule
 
 **Status:** Unresolved.
 
@@ -392,7 +392,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** The English copy should state the implemented global rule, or the reward rule should be changed if the intended policy is per user. Product intent must be confirmed before implementation. Acceptance should compare the first global submission, another user's first submission, and a retake in both locales.
 
-### D18 - Activity Tracking Can Lose Concurrent Day Updates
+### 🧩 D18 - Activity Tracking Can Lose Concurrent Day Updates
 
 **Status:** Unresolved.
 
@@ -400,7 +400,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Risk and required verification:** The write should target the individual date field atomically or use a transaction with an explicit conflict policy. A deterministic Emulator test should hold two stale snapshots, write distinct dates in opposite orders, and assert that both dates remain. Account changes and offline reconciliation should also be covered.
 
-### N01 - Inconsistent Naming and File-Name Conventions
+### 🧹 N01 - Inconsistent Naming and File-Name Conventions
 
 **Status:** Resolved.
 
@@ -412,7 +412,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Original verification criteria:** Renaming should be selective and accompanied by consumer analysis, import-graph inspection, route and filename casing checks, and Linux type-check/build validation.
 
-### N02 - Domain Types and Schemas Do Not Consistently Represent Their Lifecycle Stage
+### 🧹 N02 - Domain Types and Schemas Do Not Consistently Represent Their Lifecycle Stage
 
 **Status:** Resolved.
 
@@ -424,7 +424,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Original verification criteria:** Separate lifecycle-specific types and shared schemas while preserving legacy adapters. Define whether history documents are to remain permanently backward-compatible or be migrated; if migration is intended, introduce an explicit schema-version contract, an idempotent backfill strategy, observability for remaining legacy records, and documented fallback-retirement criteria. Validate legacy fixtures with absent and malformed `analysis`, migration retries, numeric bounds, cross-flow contracts, and compilation.
 
-### N03 - Readability Debt and Potentially Unused Modules
+### 🧹 N03 - Readability Debt and Potentially Unused Modules
 
 **Status:** Resolved.
 
@@ -436,7 +436,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Original verification criteria:** Dynamic and script-based consumers must be excluded before deletion. A dedicated unused-symbol check, import graph, lint, type-check, production build, and focused diff review are required. The numeric tolerance should additionally be supported by a documented product or mathematical rationale and by fixtures immediately below, at, and above the accepted boundary, including representative small and large magnitudes.
 
-### S01 - Feature Modules Combine Excessive and Heterogeneous Responsibilities
+### 🏗️ S01 - Feature Modules Combine Excessive and Heterogeneous Responsibilities
 
 **Status:** Resolved.
 
@@ -448,7 +448,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Original verification criteria:** Refactoring should follow domain responsibility rather than arbitrary size limits and should preserve routing, dialog focus, subscription lifetime, UID resets, and principal end-to-end flows.
 
-### S02 - Duplicated Implementations Have Diverged Semantically
+### 🏗️ S02 - Duplicated Implementations Have Diverged Semantically
 
 **Status:** Resolved.
 
@@ -460,7 +460,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Original verification criteria:** Shared abstractions should be introduced only where contracts are genuinely equivalent. Parity, locale/date fixtures, limits, create/edit/retry behaviour, and all relevant consumers require validation.
 
-### S03 - Ambiguous State Ownership Between Views and Reducers
+### 🏗️ S03 - Ambiguous State Ownership Between Views and Reducers
 
 **Status:** Resolved.
 
@@ -472,7 +472,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Original verification criteria:** Establish ownership and cancellation rules, remove genuinely dead actions or connect required ones, and test start, ready, finish, failure, reset, navigation, stale responses, and locale changes.
 
-### S04 - Inconsistent Asynchronous Completion and Error-Boundary Contracts
+### 🏗️ S04 - Inconsistent Asynchronous Completion and Error-Boundary Contracts
 
 **Status:** Resolved.
 
@@ -484,7 +484,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Original verification criteria:** Mutations that require coordination should return an explicit `Promise<Result>`, apply pending exclusion where necessary, and retain safe typed diagnostics. Delayed and rejected promises, provider failures, boundary reset, and localized recovery UI require testing.
 
-### P01 - Unbounded Queries and Client-Side List Processing
+### ⚡ P01 - Unbounded Queries and Client-Side List Processing
 
 **Status:** Resolved.
 
@@ -496,7 +496,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Original verification criteria:** Measure representative datasets (for example 100, 1,000, and 10,000 records) using read counts, transferred bytes, heap, and render time before selecting cursors, pagination, virtualization, or aggregation. Statistical and sorting correctness must be preserved.
 
-### P02 - Recurrent Timer Updates and Repeated KaTeX Rendering
+### ⚡ P02 - Recurrent Timer Updates and Repeated KaTeX Rendering
 
 **Status:** Resolved.
 
@@ -508,7 +508,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Original verification criteria:** Profile before optimization. Any timer isolation or output cache must preserve timer termination and invalidate correctly when text, rendering options, theme, or locale changes.
 
-### P03 - Duplicate Conversation Context in AI Requests
+### ⚡ P03 - Duplicate Conversation Context in AI Requests
 
 **Status:** Resolved.
 
@@ -520,7 +520,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Original verification criteria:** Review context and conversational turns should be represented once without removing necessary quiz information. Request-body structure, role mapping, message ordering, multi-turn behaviour, both languages, and byte/token measurements require validation.
 
-### P04 - Idempotency Receipts Have No Defined Retention Bound
+### ⚡ P04 - Idempotency Receipts Have No Defined Retention Bound
 
 **Status:** Implemented; production TTL/index activation blocked by IAM.
 
@@ -532,7 +532,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Remaining acceptance:** Use an appropriately authorized Google identity to apply the configuration and verify completed index/TTL operations. Verify actual expiry cleanup and retry behavior around deletion. Local machine access does not grant Google IAM permissions.
 
-### V01 - Incomplete WebKit Validation
+### 🧪 V01 - Incomplete WebKit Validation
 
 **Status:** Partial; WebKit development passed, production matrix pending.
 
@@ -544,7 +544,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Remaining acceptance:** Run the complete 28-case production E2E matrix on the corrected build. Development E2E and a successful build do not substitute for that result, and current Playwright WebKit does not establish exact Safari-version support.
 
-### V02 - Unverified Minimum Browser Versions and Physical-Camera Behaviour
+### 🧪 V02 - Unverified Minimum Browser Versions and Physical-Camera Behaviour
 
 **Status:** Partial; local physical camera passed, target matrix pending.
 
@@ -554,7 +554,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Remaining acceptance:** Safari 16.4, Chrome 111 and Firefox 128 remain documented targets without exact-version acceptance evidence. Physical mobile devices, lighting, CPU load, backend selection and permission-revocation scenarios require separate results. The script grants camera permission and therefore does not validate the operating-system permission prompt or denial flow.
 
-### V03 - Unverified Remote CI, Production Runtime, and Firestore Index State
+### 🧪 V03 - Unverified Remote CI, Production Runtime, and Firestore Index State
 
 **Status:** Partial; hosted CI failure observed, deployment verification pending.
 
@@ -564,7 +564,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Remaining acceptance:** Obtain a successful complete hosted run only when the user explicitly requests GitHub activity, validate the corrected optimized runtime and deployment settings, and confirm deployed Rules, index readiness and TTL activation. Public-route HTTP responses do not establish authenticated workflows, live AI inference or production configuration correctness.
 
-### V04 - Dependency-Risk Assessment Is Not Current
+### 🧪 V04 - Dependency-Risk Assessment Is Not Current
 
 **Status:** Resolved.
 
@@ -574,7 +574,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Enforcement and evidence:** `scripts/dependency-audit.mjs` checks advisory identity, severity, every matching installed version, development-only constraints where specified, and expiry of the review policy. Unreviewed findings cause failure. The workflow includes this command after installation. The command prints JSON by default; `--write-report` is required to create a report file. Lint, typecheck, 106 unit/component tests, seven integration tests and the production build passed following the dependency change.
 
-### V05 - Inadequate Comparative Baselines and Incomplete Coverage Evidence
+### 🧪 V05 - Inadequate Comparative Baselines and Incomplete Coverage Evidence
 
 **Status:** Partial; current and query baselines measured, historical comparison pending.
 
@@ -586,7 +586,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Remaining acceptance:** Complete a comparable historical production build, use equivalent hardware/browser/cache/dataset conditions, and compare route/chunk bytes, cold/warm loads, interaction distributions, heap and reads. Record changed-branch coverage with its actual instrumentation denominator. Do not label the exploratory measurements as proof of a performance improvement.
 
-### V06 - Production Builds Depend on Live Google Fonts Availability
+### 🧪 V06 - Production Builds Depend on Live Google Fonts Availability
 
 **Status:** Resolved.
 
