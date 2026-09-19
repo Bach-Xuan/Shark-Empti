@@ -7,7 +7,7 @@ import { uiMessage } from '@/lib/i18n';
 import { quizLabel } from '@/lib/quiz-labels';
 import { useMemo as usePageMemo } from 'react';
 
-import { generateQuestions } from '@/ai/flows/generate-questions-flow';
+import { generateQuestions } from '@/ai/client-flows';
 import Navigation from '@/components/navigation';
 import SetupView from '@/components/setup-view';
 import { Avatar,AvatarFallback,AvatarImage } from '@/components/ui/avatar';

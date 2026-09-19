@@ -1,6 +1,6 @@
 export type ErrorValue = string | number | boolean;
 
-/** A safe error shape that can cross a Next.js Server Action boundary. */
+/** A safe error shape that can cross a server-to-client boundary. */
 export interface AppError {
   code: string;
   message: string;

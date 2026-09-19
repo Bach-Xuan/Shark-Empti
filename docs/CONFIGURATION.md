@@ -78,9 +78,10 @@ Next.js reads `.env` for development/build. The two AI scripts use `node --env-f
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Browser-visible | Firebase app initialization | `firebaseConfig.messagingSenderId` |
 | `NEXT_PUBLIC_FIREBASE_APP_ID` | Browser-visible | Firebase app initialization | `firebaseConfig.appId` |
 | `OPENROUTER_API_KEY` | Server secret | Seven AI flows and live smoke | Standard OpenRouter API key |
-| `FIREBASE_ADMIN_PROJECT_ID` | Server config | Arena/Forum Admin APIs outside Emulator | Service-account JSON `project_id` |
-| `FIREBASE_ADMIN_CLIENT_EMAIL` | Server secret | Arena/Forum Admin APIs outside Emulator | Service-account JSON `client_email` |
-| `FIREBASE_ADMIN_PRIVATE_KEY` | Server secret | Arena/Forum Admin APIs outside Emulator | Service-account JSON `private_key` |
+| `AI_GENERATION_PROTOCOL_ENABLED` | Server config | Unset enables local/test and disables production; set `true` only for approved staging or production canary creation | `true` or `false` |
+| `FIREBASE_ADMIN_PROJECT_ID` | Server config | Arena, Forum and AI APIs outside Emulator | Service-account JSON `project_id` |
+| `FIREBASE_ADMIN_CLIENT_EMAIL` | Server secret | Arena, Forum and AI APIs outside Emulator | Service-account JSON `client_email` |
+| `FIREBASE_ADMIN_PRIVATE_KEY` | Server secret | Arena, Forum and AI APIs outside Emulator | Service-account JSON `private_key` |
 | `NEXT_PUBLIC_USE_EMULATORS` | Test only | Browser connection to local emulators | `true`, supplied by E2E config |
 | `FIRESTORE_EMULATOR_HOST` | Test only | Admin/SDK connection to Firestore Emulator | Set by Firebase CLI as `host:port` |
 | `FIREBASE_AUTH_EMULATOR_HOST` | Test only | Admin/SDK connection to Auth Emulator | Set by Firebase CLI as `host:port` |
@@ -187,7 +188,7 @@ npm run ai:smoke
 ```
 
 - `ai:health` confirms that a key is present, calls the model catalogue and checks that all three fallback models are listed. The catalogue may return 200 for an invalid key, so this command **does not prove authentication, quota or inference**.
-- `ai:smoke` generates one real quiz and chatbot response through the live transport. It may consume quota and does not run in CI.
+- `ai:smoke` generates one real quiz and chatbot response through the live single-attempt OpenRouter adapter. It validates provider inference and operation schemas, but does not exercise Firebase authentication, the generation ledger, quota or browser recovery. It may consume quota and does not run in CI.
 - Never print the key for debugging. Inspect only variable names/presence and safe status/error codes.
 
 ### 4.2. 🔄 Current AI Transport
@@ -198,7 +199,7 @@ The current source sends `POST https://openrouter.ai/api/v1/chat/completions`. I
 2. `google/gemma-4-31b-it:free`;
 3. `nvidia/nemotron-3.5-lightning:free`.
 
-The effective first model is not fixed: process-scoped `preferredModel` is updated after a successful foreground request or warm-up, and `orderedModels(preferredModel)` begins a later request from that model before appending the remaining nominal-priority models. Each foreground attempt has a 20-second timeout; warm-up uses 8 seconds. A timeout/transport rollover can make one generation perform up to five attempts in the same Server Action. This is the audited current state, not the target architecture. Do not address remediation by changing only the timeout or treating every HTTP 400/403 as retryable; see [AUDIT_REPORT.md](AUDIT_REPORT.md) and [AI_TRANSPORT_REMEDIATION_PLAN.md](AI_TRANSPORT_REMEDIATION_PLAN.md).
+The order is fixed and server-authoritative. Each generation may claim each ordinal once, up to three attempts, and each attempt-route invocation makes at most one OpenRouter request with a 20-second provider deadline. A short-lived Firestore ledger provides idempotency, leases, cancellation and status recovery; per-user and global quota records are reserved transactionally. The browser submits no model name or attempt number. Production generation creation remains disabled unless `AI_GENERATION_PROTOCOL_ENABLED=true`; enable it only after staging verifies Function duration, response-loss recovery, concurrent claims, TTL activation, quota thresholds and content-free telemetry.
 
 ## 5. 💻 Local Execution
 
@@ -254,7 +255,7 @@ Do not delete TEMP or a user directory. Do not run two Emulator suites on the sa
 
 1. Import the repository into Vercel and confirm the Next.js Framework Preset.
 2. Select Node.js 24.x under **Project Settings → Build and Deployment**.
-3. Under **Project Settings → Environment Variables**, add the six `NEXT_PUBLIC_FIREBASE_*` values and four server values (`OPENROUTER_API_KEY` plus three `FIREBASE_ADMIN_*`) to the correct Development, Preview and Production scopes.
+3. Under **Project Settings → Environment Variables**, add the six `NEXT_PUBLIC_FIREBASE_*` values and four server credentials (`OPENROUTER_API_KEY` plus three `FIREBASE_ADMIN_*`) to the correct Development, Preview and Production scopes. Add `AI_GENERATION_PROTOCOL_ENABLED=true` only to an approved staging environment or production canary.
 4. Mark server credentials sensitive where supported; do not reuse an unrestricted development key in production.
 5. Create a new deployment after every env change; changes are not retroactive.
 6. Add Vercel/custom hostnames to Firebase Authentication authorized domains.
@@ -293,15 +294,15 @@ npm run test:production
 
 The first E2E run uses the development server; the second uses the optimized build. CI also records the bundle inventory and synthetic performance baseline. Browser installation requires the relevant host libraries. The earlier local WebKit launch restriction no longer prevented the 15 September 2026 run: corrected development WebKit passed 7/7, while the complete corrected production matrix remains pending.
 
-Release also requires a current dependency audit, production Runtime/Function settings, deployed Firestore Rules and indexes, receipt TTL activation, the documented minimum browser targets, a physical camera and live OpenRouter validation. The build uses local system fonts and no longer downloads Google Fonts. Lists load 50 records initially and fetch older pages by cursor; search, statistics and reports cover loaded records.
+Release also requires a current dependency audit, production Runtime/Function settings, deployed Firestore Rules and indexes, receipt and AI-ledger TTL activation, the documented minimum browser targets, a physical camera and live OpenRouter validation. The AI feature flag must remain disabled outside approved staging/canary scopes. The build uses local system fonts and no longer downloads Google Fonts. Lists load 50 records initially and fetch older pages by cursor; search, statistics and reports cover loaded records.
 
 ### 9.1. 🔍 Dependency Assessment
 
 `npm run audit:dependencies` sends resolved package names and versions to npm, prints a JSON summary, and writes `reports/dependency-audit.json`. The current script does not read a checked-in exception-policy file and does not implement a `--write-report` mode. The 15 September 2026 assessment of four moderate, zero high and zero critical advisories is historical evidence only; rerun the command before making a current dependency-risk claim. V04 in [AUDIT_REPORT.md](AUDIT_REPORT.md) records the remaining verification gap.
 
-### 9.2. 🧾 Receipt Retention and Index Operations
+### 9.2. 🧾 Receipt and AI-Ledger Retention and Index Operations
 
-New receipts carry `expiresAt` seven days after creation. Deletion is asynchronous, and retained receipts remain replayable until deletion. Desired posts index and receipt field settings are in `firestore.indexes.json`. From the repository root, `node scripts/inspect-firestore.mjs` loads the Admin identity from `.env`, reads deployed metadata, and writes `reports/firestore-metadata.json`. It is read-only. This checkout contains no package command or source file that applies index or TTL configuration, so production changes require a separately authorized infrastructure workflow and subsequent verification.
+New receipts carry `expiresAt` seven days after creation. AI generation and quota records also carry short-lived `expiresAt` fields. Deletion is asynchronous, and retained receipts remain replayable until deletion. Desired posts index and TTL field settings for `_requestReceipts`, `_aiGenerations` and `_aiQuota` are in `firestore.indexes.json`. From the repository root, `node scripts/inspect-firestore.mjs` loads the Admin identity from `.env`, reads the deployed posts index and all three TTL policies, and writes `reports/firestore-metadata.json`. It is read-only. This checkout contains no package command or source file that applies index or TTL configuration, so production changes require a separately authorized infrastructure workflow and subsequent verification.
 
 The 15 September inspection found the posts index missing and receipt TTL disabled. Application failed with IAM 403 at index creation, before TTL was applied; receipt inventory returned zero documents. For legacy data, `node --conditions=react-server --env-file=.env --import tsx scripts/receipt-retention.ts` inventories missing expiry values; adding `--apply` backfills them without directly deleting receipts. Its `alreadyExpired` counter concerns missing-expiry records whose calculated expiry is past, not every expired document.
 

@@ -7,8 +7,10 @@ try {
  const client = await auth.getClient();
  const base = 'https://firestore.googleapis.com/v1/projects/' + encodeURIComponent(project) + '/databases/(default)/collectionGroups/';
  const indexes = await client.request({ url:base+'posts/indexes', method:'GET' });
- const field = await client.request({ url:base+'_requestReceipts/fields/expiresAt', method:'GET' });
- const report={ measuredAt:new Date().toISOString(), scope:'read-only deployed index and TTL metadata', indexes:(indexes.data.indexes||[]).map(index=>({state:index.state,queryScope:index.queryScope,fields:index.fields})), receiptTtl:field.data.ttlConfig ?? null };
+ const ttlCollections=['_requestReceipts','_aiGenerations','_aiQuota'];
+ const ttlResponses=await Promise.all(ttlCollections.map(collection=>client.request({ url:base+collection+'/fields/expiresAt', method:'GET' })));
+ const ttl=Object.fromEntries(ttlCollections.map((collection,index)=>[collection,ttlResponses[index].data.ttlConfig ?? null]));
+ const report={ measuredAt:new Date().toISOString(), scope:'read-only deployed index and TTL metadata', indexes:(indexes.data.indexes||[]).map(index=>({state:index.state,queryScope:index.queryScope,fields:index.fields})), ttl };
  fs.mkdirSync('reports',{recursive:true});fs.writeFileSync('reports/firestore-metadata.json',JSON.stringify(report,null,2));
  console.log(JSON.stringify(report));
 } catch (error) { console.error('Read-only Firestore inspection failed; HTTP status: '+(error.response?.status ?? 'unavailable')); process.exitCode=1; }

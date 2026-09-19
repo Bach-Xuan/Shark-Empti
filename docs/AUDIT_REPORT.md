@@ -22,8 +22,8 @@
 
 | ID | Finding | Status | Last Updated |
 |---|---|---|---|
-| M01 | Multi-Model AI Fallback Can Exceed a Single Transport Lifetime and Obscure Terminal Failures | Unresolved | 12 September 2026 |
-| F01 | Missing Server-Side Authentication and Quota Enforcement for AI Actions | Unresolved | 3 September 2026 |
+| M01 | Multi-Model AI Fallback Can Exceed a Single Transport Lifetime and Obscure Terminal Failures | Implemented locally; staging and canary verification pending | 19 September 2026 |
+| F01 | Missing Server-Side Authentication and Quota Enforcement for AI Actions | Implemented locally; targeted and deployment verification pending | 19 September 2026 |
 | F02 | Inadequate Validation of Persisted and Legacy Firestore Data | Unresolved | 3 September 2026 |
 | F10 | Unstable Business Identity for Roadmap Checklist Entries | Unresolved | 3 September 2026 |
 | F11 | Incomplete Model and Camera Cleanup Across Failure Paths | Unresolved | 3 September 2026 |
@@ -82,11 +82,13 @@
 
 ### 🤖 M01 - Multi-Model AI Fallback Can Exceed a Single Transport Lifetime and Obscure Terminal Failures
 
-**Status:** Unresolved major finding.
+**Status:** Implemented locally; staging and canary verification pending.
 
-**Description and verified context:** All seven public AI flows execute `generateStructured` within a Server Action. The adapter performs sequential model fallback inside that single invocation, with a fixed 20-second deadline for each upstream attempt. Following a timeout or transport failure, the rollover order can produce five attempts; the existing unit test explicitly asserts the sequence Inkling → Nemotron → Inkling → Gemma → Nemotron and an `attemptedModels` value of five. The resulting upstream wait can therefore approach 100 seconds before application and platform overhead. No route-level `maxDuration`, deployment-bound deadline, or configurable production margin is defined in the repository. A platform or browser connection can terminate before the adapter returns its structured `AppResult`, even though an upstream provider has already received or completed work.
+**Original mechanism:** Before the 19 September 2026 implementation, all seven public AI flows executed `generateStructured` within a Server Action. The adapter performed sequential model fallback inside one invocation, and timeout rollover could produce the five-attempt sequence Inkling → Nemotron → Inkling → Gemma → Nemotron. Process-global model preference and visitor-triggered warm-up could also change the initial model for unrelated requests.
 
-**Additional contributing mechanisms:** `requestStructured` discards the original fetch exception and classifies failures only as `AI-TIMEOUT` or `AI-TRANSPORT`. The helper named `isCancellation` treats both codes as cancellation, although current AI callers expose no AbortController-based user-cancellation contract. The process-global `preferredModel` is also updated by successful foreground requests and warm-up probes, so one request can alter the initial provider selected for unrelated users sharing the same server process. Reported browser symptoms such as `APP-REQUEST-FAILED`, HTTP-wrapper errors, or an outer fetch failure are consistent with this mechanism, but those production events were not independently reproduced during this review.
+**Current local implementation evidence:** The seven operations now use a server-only operation registry and one shared authenticated client protocol. A generation ledger transactionally claims at most three server-ordered attempts, and each attempt route calls the single-attempt OpenRouter adapter no more than once. The protocol provides idempotent creation, status recovery, explicit cancellation, short-lived validated input/result retention, per-user concurrency and rolling weighted quotas, a global ceiling, bounded request parsing, normalized retry classification, and content-free correlation telemetry. The process-global model preference, public warm-up flow, and `AiModelWarmup` bootstrap were removed. Firestore Rules explicitly deny browser access to `_aiGenerations` and `_aiQuota`, with TTL field overrides configured for both collections. Local lint, TypeScript, 32 unit/component test files with 88 tests, and a production build passed on 19 September 2026. Firestore Emulator startup remained blocked before Rules/integration assertions by the host loopback-selector error recorded in the technical documentation.
+
+**Remaining evidence boundary:** The repository does not prove the deployed Function maximum duration, Fluid Compute state, proxy behaviour, staging region, TTL activation, response-loss behaviour across real instances, or production cost/latency thresholds. The production feature flag therefore requires explicit enablement, and the finding is not classified as resolved until staging fault injection and production-canary criteria are satisfied. No `maxDuration` value has been invented from an unverified deployment assumption.
 
 **Scope boundary:** The finding is specifically concerned with the lifetime, retry topology, cancellation semantics, recovery behaviour, and process-level state of AI transport. The loss of structured diagnostic context is a consequence of that mechanism, not the complete definition of the problem. Correcting the transport does not remove the independent requirements for server-side authentication, authorization, request-size limits, rate limits, quota enforcement, semantic validation, or protection of sensitive data.
 
@@ -102,11 +104,13 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### 🔥 F01 - Missing Server-Side Authentication and Quota Enforcement for AI Actions
 
-**Status:** Unresolved.
+**Status:** Implemented locally; targeted and deployment verification pending.
 
-**Description and context:** The exported AI Server Actions validate request shape but do not authenticate the requesting user on the server or enforce user-level quotas, request-size limits, or rate limits. A prior probe invoked an action anonymously over HTTP; the present source still contains no token or session verification in the AI action layer. This finding does not assert that an API credential is exposed.
+**Historical description:** The former exported AI Server Actions validated request shape but did not authenticate the requesting user on the server or enforce user-level quotas, request-size limits, or rate limits. A prior probe invoked an action anonymously over HTTP. This finding did not assert that an API credential was exposed.
 
-**Risk and required verification:** Client-side authentication cannot protect a callable server entry point. Verification must cover absent, invalid, expired, and valid credentials; concurrent quota consumption; oversized inputs; sustained request bursts; every AI flow; and proof that rejected requests do not reach the upstream provider. Replacing Server Actions with a Route Handler does not resolve this defect unless the new entry point performs server-side authentication and enforces request budgets before any upstream attempt.
+**Current local implementation evidence:** All AI creation, status, attempt and cancellation routes call `authenticatedUser(request)`. Creation authenticates before bounded body parsing and operation validation. Provider calls occur only after an authenticated owner transactionally claims a ledger lease and reserves weighted per-user and global quota. Guest access is denied, operation inputs have byte limits, and the browser cannot choose a model or attempt ordinal.
+
+**Remaining verification boundary:** Local source and deterministic tests can verify authentication order, bounded parsing and rejection paths, but they do not calibrate production quota thresholds or prove sustained-burst behaviour across deployed instances. Emulator-backed concurrency tests and staging evidence must verify absent, invalid, expired and valid credentials, simultaneous reservations, oversized bodies and proof that rejected requests never reach OpenRouter before this finding is classified as resolved.
 
 ### 🔥 F02 - Inadequate Validation of Persisted and Legacy Firestore Data
 
@@ -566,7 +570,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Recorded external evidence, 15 September 2026:** The previously inspected hosted run `34766457053` for revision `cc97e79` passed installation, static checks, coverage, integration and build, then failed four development WebKit cases; production E2E and later validation steps were skipped. Six deployed public routes returned HTTP 200, and the deployment status indicated success. These observations predate the user's restriction on GitHub operations; no new remote verification is implied.
 
-**Local implementation and evidence:** The repository manages the posts compound index and receipt TTL in `firestore.indexes.json`, and includes production HTTP smoke and full production E2E commands. The corrected local production build passed; the complete corrected production E2E matrix remains unverified. A historical direct Firestore metadata read found the configured posts index missing and receipt TTL disabled; the subsequent configuration attempt failed with IAM 403.
+**Local implementation and evidence:** The repository declares the posts compound index plus receipt, AI-generation and AI-quota TTL policies in `firestore.indexes.json`, and includes production HTTP smoke and full production E2E commands. The read-only metadata script now inspects the posts index and all three TTL policies. The corrected local production build passed; the complete corrected production E2E matrix remains unverified. A historical direct Firestore metadata read found the configured posts index missing and receipt TTL disabled; the subsequent configuration attempt failed with IAM 403.
 
 **Remaining acceptance:** Obtain a successful complete hosted run only when the user explicitly requests GitHub activity, validate the corrected optimized runtime and deployment settings, and confirm deployed Rules, index readiness and TTL activation. Public-route HTTP responses do not establish authenticated workflows, live AI inference or production configuration correctness.
 
@@ -588,7 +592,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Recorded historical evidence, 15 September 2026:** The reported Admin SDK emulator comparison returned 100, 1,000 and 10,000 documents for unbounded queries versus 50 documents at each scale for `limit(50)`. Serialized result sizes were 12,801 / 128,001 / 1,280,001 bytes versus 6,401 bytes for bounded results. That evidence cannot be reproduced from this checkout without restoring or replacing the missing tooling. It does not establish production billing, browser subscription behavior, or full application speed.
 
-**Coverage boundary:** The 15 September local record reported 106 unit/component tests in 30 files and integration passed 7/7. A 19 September reconciliation reran the 106-test unit/component suite successfully, but the Firestore Emulator failed during startup before current integration assertions could run. Test counts do not imply whole-codebase branch coverage. Bundle inventory and configured budgets establish repeatability, not a before/after improvement by themselves.
+**Coverage boundary:** The 15 September local record reported 106 unit/component tests in 30 files and integration passed 7/7. After the 19 September M01 transport replacement, 88 unit/component tests in 32 files passed; the changed count reflects replacement of legacy five-attempt fallback tests with single-attempt, client-recovery and authenticated-route contract tests. The Firestore Emulator failed during startup before current Rules/integration assertions could run. Test counts do not imply whole-codebase branch coverage. Bundle inventory and configured budgets establish repeatability, not a before/after improvement by themselves.
 
 **Remaining acceptance:** Complete a comparable historical production build, use equivalent hardware/browser/cache/dataset conditions, and compare route/chunk bytes, cold/warm loads, interaction distributions, heap and reads. Record changed-branch coverage with its actual instrumentation denominator. Do not label the exploratory measurements as proof of a performance improvement.
 

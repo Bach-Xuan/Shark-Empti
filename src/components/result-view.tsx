@@ -3,7 +3,7 @@
 import { copyTextToClipboard } from '@/lib/clipboard';
 import { uiMessage } from '@/lib/i18n';
 
-import { personalizedQuizPerformanceFeedback } from '@/ai/flows/personalized-quiz-feedback-flow';
+import { personalizedQuizPerformanceFeedback } from '@/ai/client-flows';
 import { LatexText } from '@/components/latex-text';
 import { UiText } from "@/components/ui-text";
 import { Button } from '@/components/ui/button';

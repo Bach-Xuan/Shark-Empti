@@ -30,15 +30,15 @@ Every learning activity leaves a meaningful marker: a question indicates the lea
 - **Arena and Forum:** support community learning through academic challenges, leaderboards, and constructive discussion.
 - **Focus Shield:** protects a deliberate period of concentration through an in-browser camera feature that operates only when the learner explicitly enables it.
 
-AI inputs and outputs are validated against server-side schemas, and the OpenRouter fallback sequence prevents generation from depending upon a single model. AI results remain educational support and do not replace independent verification of academic knowledge.
+AI inputs and outputs are validated against server-side schemas. Authenticated generation records coordinate a maximum of three server-ordered model attempts, with one OpenRouter request per route invocation and status recovery after response loss. AI results remain educational support and do not replace independent verification of academic knowledge.
 
-When an AI operation cannot be completed, the error notification preserves an error code and allowlisted diagnostic metadata, such as the operation, number of attempted models, final failure classification, and HTTP status when available. It does not display prompts, raw model responses, stack traces, or secrets.
+When an AI operation cannot be completed, the interface returns a safe application error without exposing model names, attempt ordinals, prompts, raw model responses, stack traces, credentials, or provider bodies.
 
 ## 🧭 Current Technology
 
 - Next.js 16.3.4, React 19.2.8 and TypeScript 6.
 - Firebase Authentication, Cloud Firestore, Firebase Admin SDK and Firestore Security Rules.
-- OpenRouter Chat Completions through `fetch`, with a nominal Inkling → Gemma → Nemotron priority. The effective starting model can change to the process-scoped `preferredModel` after a successful request or warm-up.
+- OpenRouter Chat Completions through a server-only single-attempt adapter, with a fixed Inkling → Gemma → Nemotron priority coordinated by an authenticated Firestore generation ledger.
 - Tailwind CSS 4, Radix UI, Recharts and KaTeX.
 - TensorFlow.js for Focus Shield; its runtime and model load only when the feature is enabled.
 - Vitest, Testing Library, Firebase Emulator Suite and Playwright.
@@ -80,7 +80,7 @@ The repository is governed by `package-lock.json`; do not use pnpm or Yarn again
 | Feature | Configuration requirement or guidance |
 |---|---|
 | Configure the Firebase browser client, sign in and access Firestore | Provide the complete six-field Firebase Web configuration for consistency. The current application initializes Auth and Firestore but not Storage or Messaging; `storageBucket` and `messagingSenderId` are carried as configuration fields rather than independently validated runtime prerequisites. Google provider and the relevant authorized domains remain required for Google sign-in. |
-| Generate quizzes, flashcards, practice, feedback and chatbot responses | `OPENROUTER_API_KEY` |
+| Generate quizzes, flashcards, practice, feedback and chatbot responses | `OPENROUTER_API_KEY`, three `FIREBASE_ADMIN_*` values and a signed-in user; production/canary creation additionally requires `AI_GENERATION_PROTOCOL_ENABLED=true` |
 | Submit Arena attempts; create/delete Forum comments outside the Emulator | Three `FIREBASE_ADMIN_*` values |
 | Local integration/E2E | JDK 21; Firebase CLI in dev dependencies; Playwright Chromium, WebKit and Firefox |
 
@@ -103,10 +103,10 @@ The repository is governed by `package-lock.json`; do not use pnpm or Yarn again
 | `npm run report:bundle` | Inventory production entry and deferred JavaScript chunks | No; requires a completed build |
 | `npm run report:performance` | Record synthetic 100/1,000/10,000-record processing baselines | No |
 | `npm run audit:dependencies` | Query npm's advisory endpoint for the current lockfile and write `reports/dependency-audit.json` | npm Registry; transmits dependency names and versions |
-| `node scripts/inspect-firestore.mjs` | Read deployed posts-index and receipt-TTL metadata; write `reports/firestore-metadata.json` | Google API and Admin credentials; read-only |
+| `node scripts/inspect-firestore.mjs` | Read the deployed posts index and receipt/AI TTL metadata; write `reports/firestore-metadata.json` | Google API and Admin credentials; read-only |
 | `node --conditions=react-server --env-file=.env --import tsx scripts/receipt-retention.ts` | Inspect receipt expiry metadata; `--apply` backfills missing `expiresAt` values only | Firebase Admin credentials; `--apply` changes receipt documents |
 | `npm run ai:health` | Check the model catalogue endpoint and fallback-model presence | OpenRouter network; does not prove key/quota/inference validity |
-| `npm run ai:smoke` | Generate one real quiz and chatbot response | OpenRouter key; may consume quota |
+| `npm run ai:smoke` | Exercise quiz and chatbot schemas through the live single-attempt OpenRouter adapter; does not exercise auth, ledger or client recovery | OpenRouter key; may consume quota |
 | `npm run clean` | Remove `.next` only; retain `node_modules` | No |
 
 Install the browser after `npm ci`:

@@ -1,6 +1,6 @@
 # 🛠️ Technical Documentation · Shark Empti v1.15.1
 
-This document describes the architecture and contracts of the current source. It does not claim that unresolved findings in [AUDIT_REPORT.md](AUDIT_REPORT.md) have been corrected. Detailed setup belongs in [CONFIGURATION.md](CONFIGURATION.md); the target AI architecture belongs in [AI_TRANSPORT_REMEDIATION_PLAN.md](AI_TRANSPORT_REMEDIATION_PLAN.md).
+This document describes the architecture and contracts of the current source. It does not claim that unresolved findings in [AUDIT_REPORT.md](AUDIT_REPORT.md) have been corrected. Detailed setup belongs in [CONFIGURATION.md](CONFIGURATION.md).
 
 ## 🧭 Quick Navigation
 
@@ -24,8 +24,9 @@ The source files named in Section 1 remain authoritative when a documentation st
 | Next configuration | `next.config.ts` |
 | Client Firebase variables | `src/firebase/config.ts` |
 | Firebase Admin variables | `src/lib/firebase-admin.ts` |
-| Current AI models, payload and retry | `src/ai/config/model.ts`, `src/ai/openrouter.ts` |
-| AI input/output contracts | `src/ai/question-schema.ts`, `src/ai/flows/*` |
+| Current AI models, payload and retry orchestration | `src/ai/config/model.ts`, `src/ai/openrouter.ts`, `src/ai/error-classifier.ts`, `src/ai/generation-store.ts` |
+| AI input/output contracts | `src/ai/operation-registry.ts`, `src/ai/question-schema.ts`, `src/ai/flows/*` |
+| AI client protocol | `src/ai/client.ts`, `src/ai/client-flows.ts`, `src/ai/protocol.ts` |
 | HTTP API contracts | `src/app/api/**/route.ts`, `src/lib/server-api.ts` |
 | Firestore client authorization | `firestore.rules`, `firebase.json` |
 | Persisted-data readers | `src/lib/history-schema.ts`, `src/lib/profile-schema.ts` and consumers |
@@ -37,7 +38,7 @@ When documentation differs from an executable authority above, that authority de
 
 ## 2. 🏗️ Runtime Topology and Ownership
 
-The application uses Next.js App Router. `src/app/layout.tsx` owns root HTML, fonts, global CSS, preference provider, Firebase client provider, toast infrastructure and the AI warm-up component. `src/app/page.tsx` coordinates the primary learning flow; separate routes provide login, registration, profile, Forum and Arena.
+The application uses Next.js App Router. `src/app/layout.tsx` owns root HTML, fonts, global CSS, preference provider, Firebase client provider and toast infrastructure. `src/app/page.tsx` coordinates the primary learning flow; separate routes provide login, registration, profile, Forum and Arena.
 
 `AppPreferencesProvider` owns language/theme state, validates local storage, updates `html.lang`/dark class and synchronizes storage events across tabs. `FirebaseProvider` owns one `onAuthStateChanged`; the private subtree is keyed by UID or anonymous so account changes reset private state. Preferences remain outside that subtree.
 
@@ -78,6 +79,8 @@ Playground generates and saves flashcard/practice sessions in user subcollection
 | `arenaExams/{examId}` | title, config, questions, author, `totalAttempts` | Public read; constrained author create/update/delete |
 | `arenaExams/{examId}/attempts/{attemptId}` | user, score, duration, timestamp | Public read; Admin create only |
 | `_requestReceipts/{hash}` | fingerprint, result, createdAt, expiresAt | Admin-only; no client grant |
+| `_aiGenerations/{generationId}` | owner, operation, fingerprint, validated input while active, attempt leases/outcomes, recoverable validated result/error, expiresAt | Admin-only; explicit client deny |
+| `_aiQuota/{scope}` | rolling-window usage, active generation reservations, expiresAt | Admin-only; explicit client deny |
 
 The `users/{uid}/history` reader uses Zod with defaults for selected legacy omissions; records with corrupt core shape are excluded from the view rather than modified/deleted. The profile reader also normalizes selected missing fields. Forum/Arena boundaries still contain direct casts and are not schema-validated merely because TypeScript compiles.
 
@@ -85,7 +88,7 @@ The `users/{uid}/history` reader uses Zod with defaults for selected legacy omis
 
 ### 3.2. 📅 Dates and Timestamps
 
-- Profile, notes, posts, comments, Arena exams/attempts and receipts mainly use native Firestore/server timestamps.
+- Profile, notes, posts, comments, Arena exams/attempts, receipts, AI generations and AI quota records mainly use native Firestore/server timestamps.
 - Quiz history, flashcards and practice sessions currently write ISO strings.
 - `StoredDate`/format adapters accept the persisted representations needed by the UI.
 - Never change date representation or backfill production data by editing `backend.json` alone.
@@ -95,7 +98,7 @@ The `users/{uid}/history` reader uses Zod with defaults for selected legacy omis
 - Quiz and practice await stable-ID saves before completion. Flashcard archival is awaited but failure leaves generated cards usable with an error notice.
 - An object containing nested `undefined` can be rejected by Firestore.
 - Post deletion does not cascade comments; orphan comments remain publicly readable under current Rules.
-- New receipts have seven-day `expiresAt` and remain replayable until asynchronous deletion. TTL and its field index exemption are declared in `firestore.indexes.json`. The 15 September 2026 metadata check found TTL disabled and the posts index missing; an historical configuration attempt failed with IAM 403. `scripts/inspect-firestore.mjs` now provides only a read-only deployed-metadata inspection. `scripts/receipt-retention.ts` independently inventories legacy receipts and backfills missing expiry only with `--apply`.
+- New receipts have seven-day `expiresAt` and remain replayable until asynchronous deletion. AI generations use a 24-hour local/staging retention hypothesis, while AI quota documents expire after their rolling-window recovery period. TTL field settings for all three internal collections are declared in `firestore.indexes.json`; deployed activation remains unverified. The 15 September 2026 metadata check found receipt TTL disabled and the posts index missing; an historical configuration attempt failed with IAM 403. `scripts/inspect-firestore.mjs` now reads the posts index and all three deployed TTL policies without modifying them. `scripts/receipt-retention.ts` independently inventories legacy receipts and backfills missing receipt expiry only with `--apply`.
 - `activeDays` writes the complete map from local state, so concurrent tabs/devices can overwrite one another's dates.
 
 These limitations are tracked in the audit; a descriptive data-map edit does not change finding status.
@@ -144,9 +147,9 @@ Content is trimmed and constrained to 1–2,000 characters. The API verifies the
 
 ## 5. 🤖 AI Transport and Validation
 
-Seven public Server Actions exist: academic validation, question generation, flashcard generation, practice generation, short-answer analysis, personalized quiz feedback and AI coaching chatbot.
+Seven public operations exist: academic validation, question generation, flashcard generation, practice generation, short-answer analysis, personalized quiz feedback and AI coaching chatbot. Browser callers use the shared client state machine in `src/ai/client.ts`; they do not select models or attempt ordinals.
 
-All call `generateStructured()` in `src/ai/openrouter.ts`. Inputs are Zod-parsed at flow boundaries. Outputs are JSON-parsed, Zod-validated and, where required, checked for cross-field constraints such as count, question type, option cardinality/uniqueness and correct-answer membership.
+`POST /api/ai/generations` authenticates the Firebase ID token before bounded JSON parsing, validates the operation input through the server-only registry and creates or replays an idempotent short-lived record. `POST /api/ai/generations/{generationId}/attempt` transactionally claims one of at most three attempts, calls `requestStructuredOnce()` outside the transaction and finalizes only a matching lease. `GET` recovers status/results after response loss, and `DELETE` records cancellation. Browser access to `_aiGenerations` and `_aiQuota` is denied by Rules.
 
 Current model priority:
 
@@ -156,9 +159,9 @@ google/gemma-4-31b-it:free
 nvidia/nemotron-3.5-lightning:free
 ```
 
-Gemma receives native JSON Schema; Inkling/Nemotron receive a JSON-only instruction. The adapter checks non-2xx responses and embedded error envelopes. Safe metadata is allowlisted to `operation`, `attemptedModels`, `lastFailure`, `httpStatus`, `providerCode` and `retryAfterSeconds`.
+Gemma receives native JSON Schema; Inkling/Nemotron receive a JSON-only instruction. Each adapter invocation makes at most one OpenRouter request, checks non-2xx responses and embedded error envelopes, parses supported JSON forms and validates the operation-specific output schema and cross-field rules. Normalized failures are classified as terminal, retry-next-model, retry-after or cancelled before another claim is permitted.
 
-Foreground timeout is 20 seconds per model; warm-up timeout is 8 seconds. Process-scoped `preferredModel` is updated by warm-up or successful requests. Timeout/transport rollover can create five attempts in one Server Action. AI actions currently do not authenticate callers or enforce server-side quotas. These are current-source properties; the target generation protocol, ledger, quota, cancellation and recovery are not implemented. Review the audit and remediation plan before changing transport.
+The provider deadline is 20 seconds and the lease is 35 seconds. The ledger enforces two concurrent generations per user, a staging-hypothesis budget of 30 weighted attempts per 15 minutes and a global ceiling of 300. The protocol is enabled by default outside production; production creation requires `AI_GENERATION_PROTOCOL_ENABLED=true`. Visitor warm-up and process-scoped model preference do not exist. Deployment duration, quota calibration, TTL activation and canary acceptance remain pending and must not be inferred from local tests.
 
 Chat review context occurs once in the system message, prior conversation turns once in provider messages, and the current user input once at the end. The caller supplies prior turns without appending the current turn to history.
 
@@ -255,13 +258,13 @@ Do not add a dependency for behavior already supported by the platform/current N
 | Integration | `npm run test:integration` | Auth/Firestore Emulator and server APIs |
 | E2E | `npm run test:e2e` | Next dev or production server, demo Firebase, AI fixture; Chromium desktop/mobile, WebKit and Firefox |
 | Build | `npm run build` | Optimized Next artifact; no font-network dependency |
-| Production smoke | `npm run test:production` | Six server routes, referenced script chunks, bundle budgets and unauthenticated API behavior |
+| Production smoke | `npm run test:production` | Six page routes, referenced script chunks, bundle budgets and unauthenticated Arena/AI API behavior |
 | Bundle/performance | `npm run report:bundle`, `npm run report:performance` | Build inventory and synthetic dataset baseline; not browser interaction timing |
 | Dependency assessment | `npm run audit:dependencies` | Current lockfile query against npm's advisory endpoint; writes a report and has no checked-in exception policy |
-| Infrastructure metadata | `node scripts/inspect-firestore.mjs` | Read-only deployed posts-index and receipt-TTL inspection |
+| Infrastructure metadata | `node scripts/inspect-firestore.mjs` | Read-only deployed posts index and receipt/AI TTL inspection |
 | Receipt expiry inventory | `node --conditions=react-server --env-file=.env --import tsx scripts/receipt-retention.ts` | Read-only by default; `--apply` only backfills missing expiry values |
 | Browser/camera/query comparison | No checked-in command | Historical evidence is not reproducible from this checkout |
-| Live AI | `npm run ai:smoke` | Live OpenRouter; quota/cost possible |
+| Live AI adapter | `npm run ai:smoke` | Live OpenRouter and operation schemas; quota/cost possible; does not exercise auth, ledger or recovery |
 
 CI runs `npm ci → lint → typecheck → coverage → integration → build → install Chromium/WebKit/Firefox → development E2E → production E2E → bundle report → production HTTP smoke → synthetic performance baseline` on Ubuntu with Node 24/JDK 21. It does not currently run the dependency-audit command, a browser-performance measurement, or an emulator query-comparison command. The workflow configuration does not itself prove that a remote run has succeeded.
 
@@ -271,6 +274,6 @@ The existence or success of a test suite does not establish remote CI, deployed 
 
 History versions 1 and 2 remain readable permanently; absent versions identify legacy records. Unknown future versions are rejected. Numeric quiz settings are validated separately from draft/persisted strings. `usePagedCollection` limits initial live subscriptions to 50 records and cursor-fetches older pages on demand. Statistics/search/report labels explicitly describe loaded-record scope. Current implementation status and operational validation gaps are tracked in [the audit report](AUDIT_REPORT.md).
 
-The 15 September 2026 local validation recorded lint/typecheck success, 106 unit/component tests across 30 files, seven integration tests, a successful production build and 7/7 corrected development WebKit cases. Production E2E passed 26/28 before the WebKit/toast corrections; the entire corrected production matrix remains pending. The previously inspected hosted run failed development WebKit and did not reach production E2E. A 19 September local reconciliation reran lint, typecheck, the 106-test unit/component suite, and the production build successfully; Firestore Emulator startup then failed before integration assertions with a Java loopback-selector error. These are dated, environment-bound results rather than a claim that every validation is currently reproducible.
+The 15 September 2026 local validation recorded lint/typecheck success, 106 unit/component tests across 30 files, seven integration tests, a successful production build and 7/7 corrected development WebKit cases. Production E2E passed 26/28 before the WebKit/toast corrections; the entire corrected production matrix remains pending. The previously inspected hosted run failed development WebKit and did not reach production E2E. After the 19 September M01 transport replacement, lint, typecheck, 88 unit/component tests across 32 files, and the production build passed. Firestore Emulator startup again failed before Rules/integration assertions with `failed to create a child event loop`, caused by an unavailable loopback selector on this host. These are dated, environment-bound results rather than a claim that every validation is currently reproducible.
 
 The 15 September dependency assessment recorded four moderate findings after the `qs` override was updated to 6.16.0. It is historical evidence only: the current audit script collects advisory data but neither enforces reviewed exceptions nor reads an exception-policy manifest. P04, V01, V02, V03, V04 and V05 remain open within the assigned scope. See [AUDIT_REPORT.md](AUDIT_REPORT.md) for individual criteria.

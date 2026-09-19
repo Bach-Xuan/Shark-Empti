@@ -8,6 +8,6 @@ export default defineConfig({
   webServer: [
     { command: 'node tests/e2e/ai-server.mjs', url: 'http://127.0.0.1:9098', reuseExistingServer: false },
     { command: process.env.E2E_PRODUCTION === 'true' ? 'node node_modules/next/dist/bin/next start -p 9002' : 'node node_modules/next/dist/bin/next dev --turbopack -p 9002', url: 'http://127.0.0.1:9002/login', timeout: 180000, reuseExistingServer: false,
-      env: { SHARK_EMULATOR_TEST_MODE: 'true', NEXT_PUBLIC_USE_EMULATORS: 'true', GCLOUD_PROJECT: 'demo-shark-empti', NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'demo-shark-empti', NEXT_PUBLIC_FIREBASE_API_KEY: 'test-api-key', NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'demo-shark-empti.firebaseapp.com', NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: 'demo-shark-empti.appspot.com', NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '123456', NEXT_PUBLIC_FIREBASE_APP_ID: 'demo-app', OPENROUTER_API_KEY: 'test-only', OPENROUTER_TEST_URL: 'http://127.0.0.1:9098' } },
+      env: { SHARK_EMULATOR_TEST_MODE: 'true', AI_GENERATION_PROTOCOL_ENABLED: 'true', NEXT_PUBLIC_USE_EMULATORS: 'true', GCLOUD_PROJECT: 'demo-shark-empti', NEXT_PUBLIC_FIREBASE_PROJECT_ID: 'demo-shark-empti', NEXT_PUBLIC_FIREBASE_API_KEY: 'test-api-key', NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: 'demo-shark-empti.firebaseapp.com', NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: 'demo-shark-empti.appspot.com', NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: '123456', NEXT_PUBLIC_FIREBASE_APP_ID: 'demo-app', OPENROUTER_API_KEY: 'test-only', OPENROUTER_TEST_URL: 'http://127.0.0.1:9098' } },
   ],
 });

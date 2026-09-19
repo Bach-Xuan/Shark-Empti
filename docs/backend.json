@@ -467,8 +467,15 @@
       ],
       "description": "Deletion is transactional but does not currently use an idempotency receipt."
     },
-    "aiServerActions": {
-      "transport": "Next.js Server Actions",
+    "aiGenerationProtocol": {
+      "transport": "Authenticated Next.js Route Handlers with a Firestore generation ledger",
+      "runtime": "nodejs",
+      "paths": [
+        "POST /api/ai/generations",
+        "POST /api/ai/generations/{generationId}/attempt",
+        "GET /api/ai/generations/{generationId}",
+        "DELETE /api/ai/generations/{generationId}"
+      ],
       "operations": [
         "academic-validation",
         "generate-questions",
@@ -478,10 +485,12 @@
         "personalized-quiz-feedback",
         "ai-coaching-chatbot"
       ],
-      "authentication": "No server-side caller authentication in the current source",
+      "authentication": "Firebase ID token in Authorization: Bearer header; guest access denied",
       "provider": "OpenRouter chat/completions",
       "validation": "Zod input/output validation plus operation-specific cross-field checks",
-      "description": "Current fallback and timeout behavior is described in TECHNICAL_DOCUMENTATION.md. The remediation plan is not an implemented API contract."
+      "state": "At most three server-ordered attempts; one OpenRouter request per attempt-route invocation; idempotent status recovery and explicit cancellation",
+      "quota": "Two concurrent generations per user; 30 weighted attempts per 15-minute user window; global ceiling 300",
+      "description": "Production creation requires AI_GENERATION_PROTOCOL_ENABLED=true. Deployment duration, quota calibration, TTL activation and canary acceptance remain pending."
     }
   },
   "auth": {
@@ -533,6 +542,14 @@
     "/_requestReceipts/{hash}": {
       "schema": "RequestReceipt",
       "description": "Admin-only receipts, no client Rule grant."
+    },
+    "/_aiGenerations/{generationId}": {
+      "schema": "AiGenerationRecord",
+      "description": "Admin-only short-lived AI generation state, validated input during processing and validated result for recovery; browser Rules explicitly deny access."
+    },
+    "/_aiQuota/{scope}": {
+      "schema": "AiQuotaRecord",
+      "description": "Admin-only rolling budget and active-reservation state; browser Rules explicitly deny access."
     }
   },
   "localStorage": {

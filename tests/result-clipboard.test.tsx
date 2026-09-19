@@ -4,7 +4,7 @@ import { cleanup,fireEvent,render,waitFor } from '@testing-library/react';
 import { afterEach,expect,it,vi } from 'vitest';
 import { history } from './fixtures/quiz';
 const mocks = vi.hoisted(() => ({ error: vi.fn(), toast: vi.fn() }));
-vi.mock('@/ai/flows/personalized-quiz-feedback-flow', () => ({ personalizedQuizPerformanceFeedback: vi.fn() }));
+vi.mock('@/ai/client-flows', () => ({ personalizedQuizPerformanceFeedback: vi.fn() }));
 vi.mock('@/components/ui-text', () => ({ UiText: () => null }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));
 vi.mock('@/lib/error-toast', () => ({ showErrorToast: vi.fn(), showUnexpectedErrorToast: mocks.error }));

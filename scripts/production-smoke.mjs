@@ -21,9 +21,13 @@ try {
   for(const url of scripts){const response=await fetch(origin+url);if(!response.ok)throw new Error('Missing chunk');const bytes=Buffer.from(await response.arrayBuffer());chunks.push({url,decoded:bytes.length,gzip:gzipSync(bytes).length});}
   routes.push({route, serverResponseMs:samples, scope:'server HTML and script fetch only; no hydration or browser timing', initialScriptDecoded:chunks.reduce((n,c)=>n+c.decoded,0), initialScriptGzip:chunks.reduce((n,c)=>n+c.gzip,0),chunks});
  }
- const response=await fetch(origin+'/api/arena/smoke/submit',{method:'POST',headers:{'content-type':'application/json'},body:'{}'});
- if(response.status!==401)throw new Error('Unauthenticated API expected 401, got '+response.status);
- fs.mkdirSync('reports',{recursive:true});fs.writeFileSync('reports/production-smoke.json',JSON.stringify({measuredAt:new Date().toISOString(),node:process.version,routes,unauthenticatedApi:401},null,2));
+ const unauthenticatedApis={};
+ for(const api of ['/api/arena/smoke/submit','/api/ai/generations']) {
+  const response=await fetch(origin+api,{method:'POST',headers:{'content-type':'application/json'},body:'{}'});
+  if(response.status!==401)throw new Error('Unauthenticated API expected 401 for '+api+', got '+response.status);
+  unauthenticatedApis[api]=response.status;
+ }
+ fs.mkdirSync('reports',{recursive:true});fs.writeFileSync('reports/production-smoke.json',JSON.stringify({measuredAt:new Date().toISOString(),node:process.version,routes,unauthenticatedApis},null,2));
  if(fs.existsSync('config/bundle-budgets.json')) {
  const budgets=JSON.parse(fs.readFileSync('config/bundle-budgets.json','utf8'));
  for(const route of routes) if(route.initialScriptGzip > budgets.routes[route.route]) throw new Error('Bundle budget exceeded: '+route.route);

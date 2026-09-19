@@ -21,9 +21,7 @@ vi.mock('firebase/firestore', () => ({
     return vi.fn();
   },
 }));
-vi.mock('@/ai/flows/generate-questions-flow', () => ({ generateQuestions: vi.fn() }));
-vi.mock('@/ai/flows/short-answer-analysis-flow', () => ({ shortAnswerAnalysis: vi.fn() }));
-vi.mock('@/ai/flows/personalized-quiz-feedback-flow', () => ({ personalizedQuizPerformanceFeedback: mocks.feedback }));
+vi.mock('@/ai/client-flows', () => ({ generateQuestions: vi.fn(), shortAnswerAnalysis: vi.fn(), personalizedQuizPerformanceFeedback: mocks.feedback }));
 beforeEach(() => {
   vi.clearAllMocks(); mocks.user = { uid: 'player', getIdToken: async () => 'fixture' };
   mocks.feedback.mockResolvedValue({ ok: true, data: analysis });

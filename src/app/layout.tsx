@@ -1,5 +1,4 @@
 
-import { AiModelWarmup } from '@/components/ai-model-warmup';
 import { AppPreferencesProvider } from '@/components/app-preferences';
 import { ErrorBoundary } from '@/components/error-boundary';
 import FocusTrackerWidget from '@/components/focus-tracker-widget';
@@ -24,7 +23,6 @@ export default function RootLayout({
       <body className="font-body antialiased bg-background text-foreground">
         <AppPreferencesProvider><FirebaseClientProvider>
           {children}
-          <AiModelWarmup />
           <Toaster />
           <ErrorBoundary><FocusTrackerWidget /></ErrorBoundary>
         </FirebaseClientProvider></AppPreferencesProvider>

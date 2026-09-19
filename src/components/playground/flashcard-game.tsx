@@ -3,8 +3,7 @@
 import { uiMessage } from '@/lib/i18n';
 import type { DashboardStats } from '@/lib/stats-utils';
 
-import { validateAcademicTopic } from '@/ai/flows/academic-validation-flow';
-import { generateFlashcards } from '@/ai/flows/generate-flashcards-flow';
+import { generateFlashcards,validateAcademicTopic } from '@/ai/client-flows';
 import { LatexText } from '@/components/latex-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -343,5 +342,4 @@ export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, init
     </Card>
   );
 }
-
 

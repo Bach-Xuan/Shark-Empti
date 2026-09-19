@@ -3,8 +3,7 @@
 import { messages,uiMessage } from '@/lib/i18n';
 import type { DashboardStats } from '@/lib/stats-utils';
 
-import { validateAcademicTopic } from '@/ai/flows/academic-validation-flow';
-import { generatePractice } from '@/ai/flows/generate-practice-flow';
+import { generatePractice,validateAcademicTopic } from '@/ai/client-flows';
 import { LatexText } from '@/components/latex-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';

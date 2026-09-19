@@ -3,7 +3,7 @@
 import { uiMessage } from '@/lib/i18n';
 import { subjectOptions } from '@/lib/subjects';
 
-import { validateAcademicTopic } from '@/ai/flows/academic-validation-flow';
+import { validateAcademicTopic } from '@/ai/client-flows';
 import { Button } from '@/components/ui/button';
 import { Card,CardContent,CardDescription,CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';

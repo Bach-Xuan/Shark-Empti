@@ -2,9 +2,7 @@
 "use client";
 import { messages,uiMessage } from '@/lib/i18n';
 
-import { generateQuestions } from '@/ai/flows/generate-questions-flow';
-import { personalizedQuizPerformanceFeedback } from '@/ai/flows/personalized-quiz-feedback-flow';
-import { shortAnswerAnalysis } from '@/ai/flows/short-answer-analysis-flow';
+import { generateQuestions,personalizedQuizPerformanceFeedback,shortAnswerAnalysis } from '@/ai/client-flows';
 import { LatexText } from '@/components/latex-text';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

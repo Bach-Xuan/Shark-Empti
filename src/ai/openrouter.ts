@@ -1,44 +1,13 @@
-import { createAppError,getAiAppError,OpenRouterProviderError } from '@/lib/app-error';
 import 'server-only';
+import type { AiOperation } from './protocol';
+import type { AiMessage } from './operation-registry';
+import { modelsWithNativeStructuredOutput,OPENROUTER_MODEL_PRIORITY } from './config/model';
 import { z } from 'zod';
-import { LAST_RESORT_OPENROUTER_MODEL,modelsWithNativeStructuredOutput,OPENROUTER_MODEL_PRIORITY,type OpenRouterModel } from './config/model';
 
-type Message = { role: 'user' | 'assistant'; content: string };
-const pause = (milliseconds: number) => new Promise(resolve => setTimeout(resolve, milliseconds));
-const failure = (code: string, status?: number) => new OpenRouterProviderError(
-  createAppError(code, 'The AI request could not be completed.', status ? { httpStatus: status, providerCode: String(status) } : {}),
-);
-
-let preferredModel: OpenRouterModel = OPENROUTER_MODEL_PRIORITY[0];
-
-/** Test-only reset; production code never calls this. */
-export function resetOpenRouterModelPreferenceForTest() {
-  preferredModel = OPENROUTER_MODEL_PRIORITY[0];
-}
-
-const isCancellation = (error: unknown) => {
-  const code = getAiAppError(error).code;
-  return code === 'AI-TIMEOUT' || code === 'AI-TRANSPORT';
-};
-
-const canTryAnotherModel = (error: unknown) => {
-  const code = getAiAppError(error).code;
-  // A 403 can be a free-model/provider availability restriction even with a
-  // valid key, so only a confirmed unauthenticated key stops the sequence.
-  return !['AI-CONFIG-MISSING', 'AI-INVALID-INPUT', 'AI-PROVIDER-401'].includes(code);
-};
-
-const orderedModels = (first: OpenRouterModel) => [
-  first,
-  ...OPENROUTER_MODEL_PRIORITY.filter(model => model !== first),
-];
-
-const cancellationOrder = (interruptedModel: OpenRouterModel) => [
-  // If a non-Nemotron request was interrupted, try Nemotron immediately.
-  ...(interruptedModel === LAST_RESORT_OPENROUTER_MODEL ? [] : [LAST_RESORT_OPENROUTER_MODEL]),
-  // Then complete one normal priority pass, including Nemotron at the end.
-  ...OPENROUTER_MODEL_PRIORITY,
-];
+export type AiFailureKind = 'cancelled' | 'configuration' | 'provider' | 'timeout' | 'dns' | 'tls' | 'reset' | 'transport' | 'empty' | 'invalid_json' | 'invalid_schema' | 'unknown';
+export type NormalizedAiFailure = { kind: AiFailureKind; code: string; httpStatus?: number; retryAfterMs?: number };
+export type SingleAttemptResult<T> = { ok: true; data: T; upstreamRequestId?: string } | { ok: false; failure: NormalizedAiFailure };
+type SingleAttemptRequest<T> = { operation: AiOperation; modelOrdinal: 0 | 1 | 2; system: string; prompt: string; messages?: AiMessage[]; schema: z.ZodType<T>; signal: AbortSignal };
 
 const parseJsonContent = (content: string): unknown => {
   const trimmed = content.trim();
@@ -46,112 +15,62 @@ const parseJsonContent = (content: string): unknown => {
   return JSON.parse(fenced?.[1] ?? trimmed);
 };
 
-type StructuredRequest<T> = { operation: string; system: string; prompt: string; schema: z.ZodType<T>; messages?: Message[] };
-const FLOW_MODEL_TIMEOUT_MS = 20_000;
-const WARMUP_MODEL_TIMEOUT_MS = 8_000;
+function endpointForEnvironment(apiKey: string) {
+  if (!process.env.OPENROUTER_TEST_URL) return 'https://openrouter.ai/api/v1/chat/completions';
+  const url = new URL(process.env.OPENROUTER_TEST_URL);
+  const localHost = (value: string | undefined) => !!value && /^(?:127\.0\.0\.1|localhost):\d+$/.test(value);
+  const isolatedProductionTest = process.env.SHARK_EMULATOR_TEST_MODE === 'true' && process.env.NEXT_PUBLIC_USE_EMULATORS === 'true' && apiKey === 'test-only'
+    && localHost(process.env.FIRESTORE_EMULATOR_HOST) && localHost(process.env.FIREBASE_AUTH_EMULATOR_HOST);
+  if ((process.env.NODE_ENV === 'production' && !isolatedProductionTest) || !process.env.FIRESTORE_EMULATOR_HOST || !process.env.GCLOUD_PROJECT?.startsWith('demo-')
+    || !['127.0.0.1', 'localhost'].includes(url.hostname) || url.protocol !== 'http:' || url.username || url.password) return null;
+  return url.toString();
+}
 
-async function requestStructured<T>(model: OpenRouterModel, { system, prompt, schema, messages = [] }: StructuredRequest<T>, timeoutMs = FLOW_MODEL_TIMEOUT_MS): Promise<T> {
+function transportFailure(error: unknown, requestSignal: AbortSignal, deadline: AbortSignal): NormalizedAiFailure {
+  // A route/request disconnect is not proof of explicit user cancellation.
+  // DELETE updates the ledger when the user actually cancels.
+  if (requestSignal.aborted) return { kind: 'transport', code: 'AI-CLIENT-DISCONNECTED' };
+  if (deadline.aborted || (error instanceof Error && error.name === 'TimeoutError')) return { kind: 'timeout', code: 'AI-TIMEOUT' };
+  const cause = error instanceof Error ? error.cause : undefined;
+  const code = typeof cause === 'object' && cause && 'code' in cause ? String(cause.code) : '';
+  if (['ENOTFOUND', 'EAI_AGAIN'].includes(code)) return { kind: 'dns', code: 'AI-TRANSPORT-DNS' };
+  if (code.startsWith('ERR_TLS') || code.includes('CERT')) return { kind: 'tls', code: 'AI-TRANSPORT-TLS' };
+  if (['ECONNRESET', 'UND_ERR_SOCKET'].includes(code)) return { kind: 'reset', code: 'AI-TRANSPORT-RESET' };
+  return { kind: 'transport', code: 'AI-TRANSPORT' };
+}
+
+/** Performs exactly one request to the server-selected model. */
+export async function requestStructuredOnce<T>({ modelOrdinal, system, prompt, schema, messages = [], signal: requestSignal }: SingleAttemptRequest<T>): Promise<SingleAttemptResult<T>> {
   const apiKey = process.env.OPENROUTER_API_KEY?.trim();
-  if (!apiKey) throw failure('AI-CONFIG-MISSING');
-  let endpoint = 'https://openrouter.ai/api/v1/chat/completions';
-  if (process.env.OPENROUTER_TEST_URL) {
-    const url = new URL(process.env.OPENROUTER_TEST_URL);
-    const localHost = (value: string | undefined) => !!value && /^(?:127\.0\.0\.1|localhost):\d+$/.test(value);
-    const isolatedProductionTest = process.env.SHARK_EMULATOR_TEST_MODE === 'true'
-      && process.env.NEXT_PUBLIC_USE_EMULATORS === 'true' && apiKey === 'test-only'
-      && localHost(process.env.FIRESTORE_EMULATOR_HOST) && localHost(process.env.FIREBASE_AUTH_EMULATOR_HOST);
-    if ((process.env.NODE_ENV === 'production' && !isolatedProductionTest)
-      || !process.env.FIRESTORE_EMULATOR_HOST || !process.env.GCLOUD_PROJECT?.startsWith('demo-')
-      || !['127.0.0.1', 'localhost'].includes(url.hostname) || url.protocol !== 'http:' || url.username || url.password) throw failure('AI-CONFIG-MISSING');
-    endpoint = url.toString();
-  }
+  const endpoint = apiKey ? endpointForEnvironment(apiKey) : null;
+  if (!apiKey || !endpoint) return { ok: false, failure: { kind: 'configuration', code: 'AI-CONFIG-MISSING' } };
+  const model = OPENROUTER_MODEL_PRIORITY[modelOrdinal];
+  const deadline = AbortSignal.timeout(20_000);
+  const signal = AbortSignal.any([requestSignal, deadline]);
   const body = {
     model,
     messages: [{ role: 'system', content: `${system}\n\nReturn only a JSON object matching the requested result. Do not use Markdown fences or add prose.` }, ...messages, { role: 'user', content: prompt }],
-    ...(modelsWithNativeStructuredOutput.has(model)
-      ? { response_format: { type: 'json_schema', json_schema: { name: 'response', strict: true, schema: z.toJSONSchema(schema) } } }
-      : {}),
+    ...(modelsWithNativeStructuredOutput.has(model) ? { response_format: { type: 'json_schema', json_schema: { name: 'response', strict: true, schema: z.toJSONSchema(schema) } } } : {}),
   };
-
-  const signal = AbortSignal.timeout(timeoutMs);
   let response: Response;
   let payload: unknown;
   try {
-    response = await fetch(endpoint, {
-      method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal,
-    });
+    response = await fetch(endpoint, { method: 'POST', headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal });
     const text = await response.text();
     try { payload = JSON.parse(text); } catch { payload = null; }
-  } catch {
-    throw failure(signal.aborted ? 'AI-TIMEOUT' : 'AI-TRANSPORT');
-  }
-  const envelope = z.object({
-    error: z.object({ code: z.union([z.number(), z.string()]).optional() }).passthrough().optional(),
-    choices: z.array(z.object({ message: z.object({ content: z.string().nullable() }) })).optional(),
-  }).passthrough().safeParse(payload);
+  } catch (error) { return { ok: false, failure: transportFailure(error, requestSignal, deadline) }; }
+  const envelope = z.object({ id: z.string().optional(), error: z.object({ code: z.union([z.number(), z.string()]).optional() }).passthrough().optional(), choices: z.array(z.object({ message: z.object({ content: z.string().nullable() }) })).optional() }).passthrough().safeParse(payload);
   const embedded = envelope.success ? envelope.data.error : undefined;
   if (!response.ok || embedded) {
     const status = embedded ? Number(embedded.code) || (response.ok ? 502 : response.status) : response.status;
-    throw failure(status === 429 ? 'AI-RATE-LIMIT-429' : status >= 500 ? `AI-UPSTREAM-${status}` : `AI-PROVIDER-${status}`, status);
+    const retryAfter = Number(response.headers.get('retry-after'));
+    return { ok: false, failure: { kind: 'provider', code: `AI-PROVIDER-${status}`, httpStatus: status, ...(status === 429 && Number.isFinite(retryAfter) ? { retryAfterMs: retryAfter * 1_000 } : {}) } };
   }
   const content = envelope.success ? envelope.data.choices?.[0]?.message.content : undefined;
-  if (!content) throw failure('AI-INVALID-RESPONSE');
+  if (!content) return { ok: false, failure: { kind: 'empty', code: 'AI-INVALID-RESPONSE' } };
   let output: unknown;
-  try { output = parseJsonContent(content); } catch { throw failure('AI-INVALID-RESPONSE'); }
+  try { output = parseJsonContent(content); } catch { return { ok: false, failure: { kind: 'invalid_json', code: 'AI-INVALID-RESPONSE' } }; }
   const result = schema.safeParse(output);
-  if (!result.success) throw failure('AI-INVALID-RESPONSE');
-  return result.data;
-}
-
-/** Every public flow shares the same bounded, model-aware fallback sequence. */
-export async function generateStructured<T>(request: StructuredRequest<T>): Promise<T> {
-  let lastError = createAppError('AI-REQUEST-FAILED', 'The AI request could not be completed.');
-  let attemptedModels = 0;
-  let hasCancellationRollover = false;
-  let models = orderedModels(preferredModel);
-  while (models.length) {
-    const model = models.shift()!;
-    attemptedModels++;
-    try {
-      const result = await requestStructured(model, request);
-      preferredModel = model;
-      return result;
-    } catch (error) {
-      lastError = getAiAppError(error);
-      if (!canTryAnotherModel(error)) throw error;
-      if (isCancellation(error) && !hasCancellationRollover) {
-        // A cancelled generation gets the requested last-resort model first.
-        // If that also fails, continue once through the normal priority list.
-        models = cancellationOrder(model);
-        hasCancellationRollover = true;
-      }
-    }
-  }
-  throw new OpenRouterProviderError(createAppError('AI-FALLBACK-EXHAUSTED', 'No fallback model could complete the AI request.', {
-    operation: request.operation,
-    attemptedModels,
-    lastFailure: lastError.code,
-    ...(typeof lastError.values.httpStatus === 'number' ? { httpStatus: lastError.values.httpStatus } : {}),
-    ...(typeof lastError.values.providerCode === 'string' ? { providerCode: lastError.values.providerCode } : {}),
-  }));
-}
-
-/** A lightweight structured response proves the same contract used by the real flows. */
-export async function warmOpenRouterModels(): Promise<{ available: boolean; retryable: boolean; model?: OpenRouterModel }> {
-  for (const model of OPENROUTER_MODEL_PRIORITY) {
-    try {
-      await requestStructured(model, {
-        operation: 'warmup',
-        system: 'You are a service health check.',
-        prompt: 'Return {"ready":true}.',
-        schema: z.object({ ready: z.literal(true) }),
-      }, WARMUP_MODEL_TIMEOUT_MS);
-      preferredModel = model;
-      return { available: true, retryable: false, model };
-    } catch (error) {
-      if (!canTryAnotherModel(error)) return { available: false, retryable: false };
-    }
-  }
-  await pause(0);
-  return { available: false, retryable: true };
+  if (!result.success) return { ok: false, failure: { kind: 'invalid_schema', code: 'AI-INVALID-RESPONSE' } };
+  return { ok: true, data: result.data, ...(envelope.success && envelope.data.id ? { upstreamRequestId: envelope.data.id } : {}) };
 }

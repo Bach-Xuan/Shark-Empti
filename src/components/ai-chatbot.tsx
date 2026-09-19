@@ -2,7 +2,7 @@
 "use client";
 import { uiMessage } from '@/lib/i18n';
 
-import { aiCoachingChatbotForQuizReview } from '@/ai/flows/ai-coaching-chatbot-flow';
+import { aiCoachingChatbotForQuizReview } from '@/ai/client-flows';
 import { LatexText } from '@/components/latex-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
