@@ -1,5 +1,11 @@
 # 📋 Consolidated Technical Audit Report · Shark Empti v1.15.1
 
+### 🧭 Navigation
+
+- **Classify a finding:** use the Finding-Code Legend.
+- **Plan current remediation:** begin with Unresolved Findings, then read the matching detailed finding.
+- **Confirm completed work:** consult Resolved Findings and its cited evidence.
+
 ## 🧭 Finding-Code Legend
 
 | Code | Full Name | Scope |

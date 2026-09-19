@@ -2,6 +2,17 @@
 
 This document describes the architecture and contracts of the current source. It does not claim that unresolved findings in [AUDIT_REPORT.md](AUDIT_REPORT.md) have been corrected. Detailed setup belongs in [CONFIGURATION.md](CONFIGURATION.md); the target AI architecture belongs in [AI_TRANSPORT_REMEDIATION_PLAN.md](AI_TRANSPORT_REMEDIATION_PLAN.md).
 
+## 🧭 Quick Navigation
+
+| Reader goal | Read first |
+|---|---|
+| Determine the source of truth for a behavior or setting | Section 1 |
+| Understand runtime ownership, client boundaries, and data flow | Sections 2–4 |
+| Review AI behavior, user-facing safeguards, or dependencies | Sections 5–7 |
+| Assess test coverage, deployment limits, and evidence | Sections 8–9 and [AUDIT_REPORT.md](AUDIT_REPORT.md) |
+
+The source files named in Section 1 remain authoritative when a documentation statement and executable behavior diverge.
+
 ## 1. 🧭 Scope and Authoritative Sources
 
 | Concern | Authority |

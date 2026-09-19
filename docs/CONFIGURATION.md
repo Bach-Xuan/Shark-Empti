@@ -2,6 +2,17 @@
 
 This document describes the configuration actually consumed by the current source. Placeholders do not configure a service, and the existence of `.env` does not prove that a credential is valid.
 
+## 🧭 Quick Navigation
+
+| If you need to… | Start with |
+|---|---|
+| Install and run the project locally | Sections 1–2, then Section 5 |
+| Configure Firebase, Admin credentials, or OpenRouter | Sections 3–4 |
+| Run emulator, integration, or E2E checks | Section 6 |
+| Prepare Vercel or a release | Sections 7–9, together with the validation gaps in [AUDIT_REPORT.md](AUDIT_REPORT.md) |
+
+Read the sections in order for a first setup. For an existing environment, use the table above to navigate directly to the applicable configuration boundary.
+
 ## 1. 🧰 Runtime and Dependency Installation
 
 ### 1.1. 📋 Required Prerequisites

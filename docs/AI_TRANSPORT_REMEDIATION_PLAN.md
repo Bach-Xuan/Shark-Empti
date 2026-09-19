@@ -8,6 +8,18 @@ This document defines the complete remediation required for the current AI trans
 
 **Reconciliation, 15 September 2026:** The WebKit, dependency-assessment, camera and measurement changes do not implement this proposal. The seven-day `_requestReceipts` policy covers existing Arena/Forum operations; the proposed AI generation ledger and suggested staging retention below are separate, unimplemented contracts. Finding status remains in the audit report. GitHub operations require the user's explicit request.
 
+## 🧭 Quick Navigation
+
+| Planning need | Read first |
+|---|---|
+| Understand why the current design must change | Sections 1–3 |
+| Review the proposed server, ledger, API, and client contracts | Section 4 |
+| Plan implementation ownership and sequence | Sections 5–6 |
+| Define test, rollout, telemetry, and acceptance evidence | Sections 7–10 |
+| Identify unresolved choices and remaining risk | Sections 12–14 |
+
+This is a proposed architecture only. Use [TECHNICAL_DOCUMENTATION.md](TECHNICAL_DOCUMENTATION.md) for current behavior and [AUDIT_REPORT.md](AUDIT_REPORT.md) for the authoritative finding status.
+
 ## 1. 🧭 Purpose and Architectural Conclusion
 
 The remediation must do more than shorten the lifetime of a single HTTP request. Every AI generation must be controlled by the server, constrained by an explicit retry budget, recoverable when the browser loses a response, and protected against unexpected OpenRouter request amplification. The design must preserve or strengthen authentication, authorization, quota, validation, privacy, and operational observability.

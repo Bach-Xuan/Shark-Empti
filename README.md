@@ -134,6 +134,12 @@ CI in `.github/workflows/ci.yml` uses Node 24, JDK 21, a demo Firebase project a
 - [Backend](docs/backend.json)
 - [Audit Report](docs/AUDIT_REPORT.md)
 
+### 🧭 Recommended Reading Order
+
+1. Start with [Configuration](docs/CONFIGURATION.md) to install dependencies, create `.env`, and run the local application.
+2. Read [Technical Documentation](docs/TECHNICAL_DOCUMENTATION.md) for the executable architecture, data ownership, and operational boundaries.
+3. Review [Audit Report](docs/AUDIT_REPORT.md) before release work; its unresolved findings and validation gaps define the evidence that is still required.
+
 All repository documentation is maintained in English. The application interface itself remains bilingual, and localization behavior is described in the technical documentation.
 
 Never commit `.env`, service-account JSON, private keys, API tokens, Playwright traces containing credentials or production data. `.gitignore` cannot remove a secret that was already committed; exposed credentials require revocation/rotation and a separately approved history-remediation procedure.
