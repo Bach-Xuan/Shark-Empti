@@ -95,7 +95,7 @@ The `users/{uid}/history` reader uses Zod with defaults for selected legacy omis
 - `StoredDate`/format adapters accept the persisted representations needed by the UI.
 - Never change date representation or backfill production data by editing `backend.json` alone.
 
-### 3.3. ⚠️ Known Persistence Limitations
+### 3.3. ⚠️ Persistence Semantics and Limitations
 
 - Quiz and practice await stable-ID saves before completion. Flashcard archival is awaited but failure leaves generated cards usable with an error notice.
 - An object containing nested `undefined` can be rejected by Firestore.
@@ -197,70 +197,13 @@ Focus Shield:
 
 A recorded headed-Chromium check used the local HP Wide Vision HD Camera, produced 640 × 480 video in two start/stop cycles and verified all tracks ended. This does not establish other devices, lighting, permission revocation or exact minimum browser versions.
 
-## 7. 📦 Current Dependency Inventory
+## 7. 📦 Dependency Boundaries
 
-`package.json` contains 30 runtime and 19 development dependencies. The lockfileVersion 3 `package-lock.json` currently matches every manifest entry. “Locked” is the direct `node_modules/<package>` resolution in the lockfile; read the lockfile for the transitive graph.
+`package.json` is the authority for direct dependency ranges, and the lockfileVersion 3 `package-lock.json` is the authority for resolved direct and transitive versions. Repeating the complete inventory here caused version facts to drift without adding architectural context.
 
-### 7.1. ⚙️ Runtime Dependencies
+The main runtime groups are Next.js and React, Firebase client/Admin SDKs, Zod validation, Radix UI primitives, TensorFlow.js, KaTeX and Recharts. The development toolchain comprises TypeScript and ESLint, Vitest and Testing Library, Firebase Emulator tooling, Playwright, Tailwind/PostCSS, coverage and TSX execution. Consult the manifest and lockfile for exact versions.
 
-| Package | Manifest | Locked |
-|---|---:|---:|
-| `@radix-ui/react-alert-dialog` | `^1.1.6` | `1.1.23` |
-| `@radix-ui/react-avatar` | `^1.1.3` | `1.2.6` |
-| `@radix-ui/react-checkbox` | `^1.1.4` | `1.3.11` |
-| `@radix-ui/react-dialog` | `^1.1.6` | `1.1.23` |
-| `@radix-ui/react-dropdown-menu` | `^2.1.6` | `2.1.24` |
-| `@radix-ui/react-label` | `^2.1.2` | `2.1.15` |
-| `@radix-ui/react-progress` | `^1.1.2` | `1.1.16` |
-| `@radix-ui/react-radio-group` | `^1.2.3` | `1.4.7` |
-| `@radix-ui/react-scroll-area` | `^1.2.3` | `1.2.18` |
-| `@radix-ui/react-select` | `^2.1.6` | `2.3.7` |
-| `@radix-ui/react-slot` | `^1.2.3` | `1.3.3` |
-| `@radix-ui/react-switch` | `^1.1.3` | `1.3.7` |
-| `@radix-ui/react-tabs` | `^1.1.3` | `1.1.21` |
-| `@radix-ui/react-toast` | `^1.2.6` | `1.2.23` |
-| `@radix-ui/react-tooltip` | `^1.1.8` | `1.2.16` |
-| `@tensorflow/tfjs` | `^4.22.0` | `4.22.0` |
-| `class-variance-authority` | `^0.7.1` | `0.7.1` |
-| `clsx` | `^2.1.1` | `2.1.1` |
-| `firebase` | `12.18.0` | `12.18.0` |
-| `firebase-admin` | `14.3.0` | `14.3.0` |
-| `katex` | `0.18.5` | `0.18.5` |
-| `lucide-react` | `1.40.0` | `1.40.0` |
-| `next` | `16.3.4` | `16.3.4` |
-| `react` | `19.2.8` | `19.2.8` |
-| `react-dom` | `19.2.8` | `19.2.8` |
-| `recharts` | `3.10.1` | `3.10.1` |
-| `server-only` | `0.0.1` | `0.0.1` |
-| `tailwind-merge` | `^3.0.1` | `3.6.0` |
-| `tailwindcss-animate` | `^1.0.7` | `1.0.7` |
-| `zod` | `4.5.4` | `4.5.4` |
-
-### 7.2. 🧪 Development Dependencies
-
-| Package | Manifest | Locked |
-|---|---:|---:|
-| `@firebase/rules-unit-testing` | `5.0.2` | `5.0.2` |
-| `@playwright/test` | `^1.62.1` | `1.62.1` |
-| `@tailwindcss/postcss` | `^4.3.3` | `4.3.3` |
-| `@testing-library/react` | `^16.3.0` | `16.3.3` |
-| `@testing-library/user-event` | `^14.6.1` | `14.6.7` |
-| `@types/katex` | `^0.16.7` | `0.16.8` |
-| `@types/node` | `^24` | `24.13.3` |
-| `@types/react` | `^19.2.1` | `19.2.18` |
-| `@types/react-dom` | `^19.2.1` | `19.2.6` |
-| `@vitest/coverage-v8` | `4.1.11` | `4.1.11` |
-| `eslint` | `9.39.5` | `9.39.5` |
-| `eslint-config-next` | `16.3.4` | `16.3.4` |
-| `firebase-tools` | `^15.1.0` | `15.29.0` |
-| `jsdom` | `30.0.1` | `30.0.1` |
-| `postcss` | `^8` | `8.5.27` |
-| `tailwindcss` | `^4.3.3` | `4.3.3` |
-| `tsx` | `^4` | `4.23.13` |
-| `typescript` | `~6.0.0` | `6.0.3` |
-| `vitest` | `4.1.11` | `4.1.11` |
-
-Do not add a dependency for behavior already supported by the platform/current Node API. For upgrades, review engines, peer ranges, changelog, advisories and runtime consumers; then run a clean install and the affected suites.
+For upgrades, review runtime engines, peer ranges, changelogs, advisories and affected consumers; then perform a clean install and run the relevant validation layers. Avoid adding a dependency for behavior already provided by the supported platform or Node runtime.
 
 ## 8. 🧪 Testing, CI, and Deployment Limitations
 
@@ -288,10 +231,6 @@ The existence or success of a test suite does not establish remote CI, deployed 
 
 ## 9. 📑 Implementation and Validation Evidence
 
-History versions 1 and 2 remain readable permanently; absent versions identify legacy records. Unknown future versions are rejected. Numeric quiz settings are validated separately from draft/persisted strings. `usePagedCollection` limits initial live subscriptions to 50 records and cursor-fetches older pages on demand. Statistics/search/report labels explicitly describe loaded-record scope. Current implementation status and operational validation gaps are tracked in [the audit report](AUDIT_REPORT.md).
+History versions 1 and 2 remain readable; absent versions identify legacy records, and unknown future versions are rejected. Numeric quiz settings are validated separately from draft and persisted strings. `usePagedCollection` limits initial live subscriptions to 50 records and cursor-fetches older pages on demand. Statistics, search and report labels describe loaded-record scope.
 
-A historical local validation recorded lint/typecheck success, 106 unit/component tests across 30 files, seven integration tests, a successful production build and 7/7 corrected development WebKit cases. Production E2E passed 26/28 before the WebKit/toast corrections; the entire corrected production matrix remains pending. The previously inspected hosted run failed development WebKit and did not reach production E2E. Following the M01 transport replacement, lint, typecheck, 88 unit/component tests across 32 files, and the production build passed. Firestore Emulator startup again failed before Rules/integration assertions with `failed to create a child event loop`, caused by an unavailable loopback selector on this host. These are environment-bound results rather than a claim that every validation is currently reproducible.
-
-Following the F02/F10/F11/F12 and D01/D04/D05/D07/D08/D09 implementation, the full local suite passed **268 tests in 46 files**; the two opt-in print tests in one additional file were skipped in that ordinary run. Whole-project ESLint, TypeScript and the optimized production build passed. The print fixture was run separately on Chrome, Firefox and WebKit: two language tests per engine, each exercising both themes, with real KaTeX styles/fonts; Chrome produced multipage PDFs, including a 13-page Vietnamese dark fixture. JSON parsing, manifest/lockfile consistency, Markdown links, audit-code inventory and `git diff --check` also passed. A fresh Emulator attempt with the local JDK 21, including an IPv4 preference, still failed in Java's loopback selector before Rules/integration assertions. No remote CI, production deployment, live AI or physical-camera verification was performed in this remediation batch.
-
-The historical dependency assessment recorded four moderate findings after the `qs` override was updated to 6.16.0. It is historical evidence only: the current audit script collects advisory data but neither enforces reviewed exceptions nor reads an exception-policy manifest. P04, V01, V02, V03, V04 and V05 remain open within the assigned scope. See [AUDIT_REPORT.md](AUDIT_REPORT.md) for individual criteria.
+This document defines the implemented architecture and the validation layers available in the checkout. Dated test results, finding-level evidence and unresolved acceptance criteria belong in [the audit report](AUDIT_REPORT.md); executable commands and environment requirements belong in [the configuration guide](CONFIGURATION.md). A historical result must not be treated as proof of current remote CI, deployed Firestore configuration, production runtime behavior, live-provider reliability or physical-device compatibility.

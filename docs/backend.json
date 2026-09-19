@@ -456,7 +456,7 @@
           "description": "New receipts expire seven days after creation; legacy records may lack this field pending backfill."
         }
       },
-      "description": "Server hashes scope/UID/requestId to form the document ID. Admin dates are stored as Timestamp. Seven-day TTL and a field index exemption are declared in firestore.indexes.json; retained receipts remain replayable until asynchronous deletion. A recorded check found TTL disabled; configuration application failed with IAM 403."
+      "description": "Server hashes scope/UID/requestId to form the document ID. Admin dates are stored as Timestamp. Seven-day TTL and a field index exemption are declared in firestore.indexes.json; retained receipts remain replayable until asynchronous deletion."
     }
   },
   "serverInterfaces": {
@@ -571,7 +571,7 @@
       "validation": "Zod input/output validation plus operation-specific cross-field checks",
       "state": "At most three server-ordered attempts; one OpenRouter request per attempt-route invocation; idempotent status recovery and explicit cancellation",
       "quota": "Two concurrent generations per user; 30 weighted attempts per 15-minute user window; global ceiling 300",
-      "description": "Production creation requires AI_GENERATION_PROTOCOL_ENABLED=true. Deployment duration, quota calibration, TTL activation and canary acceptance remain pending."
+      "description": "Creation is gated by AI_GENERATION_PROTOCOL_ENABLED; deployment acceptance and operational evidence are tracked in the audit report."
     }
   },
   "auth": {
@@ -622,7 +622,7 @@
     },
     "/_arenaSessions/{hash}": {
       "schema": "ArenaSession",
-      "description": "Admin-only server timing; expiresAt TTL declared, production activation must be verified."
+      "description": "Admin-only server timing with expiresAt TTL declared in firestore.indexes.json."
     },
     "/_requestReceipts/{hash}": {
       "schema": "RequestReceipt",
