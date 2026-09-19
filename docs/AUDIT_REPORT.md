@@ -25,15 +25,14 @@
 | M01 | Multi-Model AI Fallback Can Exceed a Single Transport Lifetime and Obscure Terminal Failures | Unresolved | 12 September 2026 |
 | F01 | Missing Server-Side Authentication and Quota Enforcement for AI Actions | Unresolved | 3 September 2026 |
 | F02 | Inadequate Validation of Persisted and Legacy Firestore Data | Unresolved | 3 September 2026 |
-| F03 | Non-Durable History Persistence Caused by `undefined` Values and Unawaited Writes | Unresolved | 3 September 2026 |
 | F10 | Unstable Business Identity for Roadmap Checklist Entries | Unresolved | 3 September 2026 |
 | F11 | Incomplete Model and Camera Cleanup Across Failure Paths | Unresolved | 3 September 2026 |
 | F12 | Loss of Error State and Diagnostic Context Across Arena and API Boundaries | Unresolved | 3 September 2026 |
 | D01 | Arena Retakes Reuse the Previous Attempt Identifier | Unresolved | 3 September 2026 |
-| D03 | Profile Snapshots Can Overwrite an Unsaved Biography Draft | Unresolved | 3 September 2026 |
+| D03 | Profile Snapshots Can Overwrite an Unsaved Biography Draft | Implemented; targeted regression verification pending | 19 September 2026 |
 | D04 | Report-Selection Checkboxes Can Toggle Twice per Interaction | Unresolved | 3 September 2026 |
 | D05 | Stale Setup Validation Can Start a Quiz After Context Changes | Unresolved | 3 September 2026 |
-| D06 | Forum Edit Drafts Are Discarded Before Write Confirmation | Unresolved | 3 September 2026 |
+| D06 | Forum Edit Drafts Are Discarded Before Write Confirmation | Implemented; targeted regression verification pending | 19 September 2026 |
 | D07 | Post Deletion Leaves Publicly Readable Orphaned Comments | Unresolved | 3 September 2026 |
 | D08 | Arena “Ask Guru” Action Has No User-Facing Effect | Unresolved | 3 September 2026 |
 | D09 | Report Printing Is Constrained by the Dialog Scroll Container | Unresolved | 3 September 2026 |
@@ -47,9 +46,10 @@
 | D18 | Activity Tracking Can Lose Concurrent Day Updates | Unresolved | 12 September 2026 |
 | P04 | Idempotency Receipts Have No Defined Retention Bound | Implemented; production TTL/index activation blocked by IAM | 15 September 2026 |
 | V01 | Incomplete WebKit Validation | Partial; WebKit development passed, production matrix pending | 15 September 2026 |
-| V02 | Unverified Minimum Browser Versions and Physical-Camera Behaviour | Partial; local physical camera passed, target matrix pending | 15 September 2026 |
+| V02 | Unverified Minimum Browser Versions and Physical-Camera Behaviour | Partial; historical physical-camera result is not reproducible from the current checkout; target matrix pending | 19 September 2026 |
 | V03 | Unverified Remote CI, Production Runtime, and Firestore Index State | Partial; hosted CI failure observed, deployment verification pending | 15 September 2026 |
-| V05 | Inadequate Comparative Baselines and Incomplete Coverage Evidence | Partial; current and query baselines measured, historical comparison pending | 15 September 2026 |
+| V04 | Dependency-Risk Assessment Is Not Current | Partial; registry runner exists, but no checked-in exception policy or current measurement | 19 September 2026 |
+| V05 | Inadequate Comparative Baselines and Incomplete Coverage Evidence | Partial; synthetic baseline exists, but browser and query-comparison tooling is absent | 19 September 2026 |
 
 ## ✅ Resolved Findings
 
@@ -63,6 +63,7 @@
 | F09 | Inadequate Authentication Guarding and Retry Behaviour in Arena | Resolved | 3 September 2026 |
 | F13 | Incomplete Localization and Accessible Naming in Identified Controls | Resolved | 3 September 2026 |
 | F14 | False-Positive Clipboard Success Notification | Resolved | 3 September 2026 |
+| F03 | Non-Durable History Persistence Caused by `undefined` Values and Unawaited Writes | Resolved | 19 September 2026 |
 | D02 | LaTeX Corruption Caused by Redundant Escape Replacement | Resolved | 12 September 2026 |
 | D10 | Duplicate Error Codes and English Text in Vietnamese Toasts | Resolved | 12 September 2026 |
 | N01 | Inconsistent Naming and File-Name Conventions | Resolved | 13 September 2026 |
@@ -75,7 +76,6 @@
 | P01 | Unbounded Queries and Client-Side List Processing | Resolved | 13 September 2026 |
 | P02 | Recurrent Timer Updates and Repeated KaTeX Rendering | Resolved | 13 September 2026 |
 | P03 | Duplicate Conversation Context in AI Requests | Resolved | 13 September 2026 |
-| V04 | Dependency-Risk Assessment Is Not Current | Resolved | 15 September 2026 |
 | V06 | Production Builds Depend on Live Google Fonts Availability | Resolved | 13 September 2026 |
 
 ## 🔎 Detailed Findings
@@ -118,11 +118,13 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### 🔥 F03 - Non-Durable History Persistence Caused by `undefined` Values and Unawaited Writes
 
-**Status:** Unresolved.
+**Status:** Resolved for the main learning-history and persisted Playground paths.
 
-**Description and context:** `src/app/page.tsx` transitions to the result state and issues `addDoc` without awaiting completion. The object spread may retain optional nested values that Firestore rejects when they are `undefined`. Similar unawaited history writes remain in Playground flows.
+**Historical finding:** The former page-level flow could transition to results before an `addDoc` write completed, while optional nested values could remain `undefined` and be rejected by Firestore. Similar detached writes were previously reported for Playground flows.
 
-**Risk and required verification:** A failure may be reported after the UI has implied success, and a retry may duplicate data. A write DTO should omit absent properties, persistence should have explicit completion semantics, and validation should cover nested `undefined`, rejected writes, retry idempotency, reload, and history consistency.
+**Resolution evidence:** `useLearningSession` now assigns a stable document ID per session, awaits `setDoc`, removes `undefined` values from the wire record, and suppresses a stale completion after reset. Practice saves also await a stable-ID `setDoc`; flashcard archival awaits `addDoc` and emits a visible persistence error if it fails without claiming that archival succeeded. The session-persistence tests cover rejected writes, retry with the same record, omission of undefined analysis, and reset during a pending save.
+
+**Boundary:** The generated flashcards remain usable after an archival failure by design. That is a recoverable persistence outcome, not a durable-history success claim.
 
 ### 🔥 F04 - Prototype-Key Collisions in Topic Aggregation
 
@@ -254,13 +256,13 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### 🧩 D03 - Profile Snapshots Can Overwrite an Unsaved Biography Draft
 
-**Status:** Unresolved.
+**Status:** Implemented; targeted regression verification pending.
 
-**Description and context:** A profile effect calls `setBio(profile.bio)` whenever the profile object changes, without a dirty-state or version guard. A subscription or authentication refresh may therefore replace text currently being edited.
+**Historical finding:** A profile effect previously treated every incoming profile snapshot as authoritative, allowing a refresh to replace a biography draft before submission.
 
-**Observed mechanism and consequence:** The same state variable represents both the last server value and the mutable form draft. Because the synchronization effect does not distinguish those roles, any later non-empty profile snapshot is authoritative even after local editing has begun. The resulting data loss occurs before submission and may not produce an error or recovery prompt.
+**Current-source evidence:** The profile page now records local editing in `bioDirty`; the snapshot synchronization effect calls `setBio(profile.bio)` only while the draft is pristine. Input marks the draft dirty, and successful save resets the guard. A later snapshot therefore cannot overwrite an unsaved local draft.
 
-**Risk and required verification:** The component needs an explicit synchronization policy for pristine, dirty, saved, cancelled, and remotely updated states. Tests should include delayed snapshots, failed and successful saves, account changes, and unmounting.
+**Remaining verification:** Add a focused regression test covering a dirty draft followed by a delayed profile snapshot, a failed save, a successful save, account change, and unmount. The implementation does not attempt a multi-writer merge or conflict-resolution interface for two independently saved biography edits.
 
 ### 🧩 D04 - Report-Selection Checkboxes Can Toggle Twice per Interaction
 
@@ -284,13 +286,13 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 ### 🧩 D06 - Forum Edit Drafts Are Discarded Before Write Confirmation
 
-**Status:** Unresolved.
+**Status:** Implemented; targeted regression verification pending.
 
-**Description and context:** Both post and comment edit handlers clear their editing state before `updateDoc` resolves and attach `.then/.catch` rather than awaiting a result. A rejected write therefore closes the editor and discards the recoverable draft.
+**Historical finding:** Post and comment edit handlers previously detached their writes and closed the editor before Firestore confirmed success.
 
-**Observed mechanism and consequence:** The update payload is retained only inside the detached promise callbacks; it is no longer available to the user interface after the editor state is cleared. The failure path emits an error but does not reconstruct the editor, restore the draft, or expose a retry action, so a transient write rejection becomes user-visible data loss.
+**Current-source evidence:** Both Forum list and detail routes await `mutation.run(() => updateDoc(...))`. They close the post or comment editor and clear list-form fields only when `result.ok` is true; a rejected write leaves the current editor state and draft available for retry.
 
-**Risk and required verification:** Edit operations need the completion semantics already implemented for post creation: payload snapshotting, pending exclusion, confirmation before closure, and draft retention on failure. Tests should include delay, duplicate submission, rejection, retry, and limits.
+**Remaining verification:** Add focused post-edit and comment-edit rejection/retry tests in both Forum routes. Cancellation remains an explicit user action, and remote concurrent edits still follow Firestore's last-write-wins behaviour.
 
 ### 🧩 D07 - Post Deletion Leaves Publicly Readable Orphaned Comments
 
@@ -532,7 +534,7 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Implemented behavior:** New Arena and Forum receipts include `expiresAt` seven days after creation. `src/lib/receipt-retention.ts` defines the supported retry window; a retained receipt remains replayable after its expiry timestamp until asynchronous TTL deletion occurs. After deletion, the same request identifier is no longer guaranteed to suppress a new operation. `firestore.indexes.json` declares the receipt TTL field and index exemption. `scripts/receipt-retention.ts` inventories legacy receipts and only backfills missing expiry values with `--apply`.
 
-**Recorded evidence, 15 September 2026:** The production metadata inspection found TTL disabled and the configured posts compound index missing. Receipt inventory returned zero documents. `scripts/firestore-retention-admin.mjs --apply` was rejected with HTTP 403 `PERMISSION_DENIED` at index creation, before TTL configuration was attempted; no production configuration change succeeded. Local integration tests passed 7/7.
+**Recorded historical evidence, 15 September 2026:** The production metadata inspection found TTL disabled and the configured posts compound index missing. Receipt inventory returned zero documents. A configuration application attempt was rejected with HTTP 403 `PERMISSION_DENIED` at index creation, before TTL configuration was attempted; no production configuration change succeeded. The apply script cited in the original evidence is not present in this checkout. `scripts/inspect-firestore.mjs` is currently read-only. Local integration tests passed 7/7 at that time.
 
 **Remaining acceptance:** Use an appropriately authorized Google identity to apply the configuration and verify completed index/TTL operations. Verify actual expiry cleanup and retry behavior around deletion. Local machine access does not grant Google IAM permissions.
 
@@ -542,21 +544,21 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Historical finding:** Earlier WebKit attempts were limited by host application control and stalled Firestore subscriptions. The host launch restriction no longer prevented the September 15 run.
 
-**Implemented correction:** Emulator-only Firestore initialization forces long polling to avoid the observed WebKit streaming failure. Production initialization retains its normal transport. The toast viewport allows pointer events through its empty area, while visible notifications remain interactive; the failed-comment E2E case dismisses its error notification before retrying.
+**Current-source reconciliation:** `src/firebase/index.ts` currently connects to the Auth and Firestore emulators but does not set a Firestore long-polling option. The earlier claim that long polling is forced is therefore not supported by this checkout. The toast viewport change and failed-comment E2E handling remain separate UI corrections.
 
-**Recorded evidence, 15 September 2026:** Before these fixes, production E2E passed 26/28 cases, with two WebKit failures. After the fixes, WebKit development E2E passed 7/7 and the production build passed. Firestore Rules and access controls were not weakened.
+**Recorded historical evidence, 15 September 2026:** Before the recorded corrections, production E2E passed 26/28 cases, with two WebKit failures. After those corrections, WebKit development E2E passed 7/7 and the production build passed. Firestore Rules and access controls were not weakened.
 
 **Remaining acceptance:** Run the complete 28-case production E2E matrix on the corrected build. Development E2E and a successful build do not substitute for that result, and current Playwright WebKit does not establish exact Safari-version support.
 
 ### 🧪 V02 - Unverified Minimum Browser Versions and Physical-Camera Behaviour
 
-**Status:** Partial; local physical camera passed, target matrix pending.
+**Status:** Partial; historical physical-camera result is not reproducible from the current checkout; target matrix pending.
 
-**Implemented verification:** `scripts/check-physical-camera.mjs` uses headed Chromium and a real camera against a local application. It checks live video and media-track termination through two start/stop cycles without substituting a synthetic camera.
+**Current-source reconciliation:** The checkout does not contain `scripts/check-physical-camera.mjs` or a package command that provides equivalent hardware verification. The historical result below remains useful context, but cannot be rerun without restoring or replacing that tooling.
 
 **Recorded evidence, 15 September 2026:** The local HP Wide Vision HD Camera produced 640 × 480 video in both cycles, and all acquired tracks ended after stopping. This establishes capture and cleanup on that Windows/Chromium configuration only.
 
-**Remaining acceptance:** Safari 16.4, Chrome 111 and Firefox 128 remain documented targets without exact-version acceptance evidence. Physical mobile devices, lighting, CPU load, backend selection and permission-revocation scenarios require separate results. The script grants camera permission and therefore does not validate the operating-system permission prompt or denial flow.
+**Remaining acceptance:** Safari 16.4, Chrome 111 and Firefox 128 remain documented targets without exact-version acceptance evidence. Physical mobile devices, lighting, CPU load, backend selection and permission-revocation scenarios require separate results. The historical script granted camera permission and therefore did not validate the operating-system permission prompt or denial flow.
 
 ### 🧪 V03 - Unverified Remote CI, Production Runtime, and Firestore Index State
 
@@ -564,29 +566,29 @@ All prompts, model policy, credentials, request construction, output parsing, Zo
 
 **Recorded external evidence, 15 September 2026:** The previously inspected hosted run `34766457053` for revision `cc97e79` passed installation, static checks, coverage, integration and build, then failed four development WebKit cases; production E2E and later validation steps were skipped. Six deployed public routes returned HTTP 200, and the deployment status indicated success. These observations predate the user's restriction on GitHub operations; no new remote verification is implied.
 
-**Local implementation and evidence:** The repository manages the posts compound index and receipt TTL in `firestore.indexes.json`, and includes production HTTP smoke and full production E2E commands. The corrected local production build passed; the complete corrected production E2E matrix remains unverified. A direct Firestore metadata read found the configured posts index missing and receipt TTL disabled; the subsequent configuration attempt failed with IAM 403.
+**Local implementation and evidence:** The repository manages the posts compound index and receipt TTL in `firestore.indexes.json`, and includes production HTTP smoke and full production E2E commands. The corrected local production build passed; the complete corrected production E2E matrix remains unverified. A historical direct Firestore metadata read found the configured posts index missing and receipt TTL disabled; the subsequent configuration attempt failed with IAM 403.
 
 **Remaining acceptance:** Obtain a successful complete hosted run only when the user explicitly requests GitHub activity, validate the corrected optimized runtime and deployment settings, and confirm deployed Rules, index readiness and TTL activation. Public-route HTTP responses do not establish authenticated workflows, live AI inference or production configuration correctness.
 
 ### 🧪 V04 - Dependency-Risk Assessment Is Not Current
 
-**Status:** Resolved.
+**Status:** Partial; the registry runner exists, but current policy/enforcement evidence is absent.
 
-**Resolved assessment gap:** A registry-backed assessment of the current lockfile was completed on 15 September 2026, replacing the stale vulnerability snapshot. The `qs` override and installed resolution were updated to 6.16.0, reducing the measured advisory count from six to four moderate findings; zero high and zero critical findings were reported. These are dated measurements, not a guarantee about future advisory data.
+**Historical measurement:** A registry-backed assessment was completed on 15 September 2026. It recorded four moderate, zero high and zero critical findings after the `qs` override and installed resolution were updated to 6.16.0. This is a dated measurement, not a current advisory claim.
 
-**Residual dependency risks:** `config/dependency-audit-policy.json` records exact package versions and advisory identifiers for `@opentelemetry/core` 1.30.1, `csv-parse` 5.6.0, `stream-json` 1.9.1 and `uuid` 9.0.1, with review due by 15 October 2026. The first three are development-tool dependencies. For the runtime UUID dependency, inspected callers use `v4()` without an output buffer, outside the advisory's identified v3/v5/v6 buffer path. These reviewed exceptions do not remove vulnerable package versions or prove that all future usage is safe.
+**Current-source reconciliation:** `scripts/dependency-audit.mjs` queries npm's bulk advisory endpoint for versions in `package-lock.json` and writes `reports/dependency-audit.json`. It does not read `config/dependency-audit-policy.json`, because that file is not present in this checkout; it also does not implement exception expiry or a `--write-report` option. The current CI workflow does not run this script.
 
-**Enforcement and evidence:** `scripts/dependency-audit.mjs` checks advisory identity, severity, every matching installed version, development-only constraints where specified, and expiry of the review policy. Unreviewed findings cause failure. The workflow includes this command after installation. The command prints JSON by default; `--write-report` is required to create a report file. Lint, typecheck, 106 unit/component tests, seven integration tests and the production build passed following the dependency change.
+**Remaining acceptance:** Rerun the registry query before reporting current advisory counts. If reviewed exceptions are required, add and document a checked-in policy with explicit expiry and enforce it in the script and CI; otherwise, do not describe advisory findings as approved exceptions.
 
 ### 🧪 V05 - Inadequate Comparative Baselines and Incomplete Coverage Evidence
 
-**Status:** Partial; current and query baselines measured, historical comparison pending.
+**Status:** Partial; the synthetic baseline exists, but browser and query-comparison tooling is absent.
 
-**Implemented measurement:** The repository has a production bundle inventory, route budget configuration, production smoke checks, synthetic dataset processing measurements, a local browser performance script, and an emulator query comparison. `scripts/browser-performance.mjs` samples cold/warm loads for login, Forum and Arena, transferred bytes, heap, DOM nodes and an automated language-menu interaction. Its interaction timing includes automation overhead and is not real-user INP.
+**Current-source reconciliation:** The repository has a production bundle inventory, route budget configuration, production smoke checks, and `scripts/performance-baseline.ts` for synthetic dataset processing. It does not contain `scripts/browser-performance.mjs` or a checked-in emulator query-comparison script. Consequently, no current command measures cold/warm browser loads, heap, DOM nodes, interaction timing, or bounded-versus-unbounded emulator reads.
 
-**Recorded evidence, 15 September 2026:** The Admin SDK emulator comparison returned 100, 1,000 and 10,000 documents for unbounded queries versus 50 documents at each scale for `limit(50)`. Serialized result sizes were 12,801 / 128,001 / 1,280,001 bytes versus 6,401 bytes for bounded results. This measures query shape in an emulator; it does not measure production billing, browser subscription behavior or full application speed. Browser measurements were exploratory and do not establish a controlled historical comparison. Attempts to build the historical comparator did not complete.
+**Recorded historical evidence, 15 September 2026:** The reported Admin SDK emulator comparison returned 100, 1,000 and 10,000 documents for unbounded queries versus 50 documents at each scale for `limit(50)`. Serialized result sizes were 12,801 / 128,001 / 1,280,001 bytes versus 6,401 bytes for bounded results. That evidence cannot be reproduced from this checkout without restoring or replacing the missing tooling. It does not establish production billing, browser subscription behavior, or full application speed.
 
-**Coverage boundary:** The latest local unit/component run passed 106 tests in 30 files and integration passed 7/7. Test counts do not imply whole-codebase branch coverage. Bundle inventory and configured budgets establish repeatability, not a before/after improvement by themselves.
+**Coverage boundary:** The 15 September local record reported 106 unit/component tests in 30 files and integration passed 7/7. A 19 September reconciliation reran the 106-test unit/component suite successfully, but the Firestore Emulator failed during startup before current integration assertions could run. Test counts do not imply whole-codebase branch coverage. Bundle inventory and configured budgets establish repeatability, not a before/after improvement by themselves.
 
 **Remaining acceptance:** Complete a comparable historical production build, use equivalent hardware/browser/cache/dataset conditions, and compare route/chunk bytes, cold/warm loads, interaction distributions, heap and reads. Record changed-branch coverage with its actual instrumentation denominator. Do not label the exploratory measurements as proof of a performance improvement.
 

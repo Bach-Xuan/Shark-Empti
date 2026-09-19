@@ -19,7 +19,7 @@ The source files named in Section 1 remain authoritative when a documentation st
 |---|---|
 | Runtime/dependency ranges | `package.json`, `.nvmrc` |
 | Dependency resolutions | `package-lock.json` |
-| Advisory review | `scripts/dependency-audit.mjs`, `config/dependency-audit-policy.json` |
+| Advisory review | `scripts/dependency-audit.mjs`; no checked-in exception-policy manifest |
 | Desired indexes and TTL | `firestore.indexes.json`; deployed readiness requires verification |
 | Next configuration | `next.config.ts` |
 | Client Firebase variables | `src/firebase/config.ts` |
@@ -41,7 +41,7 @@ The application uses Next.js App Router. `src/app/layout.tsx` owns root HTML, fo
 
 `AppPreferencesProvider` owns language/theme state, validates local storage, updates `html.lang`/dark class and synchronizes storage events across tabs. `FirebaseProvider` owns one `onAuthStateChanged`; the private subtree is keyed by UID or anonymous so account changes reset private state. Preferences remain outside that subtree.
 
-When `NEXT_PUBLIC_USE_EMULATORS` is `true`, client initialization forces Firestore long polling to support WebKit/emulator transport. Normal production initialization retains `getFirestore`. Empty toast viewport space allows pointer events through; visible notifications remain interactive.
+When `NEXT_PUBLIC_USE_EMULATORS` is `true`, client initialization connects Auth and Firestore to the local demo emulators. The current source does not set a Firestore long-polling option, so WebKit/emulator transport remains a runtime-validation concern. Empty toast viewport space allows pointer events through; visible notifications remain interactive.
 
 Home owns the non-session navigation section. `useLearningSession` owns reducer transitions, stable save IDs and durable completion; `useHistory` owns the paged history source. Quiz owns answers, timer, generation/feedback UI and retries. Navigation reset/unmount invalidates late completions.
 
@@ -95,7 +95,7 @@ The `users/{uid}/history` reader uses Zod with defaults for selected legacy omis
 - Quiz and practice await stable-ID saves before completion. Flashcard archival is awaited but failure leaves generated cards usable with an error notice.
 - An object containing nested `undefined` can be rejected by Firestore.
 - Post deletion does not cascade comments; orphan comments remain publicly readable under current Rules.
-- New receipts have seven-day `expiresAt` and remain replayable until asynchronous deletion. TTL and its field index exemption are declared in `firestore.indexes.json`. The 15 September 2026 metadata check found TTL disabled and the posts index missing; configuration application failed with IAM 403. `scripts/firestore-retention-admin.mjs` inspects metadata by default and applies configuration only with `--apply`. `scripts/receipt-retention.ts` independently inventories legacy receipts and backfills missing expiry only with `--apply`.
+- New receipts have seven-day `expiresAt` and remain replayable until asynchronous deletion. TTL and its field index exemption are declared in `firestore.indexes.json`. The 15 September 2026 metadata check found TTL disabled and the posts index missing; an historical configuration attempt failed with IAM 403. `scripts/inspect-firestore.mjs` now provides only a read-only deployed-metadata inspection. `scripts/receipt-retention.ts` independently inventories legacy receipts and backfills missing expiry only with `--apply`.
 - `activeDays` writes the complete map from local state, so concurrent tabs/devices can overwrite one another's dates.
 
 These limitations are tracked in the audit; a descriptive data-map edit does not change finding status.
@@ -257,14 +257,13 @@ Do not add a dependency for behavior already supported by the platform/current N
 | Build | `npm run build` | Optimized Next artifact; no font-network dependency |
 | Production smoke | `npm run test:production` | Six server routes, referenced script chunks, bundle budgets and unauthenticated API behavior |
 | Bundle/performance | `npm run report:bundle`, `npm run report:performance` | Build inventory and synthetic dataset baseline; not browser interaction timing |
-| Browser measurements | `npm run test:browser-performance` | Local public-route samples; automation overhead included |
-| Physical camera | `npm run test:physical-camera` | Headed Chromium and real hardware; capture/cleanup cycles |
-| Query comparison | `npm run test:read-baseline` | Demo emulator and Admin SDK; not production billing |
-| Dependency assessment | `npm run audit:dependencies` | Registry advisories and dated exact-version exceptions |
-| Infrastructure inspection | `npm run firestore:retention` | Read-only index/TTL metadata unless `-- --apply` is supplied |
+| Dependency assessment | `npm run audit:dependencies` | Current lockfile query against npm's advisory endpoint; writes a report and has no checked-in exception policy |
+| Infrastructure metadata | `node scripts/inspect-firestore.mjs` | Read-only deployed posts-index and receipt-TTL inspection |
+| Receipt expiry inventory | `node --conditions=react-server --env-file=.env --import tsx scripts/receipt-retention.ts` | Read-only by default; `--apply` only backfills missing expiry values |
+| Browser/camera/query comparison | No checked-in command | Historical evidence is not reproducible from this checkout |
 | Live AI | `npm run ai:smoke` | Live OpenRouter; quota/cost possible |
 
-CI runs `npm ci → dependency audit → lint → typecheck → coverage → integration → query comparison → build → install Chromium/WebKit/Firefox → development E2E → production E2E → bundle report → production HTTP smoke → synthetic performance baseline` on Ubuntu with Node 24/JDK 21. The workflow configuration does not itself prove that a remote run has succeeded.
+CI runs `npm ci → lint → typecheck → coverage → integration → build → install Chromium/WebKit/Firefox → development E2E → production E2E → bundle report → production HTTP smoke → synthetic performance baseline` on Ubuntu with Node 24/JDK 21. It does not currently run the dependency-audit command, a browser-performance measurement, or an emulator query-comparison command. The workflow configuration does not itself prove that a remote run has succeeded.
 
 The existence or success of a test suite does not establish remote CI, deployed Firestore indexes/Rules, production Vercel runtime, Safari/Firefox minimum versions, physical-camera behavior, live-provider reliability or current vulnerability applicability. Builds use local system font stacks and do not require Google Fonts.
 
@@ -272,6 +271,6 @@ The existence or success of a test suite does not establish remote CI, deployed 
 
 History versions 1 and 2 remain readable permanently; absent versions identify legacy records. Unknown future versions are rejected. Numeric quiz settings are validated separately from draft/persisted strings. `usePagedCollection` limits initial live subscriptions to 50 records and cursor-fetches older pages on demand. Statistics/search/report labels explicitly describe loaded-record scope. Current implementation status and operational validation gaps are tracked in [the audit report](AUDIT_REPORT.md).
 
-The 15 September 2026 local validation recorded lint/typecheck success, 106 unit/component tests across 30 files, seven integration tests, a successful production build and 7/7 corrected development WebKit cases. Production E2E passed 26/28 before the WebKit/toast corrections; the entire corrected production matrix remains pending. The previously inspected hosted run failed development WebKit and did not reach production E2E. These are dated results, not tests rerun during documentation reconciliation.
+The 15 September 2026 local validation recorded lint/typecheck success, 106 unit/component tests across 30 files, seven integration tests, a successful production build and 7/7 corrected development WebKit cases. Production E2E passed 26/28 before the WebKit/toast corrections; the entire corrected production matrix remains pending. The previously inspected hosted run failed development WebKit and did not reach production E2E. A 19 September local reconciliation reran lint, typecheck, the 106-test unit/component suite, and the production build successfully; Firestore Emulator startup then failed before integration assertions with a Java loopback-selector error. These are dated, environment-bound results rather than a claim that every validation is currently reproducible.
 
-The dependency assessment is complete with four moderate exceptions due for review by 15 October 2026. The `qs` override is 6.16.0. Exact advisory/version matching and applicable development-only constraints are enforced by the audit script. P04, V01, V02, V03 and V05 remain open within the assigned scope. See [AUDIT_REPORT.md](AUDIT_REPORT.md) for individual criteria.
+The 15 September dependency assessment recorded four moderate findings after the `qs` override was updated to 6.16.0. It is historical evidence only: the current audit script collects advisory data but neither enforces reviewed exceptions nor reads an exception-policy manifest. P04, V01, V02, V03, V04 and V05 remain open within the assigned scope. See [AUDIT_REPORT.md](AUDIT_REPORT.md) for individual criteria.
