@@ -47,24 +47,24 @@
 
 | ID | Finding | Status | Last Updated |
 |---|---|---|---|
-| F10 | Unstable Business Identity for Roadmap Checklist Entries | Resolved | 19 September 2026 |
-| F11 | Incomplete Model and Camera Cleanup Across Failure Paths | Resolved | 19 September 2026 |
-| F12 | Loss of Error State and Diagnostic Context Across Arena and API Boundaries | Resolved | 19 September 2026 |
-| D01 | Arena Retakes Reuse the Previous Attempt Identifier | Resolved | 19 September 2026 |
-| D04 | Report-Selection Checkboxes Can Toggle Twice per Interaction | Resolved | 19 September 2026 |
-| D05 | Stale Setup Validation Can Start a Quiz After Context Changes | Resolved | 19 September 2026 |
-| D08 | Arena “Ask Guru” Action Has No User-Facing Effect | Resolved | 19 September 2026 |
-| D09 | Report Printing Is Constrained by the Dialog Scroll Container | Resolved | 19 September 2026 |
+| F03 | Non-Durable History Persistence Caused by `undefined` Values and Unawaited Writes | Resolved | 19 September 2026 |
 | F04 | Prototype-Key Collisions in Topic Aggregation | Resolved | 3 September 2026 |
 | F05 | Incorrect Denominators in Per-Skill Aggregate Scores | Resolved | 3 September 2026 |
 | F06 | Insufficient Semantic Validation of AI Inputs and Outputs | Resolved | 3 September 2026 |
 | F07 | Duplicate Forum Submission and Premature Draft Disposal | Resolved | 3 September 2026 |
 | F08 | Duplicate AI Feedback Generation for a Single Arena Attempt | Resolved | 3 September 2026 |
 | F09 | Inadequate Authentication Guarding and Retry Behaviour in Arena | Resolved | 3 September 2026 |
+| F10 | Unstable Business Identity for Roadmap Checklist Entries | Resolved | 19 September 2026 |
+| F11 | Incomplete Model and Camera Cleanup Across Failure Paths | Resolved | 19 September 2026 |
+| F12 | Loss of Error State and Diagnostic Context Across Arena and API Boundaries | Resolved | 19 September 2026 |
 | F13 | Incomplete Localization and Accessible Naming in Identified Controls | Resolved | 3 September 2026 |
 | F14 | False-Positive Clipboard Success Notification | Resolved | 3 September 2026 |
-| F03 | Non-Durable History Persistence Caused by `undefined` Values and Unawaited Writes | Resolved | 19 September 2026 |
+| D01 | Arena Retakes Reuse the Previous Attempt Identifier | Resolved | 19 September 2026 |
 | D02 | LaTeX Corruption Caused by Redundant Escape Replacement | Resolved | 12 September 2026 |
+| D04 | Report-Selection Checkboxes Can Toggle Twice per Interaction | Resolved | 19 September 2026 |
+| D05 | Stale Setup Validation Can Start a Quiz After Context Changes | Resolved | 19 September 2026 |
+| D08 | Arena “Ask Guru” Action Has No User-Facing Effect | Resolved | 19 September 2026 |
+| D09 | Report Printing Is Constrained by the Dialog Scroll Container | Resolved | 19 September 2026 |
 | D10 | Duplicate Error Codes and English Text in Vietnamese Toasts | Resolved | 12 September 2026 |
 | N01 | Inconsistent Naming and File-Name Conventions | Resolved | 13 September 2026 |
 | N02 | Domain Types and Schemas Do Not Consistently Represent Their Lifecycle Stage | Resolved | 13 September 2026 |
