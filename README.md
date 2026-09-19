@@ -12,12 +12,12 @@ Shark Empti earned national recognition at **AI Young Guru 2026** through **"VTS
 
 **AI Young Guru** is a nationwide AI creativity competition for upper-secondary and vocational students. **FPT University** organizes it under the patronage of the **Ministry of Education and Training** and professional patronage of the **Ministry of Science and Technology**, with the **Science and Education Programme Department of Vietnam Television**, the **Central Committee of the Ho Chi Minh Communist Youth Union**, the **Department of Cybersecurity and High-Tech Crime Prevention under the Ministry of Public Security**, and units of **FPT Corporation**. Its mission, **“Bình dân học AI”**-making AI learning broadly accessible-promotes innovative thinking and practical AI proficiency to improve quality of life and support sustainable development.
 
-The progression and recognition of VTS - Cá Mập Laze may be consulted through the following official records:
+The progression and recognition of "VTS - Cá Mập Laze" may be consulted through the following official records:
 
-- [Official AI Young Guru fanpage](https://www.facebook.com/aiyoungguru1)
-- [Announcement of the Top 250 teams advancing to the Regional round](https://www.facebook.com/aiyoungguru1/posts/pfbid0jQvJgADPYpX3ZxuSmLBTrs25xaxLsn7urWU9bNyTQqANqcAFsqi1gXj1Hx9Qv5Hkl)
-- [Announcement of the Top 30 teams advancing to the practical round](https://www.facebook.com/aiyoungguru1/posts/pfbid02bfr57ZqxfWRtY7LYwfaFQ7Bit4x94NHMsmGJBAcWoGN6odB4vApv3L2v64uzxN61l?rdid=nlLB1dfbhFpVTRG9#)
-- [Detailed announcement of the Top 30 teams advancing to the Practical round](https://www.facebook.com/aiyoungguru1/posts/pfbid0JTEMeq62vQy9evu9SS99cbYHpHofMUbMXbV4vrfGVyxYcYsjLP5MveBnR974B1Mpl?rdid=sc7MoUU3UXosSdm5#)
+- [Official AI Young Guru Fanpage](https://www.facebook.com/aiyoungguru1)
+- ["VTS - Cá Mập Laze" advancing to the Regional round](https://www.facebook.com/aiyoungguru1/posts/pfbid0jQvJgADPYpX3ZxuSmLBTrs25xaxLsn7urWU9bNyTQqANqcAFsqi1gXj1Hx9Qv5Hkl)
+- ["VTS - Cá Mập Laze" advancing to the Practical round](https://www.facebook.com/aiyoungguru1/posts/pfbid02bfr57ZqxfWRtY7LYwfaFQ7Bit4x94NHMsmGJBAcWoGN6odB4vApv3L2v64uzxN61l?rdid=nlLB1dfbhFpVTRG9#)
+- [Invitation to the Practical round](https://www.facebook.com/aiyoungguru1/posts/pfbid0JTEMeq62vQy9evu9SS99cbYHpHofMUbMXbV4vrfGVyxYcYsjLP5MveBnR974B1Mpl?rdid=sc7MoUU3UXosSdm5#)
 - [Recognition published by Võ Thị Sáu High School](https://www.facebook.com/permalink.php?story_fbid=pfbid023FaPNEaCvTwEcFmfQ9CrxVHXpY2zKhc9xBpDdiYeVXZcjn8Q9VrEWuCawZWkAwuUl&id=61583508615694&rdid=BipgwzyCQMh6luqG#)
 - [Promising Award ceremony and recognition](https://www.facebook.com/reel/1516002886825130)
 
@@ -133,7 +133,6 @@ CI in `.github/workflows/ci.yml` uses Node 24, JDK 21, a demo Firebase project a
 - [Technical Documentation](docs/TECHNICAL_DOCUMENTATION.md)
 - [Backend](docs/backend.json)
 - [Audit Report](docs/AUDIT_REPORT.md)
-- [Proposed AI Transport Remediation Plan](docs/AI_TRANSPORT_REMEDIATION_PLAN.md)
 
 All repository documentation is maintained in English. The application interface itself remains bilingual, and localization behavior is described in the technical documentation.
 
