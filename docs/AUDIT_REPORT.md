@@ -6,6 +6,10 @@
 - **Plan current remediation:** begin with Unresolved Findings, then read the matching detailed finding.
 - **Confirm completed work:** consult Resolved Findings and its cited evidence.
 
+Read **Status** and **Current implementation** or **Resolution and evidence** for the present finding state. Paragraphs labelled **Historical description and context** and **Original verification criteria** preserve the audited baseline and its original acceptance requirements. They do not describe unresolved behavior after a finding has been closed.
+
+Evidence applies to the revision, environment and scope in which it was collected. Local tests, Emulator checks, browser fixtures and deployed acceptance are distinct layers; **Resolved** closes the stated finding within its documented boundary. Finding-specific limitations remain below. The [release procedure](CONFIGURATION.md#release-procedure) connects the outstanding checks to staging and canary work.
+
 ## 🧭 Finding-Code Legend
 
 | Code | Full Name | Scope |
@@ -424,7 +428,7 @@
 
 **Current implementation:** Component filenames and import paths now use the selected kebab-case convention, inconsistent state/setter names were normalized, and unused placeholder exports were removed. The original naming examples below describe the audited baseline.
 
-**Historical description and context:** The repository mixes PascalCase and kebab-case filenames and retains inconsistent identifiers such as `PlaceHolderImages` and `currentIndex/setCurrentIdx`. These inconsistencies primarily affect comprehension and case-sensitive portability rather than confirmed runtime behaviour.
+**Historical description and context:** The audited baseline mixed PascalCase and kebab-case filenames and retained inconsistent identifiers such as `PlaceHolderImages` and `currentIndex/setCurrentIdx`. These inconsistencies affected comprehension and case-sensitive portability; they were not confirmed runtime failures.
 
 **Observed scope and consequence:** The inconsistency occurs across component filenames, exported symbols, and state/setter pairs rather than within a single isolated module. It increases the cognitive cost of predicting import paths and identifier names and creates avoidable risk when development on case-insensitive Windows filesystems is later validated or deployed on case-sensitive Linux filesystems.
 
@@ -436,7 +440,7 @@
 
 **Current implementation:** Lifecycle-specific quiz configuration validation and shared analysis schemas are present. New history writes use schemaVersion 2; versions 1 and 2 remain permanently readable, an absent version maps to legacy version 1, and unsupported future versions are rejected. Invalid optional analysis remains safely omitted. No migration or fallback retirement is required by this compatibility policy.
 
-**Historical description and context:** Question and result concepts remain partially conflated; form-originated numeric configuration values traverse layers as strings; and related metric schemas are defined repeatedly. Persisted quiz-history records also have no explicit schema version: the current history adapter accepts an absent `analysis` field and converts invalid `analysis` values to `undefined`, allowing legacy records to remain readable without a backfill. This compatibility behaviour is deliberate and useful, but the repository does not define a migration, backfill, or fallback-retirement policy. Collectively, these representations obscure the distinction between draft, validated, persisted, migrated, and evaluated data.
+**Historical description and context:** The audited baseline partially conflated question and result concepts, passed form-originated numeric values between layers as strings, and repeated related metric schemas. Quiz-history records lacked an explicit schema version. The adapter accepted absent `analysis` and converted invalid analysis to `undefined`, preserving legacy readability without a backfill. However, no migration or fallback-retirement policy explained the intended lifecycle of those records. This obscured the distinction between draft, validated, persisted, migrated and evaluated data.
 
 **Observed scope and consequence:** A value may satisfy a TypeScript interface while still belonging to the wrong lifecycle stage or requiring runtime normalization before use. Repeated structural definitions can also diverge without a compiler error because nominal ownership is absent. For quiz history, heterogeneous legacy and current documents can remain operationally indistinguishable after adaptation, which makes it difficult to quantify migration progress, identify records that have lost optional analytical output, or determine when compatibility logic can be removed. The principal risk is incorrect confidence at module boundaries and indefinite schema ambiguity rather than an immediate type-check failure.
 
@@ -448,7 +452,7 @@
 
 **Current implementation:** Unused brand/placeholder modules were removed after consumer review. The scoring source documents the absolute 1e-6 tolerance, and boundary fixtures cover its intended acceptance behavior. The observations below refer to the earlier source rather than active modules.
 
-**Historical description and context:** `brand-badges.tsx` and `placeholder-images.ts` have no static consumer in the current source, while formatting, import ordering, comments, and local naming remain inconsistent. Arena scoring uses the named constant `NUMERIC_ANSWER_TOLERANCE = 1e-6`, but neither the source nor the technical documentation explains how that threshold was derived, which numeric domains or units it is intended to cover, or whether the comparison is deliberately absolute rather than relative. Lint and type-check pass because the compiler does not enable `noUnusedLocals`; therefore, those results do not disprove dead-code candidates or establish that business-rule constants are adequately documented.
+**Historical description and context:** The audited baseline contained no identified static consumers of `brand-badges.tsx` or `placeholder-images.ts`, and formatting, imports, comments and naming were inconsistent. Arena scoring used `NUMERIC_ANSWER_TOLERANCE = 1e-6` without explaining its derivation, intended numeric domains or units, or absolute-versus-relative semantics. Passing lint and type-check did not settle these questions; `noUnusedLocals` was not enabled.
 
 **Observed scope and consequence:** The candidate modules add maintenance surface and can mislead a reviewer into assuming that dormant assets or branding behaviour remain active. Inconsistent imports, comments, and unexplained constants further obscure ownership during change review. The Arena threshold is directly testable and is not itself evidence of incorrect scoring; however, without a documented domain rationale, a future maintainer cannot determine whether changing the accepted answer format, magnitude, or unit requires changing the tolerance. Static absence of a consumer is strong evidence of disuse, but dynamic loading and external scripts must be excluded before deletion is justified.
 
@@ -460,7 +464,7 @@
 
 **Current implementation:** Domain responsibilities were extracted into dedicated modules, including dashboard cards, practice mode, flashcard gameplay, shared authentication UI, paged collection loading and learning-session lifecycle. Historical line counts below are baseline observations, not current measurements or acceptance thresholds.
 
-**Historical description and context:** Dashboard (998 lines), Playground (844), Profile (755), Forum list (699), and Forum detail (642) continue to combine presentation, subscriptions, mutations, dialogs, and reporting. File length alone is not a defect, but these modules exhibit multiple distinct ownership boundaries.
+**Historical description and context:** Dashboard (998 lines), Playground (844), Profile (755), Forum list (699) and Forum detail (642) combined presentation, subscriptions, mutations, dialogs and reporting. These historical line counts illustrated several ownership boundaries within each module; file length alone was not the defect.
 
 **Observed scope and consequence:** A single component frequently owns remote-data lifecycle, form drafts, mutation error handling, navigation transitions, derived statistics, and large presentation trees. Changes to one responsibility consequently require reasoning about unrelated state and effects. This increases regression risk and makes focused component testing more difficult without establishing that any particular line-count threshold is inherently unacceptable.
 
@@ -472,7 +476,7 @@
 
 **Current implementation:** Shared authentication, subject metadata, date formatting, analysis schemas and coordinated mutation handling now provide common policy boundaries. Coordinated Forum edits retain drafts and await persistence. The duplicated behavior described below is historical.
 
-**Historical description and context:** Authentication shells, Forum mutation handlers, subject metadata, date wrappers, metric schemas, and localization access patterns remain duplicated. The divergence is behavioural rather than merely textual: post creation awaits persistence and retains a draft after failure, whereas the corresponding edit paths close their editors before persistence has been confirmed. Similar duplication increases the probability that validation limits, error handling, localization, and lifecycle rules will evolve differently across nominally equivalent workflows.
+**Historical description and context:** Authentication shells, Forum mutation handlers, subject metadata, date wrappers, metric schemas and localization access patterns were duplicated. Their behavior also diverged: post creation awaited persistence and retained failed drafts, while edit paths closed before write confirmation. Equivalent workflows could therefore develop different validation, error-handling, localization and lifecycle policies.
 
 **Observed scope and consequence:** The duplicated implementations do not share a single executable contract, so correcting one path provides no mechanical assurance that its peers receive the same correction. Consolidation should target stable policy boundaries-such as mutation completion, validation, or formatting-rather than forcing unrelated feature behaviour into a highly parameterized generic component.
 
@@ -484,7 +488,7 @@
 
 **Current implementation:** useLearningSession owns reducer transitions and persistence; navigation owns non-session sections and Quiz owns generation/answer-feedback UI. Reset invalidates pending save completions. This establishes ownership for the assigned structural finding without closing separately tracked setup/authentication race findings.
 
-**Historical description and context:** Home maintains a separate `view`, the learning-session reducer defines transitions that are not uniformly dispatched, and Quiz owns additional loading and error state. The architecture does not document which representation is authoritative for each transition.
+**Historical description and context:** Home maintained a separate `view`, learning-session reducer transitions were not uniformly dispatched, and Quiz owned additional loading and error state. The architecture did not identify the authoritative representation for each transition.
 
 **Observed scope and consequence:** The same conceptual session can be represented simultaneously by route/view selection, reducer state, and component-local flags. A transition may update only a subset of those representations, especially after late asynchronous completion. The ambiguity complicates cancellation and reset behaviour and makes illegal or contradictory states possible even though each individual state variable is correctly typed.
 
@@ -496,7 +500,7 @@
 
 **Current implementation:** Coordinated mutations return promises with explicit success/failure outcomes and pending exclusion, and success is tied to completed persistence. Render boundaries remain separate from asynchronous failure reporting. This resolution covers the assigned completion contract, not every independently tracked error-handling defect.
 
-**Historical description and context:** Render boundaries cannot capture event-handler or request failures, while several mutations use detached `.then/.catch` chains or return before the durable operation completes. Callers therefore cannot consistently infer completion or recovery semantics.
+**Historical description and context:** Several mutations used detached `.then/.catch` chains or returned before durable completion, leaving callers without consistent completion or recovery semantics. Render boundaries could not cover those asynchronous failures; that React boundary distinction still applies.
 
 **Observed scope and consequence:** Some handlers return `void`, others return booleans or promises, and success notifications are not uniformly tied to durable completion. A caller cannot apply a consistent pending lock, retry decision, or navigation policy without understanding each implementation. Render recovery and asynchronous operation recovery are separate mechanisms and should not be treated as interchangeable.
 
@@ -508,9 +512,9 @@
 
 **Current implementation:** usePagedCollection maintains a live first page limited to 50 records and fetches older pages by cursor. First-page changes invalidate older pages and in-flight continuations; duplicate IDs are filtered. Search, statistics and reports explicitly cover loaded records. The recorded emulator comparison confirms a 50-document query bound at 100, 1,000 and 10,000 records without asserting production cost savings.
 
-**Historical description and context:** History, posts, exams, and comments use broad real-time queries or subscriptions, with substantial filtering and sorting performed on the client. Reads, memory, and render work may grow with the dataset.
+**Historical description and context:** History, posts, exams and comments used broad real-time queries or subscriptions, with substantial client-side filtering and sorting. Reads, memory and rendering work could grow with the dataset.
 
-**Evidence and interpretive boundary:** The source contains no cursor, page-size limit, or virtualization boundary for the principal history and Forum lists. This establishes an unbounded growth path, but not a measured performance regression at the current production dataset size. Network cache behaviour, Firestore billing, device capacity, and actual record distribution must be observed before severity is quantified.
+**Historical evidence and boundary:** The audited history and Forum lists had no cursor, page-size limit or virtualization boundary. This established an unbounded growth path, without measuring a production regression. Cache behavior, Firestore billing, device capacity and record distribution still require observation before quantifying production impact.
 
 **Original verification criteria:** Measure representative datasets (for example 100, 1,000, and 10,000 records) using read counts, transferred bytes, heap, and render time before selecting cursors, pagination, virtualization, or aggregation. Statistical and sorting correctness must be preserved.
 
@@ -520,9 +524,9 @@
 
 **Current implementation:** LatexText is memoized and its rendering preparation is keyed by text, reducing repeated formula work during unrelated timer updates. Timer termination remains part of quiz behavior. This closes the identified repeated-render mechanism; a material CPU/frame-rate improvement remains outside the available measurements.
 
-**Historical description and context:** The quiz timer updates each second, and `LatexText` invokes `katex.renderToString` during rendering even though token splitting is memoized. The repository contains no CPU, frame-rate, or invocation-count evidence that quantifies the impact.
+**Historical description and context:** Per-second quiz timer updates could cause `LatexText` to repeat `katex.renderToString` during rendering, even though token splitting was memoized. The audit had no CPU, frame-rate or invocation-count measurements quantifying the impact.
 
-**Evidence and interpretive boundary:** The relevant execution paths are directly visible, but their cost depends on component boundaries, the number and complexity of expressions, browser hardware, and React scheduling. The finding therefore identifies repeated work suitable for profiling; it does not establish that memoization or timer isolation would produce a material user-visible improvement.
+**Evidence and interpretive boundary:** The original repeated-render path was visible in source. Its cost depended on component boundaries, expression complexity, hardware and React scheduling. The implemented memoization closes that mechanism; a material user-visible improvement requires profiling evidence.
 
 **Original verification criteria:** Profile before optimization. Any timer isolation or output cache must preserve timer termination and invalidate correctly when text, rendering options, theme, or locale changes.
 
@@ -532,7 +536,7 @@
 
 **Current implementation:** Review context appears once in the system message, prior conversation turns once in provider messages, and current input once at the end. The caller no longer appends the current input to the prior-turn history. Provider token and answer-quality gains are not inferred solely from this structural correction.
 
-**Historical description and context:** The validated `data` object, including `chatHistory`, is serialized into the prompt, while the same history is also mapped into the provider `messages` array. The current user message is included in both `userMessage` and the accumulated history supplied by the component.
+**Historical description and context:** The validated `data` object, including `chatHistory`, was serialized into the prompt while the same history was mapped into provider `messages`. The current user message appeared in both `userMessage` and the accumulated component history.
 
 **Observed mechanism and consequence:** Each conversational turn can reach the provider through two representations with overlapping semantics. This increases request size and may cause the model to assign disproportionate weight to repeated text or interpret the duplicated current turn as two separate instructions. The actual token and response-quality impact remains input- and tokenizer-dependent.
 

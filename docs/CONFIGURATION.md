@@ -1,6 +1,6 @@
 # ⚙️ Configuration, Dependencies, and Troubleshooting · Shark Empti v1.15.1
 
-This document describes the configuration actually consumed by the current source. Placeholders do not configure a service, and the existence of `.env` does not prove that a credential is valid.
+This guide covers installation, configuration, local validation and release preparation for the current source. Replace example values with credentials for the intended environment, then verify each configured service.
 
 ## 🧭 Quick Navigation
 
@@ -10,6 +10,8 @@ This document describes the configuration actually consumed by the current sourc
 | Configure Firebase, Admin credentials, or OpenRouter | Sections 3–4 |
 | Run emulator, integration, or E2E checks | Section 6 |
 | Prepare Vercel or a release | Sections 7–9, together with the validation gaps in [AUDIT_REPORT.md](AUDIT_REPORT.md) |
+| Diagnose a local setup failure | [Local troubleshooting](#local-troubleshooting) |
+| Coordinate staging and canary acceptance | [Release procedure](#release-procedure) |
 
 Read the sections in order for a first setup. For an existing environment, use the table above to navigate directly to the applicable configuration boundary.
 
@@ -199,7 +201,11 @@ The current source sends `POST https://openrouter.ai/api/v1/chat/completions`. I
 2. `google/gemma-4-31b-it:free`;
 3. `nvidia/nemotron-3.5-lightning:free`.
 
-The order is fixed and server-authoritative. Each generation may claim each ordinal once, up to three attempts, and each attempt-route invocation makes at most one OpenRouter request with a 20-second provider deadline. A short-lived Firestore ledger provides idempotency, leases, cancellation and status recovery; per-user and global quota records are reserved transactionally. The browser submits no model name or attempt number. Production generation creation remains disabled unless `AI_GENERATION_PROTOCOL_ENABLED=true`; enable it only after staging verifies Function duration, response-loss recovery, concurrent claims, TTL activation, quota thresholds and content-free telemetry.
+The server fixes the model order and permits each ordinal once, up to three attempts per generation. Each attempt-route invocation makes at most one OpenRouter request with a 20-second provider deadline. The browser submits neither a model name nor an attempt number.
+
+A short-lived Firestore ledger coordinates idempotency, leases, cancellation and recovery. Per-user and global quotas are reserved transactionally. See the [AI request lifecycle](TECHNICAL_DOCUMENTATION.md#ai-request-lifecycle) for the interaction between browser, API and ledger.
+
+Production-mode generation creation requires `AI_GENERATION_PROTOCOL_ENABLED=true`. Use this flag within the staged verification process described in the [release procedure](#release-procedure); broader enablement depends on duration, recovery, quota, TTL and telemetry acceptance.
 
 ## 5. 💻 Local Execution
 
@@ -214,12 +220,26 @@ Open `http://localhost:9002`. At minimum, verify:
 1. The page renders without a Firebase initialization error.
 2. The Google popup signs in and returns to the correct origin.
 3. Firestore reads/writes are allowed only as intended by Rules.
-4. An AI flow returns a structured result when an OpenRouter key is present.
-5. Arena submission and Forum comment APIs work when Admin credentials are present.
+4. An AI flow returns a structured result for a signed-in user when both OpenRouter and Admin credentials are configured.
+5. Arena creation/submission and Forum post deletion or comment creation/deletion work through the authenticated Admin APIs.
 
 Missing Admin credentials do not mean the Firebase Web config is invalid; they make Admin Route Handlers return `APP-CONFIG-MISSING`. A missing OpenRouter key produces `AI-CONFIG-MISSING` without preventing Firebase-only features from rendering.
 
-### Arena timing and ranking deployment
+<a id="local-troubleshooting"></a>
+
+### 5.1. Local Troubleshooting
+
+| Symptom | Check first | Next step |
+|---|---|---|
+| Firebase initialization fails | Six Web configuration fields and selected project | Correct values using Section 3.1; restart the app and rebuild after public-variable changes |
+| Google sign-in fails | Google provider and authorized hostname | Check Section 3.3 and confirm the popup returns to the intended origin |
+| API returns `APP-CONFIG-MISSING` | Three Admin variables and matching project IDs | Check Section 3.4 without printing credential values |
+| AI returns `AI-CONFIG-MISSING` | Server-side OpenRouter key | Follow Section 4.1; health success alone does not validate the full AI protocol |
+| AI is unavailable in a production build | Feature flag, authenticated session and server credentials | Confirm the intended staging/canary scope before enabling generation creation |
+| Integration tests fail before assertions | JDK, Emulator ports and temporary directory | Use the diagnostics and Windows workaround in Section 6 |
+| Arena leaderboard query fails | Readiness of the target project's composite index | Follow Section 5.2 and the metadata inspection procedure in Section 9.2 |
+
+### 5.2. Arena Timing and Ranking Deployment
 
 Deploy the `attempts` composite index declared in `firestore.indexes.json` before releasing the new leaderboard query: `timingVersion ASC`, `score DESC`, `duration ASC`, and document ID `ASC`. Confirm that the index is ready on the target project; Emulator query success does not prove production index readiness. The UI reports query failures and offers retry.
 
@@ -300,7 +320,17 @@ npm run test:production
 
 The first E2E run uses the development server; the second uses the optimized build. CI also records the bundle inventory and synthetic performance baseline. Browser installation requires the relevant host libraries. Consult [the audit report](AUDIT_REPORT.md) for dated results and outstanding browser acceptance evidence.
 
-Release also requires a current dependency audit, production Runtime/Function settings, deployed Firestore Rules and indexes, receipt and AI-ledger TTL activation, the documented minimum browser targets, a physical camera and live OpenRouter validation. The AI feature flag must remain disabled outside approved staging/canary scopes. The build uses local system fonts and no longer downloads Google Fonts. Lists load 50 records initially and fetch older pages by cursor; search, statistics and reports cover loaded records.
+The commands above establish local evidence. Before release, complete the environment-specific checks below and review each open finding's acceptance criteria in [AUDIT_REPORT.md](AUDIT_REPORT.md).
+
+| Release area | Required evidence |
+|---|---|
+| Dependencies and hosting | Current dependency assessment; confirmed production Runtime/Function settings and hosted CI result |
+| Firestore | Deployed Rules, ready posts/Arena indexes and active receipt, AI-generation, AI-quota and Arena-session TTL policies |
+| AI protocol | Live provider validation, staging recovery/concurrency checks, calibrated quotas and controlled canary acceptance |
+| Browser and device support | Corrected production E2E matrix, documented minimum browser targets and physical-camera checks |
+| User-visible scope | Confirm labels describe loaded-record search/statistics/reports; initial pages contain at most 50 records |
+
+The AI feature flag remains disabled outside approved staging/canary scopes. Production builds use local system fonts and require no Google Fonts download.
 
 The public-data changes require coordinated deployment of server routes, client assets and Firestore Rules: Arena creation now uses `POST /api/arena`, and post deletion uses `DELETE /api/forum/{postId}`. Old browser create/delete paths are denied by the new Rules. `_forumDeletions` records deliberately have no TTL; they retain owner recovery and post-ID reuse protection. No production deployment or legacy data sweep is implied by local verification.
 
@@ -312,17 +342,25 @@ node node_modules/vitest/vitest.mjs run tests/report-print.browser.test.tsx
 Remove-Item Env:REPORT_PRINT_BROWSER
 ```
 
-The selected browser must be installed. The test renders the actual print component with long English/Vietnamese fixtures in both themes; Chromium also writes multipage PDFs to ignored `tmp/pdfs/`. With no environment opt-in, these browser tests are skipped by the ordinary unit suite. This is a print fixture check, not an authenticated end-to-end profile test.
-
-The fixture checks application print markup and can produce Chromium PDFs for inspection. It does not establish native print-preview or physical-printer behavior; dated execution evidence is recorded in [the audit report](AUDIT_REPORT.md).
+The selected browser must be installed. The test renders the actual print component with long English/Vietnamese fixtures in both themes; Chromium writes multipage PDFs to ignored `tmp/pdfs/`. Without the environment opt-in, the ordinary unit suite skips these checks. Coverage is limited to the print fixture; authenticated profile flows, native print preview and physical printers require separate verification. Dated results belong in [the audit report](AUDIT_REPORT.md).
 
 ### 9.1. 🔍 Dependency Assessment
 
 `npm run audit:dependencies` sends resolved package names and versions to npm and writes `reports/dependency-audit.json` with the lockfile SHA-256 and measurement time. `config/dependency-audit-policy.json` blocks high/critical advisories; registry errors also fail validation. Low/moderate findings remain visible and are not approved exceptions. The checked-in CI workflow runs the command after installation. Rerun it before making a current advisory claim; V04 in [the audit report](AUDIT_REPORT.md) records dated evidence.
 
+<a id="retention-operations"></a>
+
 ### 9.2. 🧾 Receipt and AI-Ledger Retention and Index Operations
 
-New receipts carry `expiresAt` seven days after creation. AI generation and quota records also carry short-lived `expiresAt` fields, and Arena timing sessions have a 24-hour logical lifetime. Deletion is asynchronous, and retained receipts remain replayable until deletion. Desired posts/Arena indexes and TTL field settings for `_requestReceipts`, `_aiGenerations`, `_aiQuota` and `_arenaSessions` are in `firestore.indexes.json`. From the repository root, `node scripts/inspect-firestore.mjs` loads the Admin identity from `.env`, reads the deployed posts/Arena indexes and all four TTL policies, and writes `reports/firestore-metadata.json`. It is read-only. This checkout contains no package command or source file that applies index or TTL configuration, so production changes require a separately authorized infrastructure workflow and subsequent verification.
+New receipts carry `expiresAt` seven days after creation and remain replayable until asynchronous deletion. AI generation and quota records also carry short-lived expiry fields; Arena timing sessions have a 24-hour logical lifetime. The [technical documentation](TECHNICAL_DOCUMENTATION.md) distinguishes retention from application-enforced expiry.
+
+`firestore.indexes.json` declares the desired posts/Arena indexes and TTL settings for `_requestReceipts`, `_aiGenerations`, `_aiQuota` and `_arenaSessions`. Inspect deployed state from the repository root:
+
+```powershell
+node scripts/inspect-firestore.mjs
+```
+
+The script loads the Admin identity from `.env`, reads indexes and all four TTL policies, and writes `reports/firestore-metadata.json`. It does not change remote configuration. This checkout has no package command or source file that applies indexes or TTL policies; use a separately authorized infrastructure workflow, then repeat the inspection to verify readiness.
 
 For legacy data, `node --conditions=react-server --env-file=.env --import tsx scripts/receipt-retention.ts` inventories missing expiry values; adding `--apply` backfills them without directly deleting receipts. Its `alreadyExpired` counter concerns missing-expiry records whose calculated expiry is past, not every expired document. Deployment attempts and IAM outcomes are tracked in [the audit report](AUDIT_REPORT.md), rather than repeated in this operational guide.
 
@@ -336,3 +374,16 @@ For legacy data, `node --conditions=react-server --env-file=.env --import tsx sc
 - Physical-camera verification still requires device access and separate tooling; browser performance does not reproduce the historical camera result.
 
 Current verification scripts print or write their evidence when explicitly run. Bundle, dependency-audit, Firestore-metadata, and synthetic-performance commands generate machine-readable artifacts. GitHub operations require the user's explicit request, including pushes, pull requests and workflow actions.
+
+<a id="release-procedure"></a>
+
+### 9.4. Staging and Canary Procedure
+
+This procedure organizes the existing acceptance requirements. It does not record a completed deployment or supply unmeasured cost, latency or traffic thresholds.
+
+1. **Identify the release candidate.** Record the source revision, lockfile hash, target environment and configuration changes. Run the local checklist and retain the relevant reports with their dates and environment details.
+2. **Prepare staging infrastructure.** Confirm the target Firebase project, authorized domains, server credentials, Function duration and region. Coordinate client assets, server routes and Rules; verify indexes and all four TTL policies through Section 9.2. Preserve Forum tombstones.
+3. **Validate staging behavior.** Enable AI creation only within the approved staging scope. Exercise response loss, duplicate/concurrent claims, cancellation, quota rejection and all seven AI operations. Correlate requests using non-sensitive generation identifiers and verify the one-provider-call-per-invocation boundary. Run the corrected production browser matrix and record device checks separately.
+4. **Define canary acceptance before exposure.** Assign a release owner and specify the allowed scope, observation period, cost/latency/error thresholds and stop conditions. Calibrate the current 30/300 weighted quota budgets using staging evidence. M01 and F01 remain open until their deployed acceptance requirements are met.
+5. **Run and assess the canary.** Enable creation in the approved production scope, retain content-free telemetry and compare observations with the agreed criteria. If criteria fail, disable new production generation creation through the feature flag and deploy the updated configuration. The flag controls creation; it must not be treated as cancellation of in-flight generations or reversal of persisted mutations.
+6. **Record the decision.** Attach dated evidence to the relevant audit findings before broader release. Record unresolved failures and recovery work. Coordinate any client/server/Rules rollback as a separate release change, since older clients may use paths that current Rules deny.

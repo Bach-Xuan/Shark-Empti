@@ -1,6 +1,6 @@
 # 🛠️ Technical Documentation · Shark Empti v1.15.1
 
-This document describes the architecture and contracts of the current source. It does not claim that unresolved findings in [AUDIT_REPORT.md](AUDIT_REPORT.md) have been corrected. Detailed setup belongs in [CONFIGURATION.md](CONFIGURATION.md).
+This document describes the architecture and contracts of the current source. [AUDIT_REPORT.md](AUDIT_REPORT.md) records implementation status and acceptance evidence; [CONFIGURATION.md](CONFIGURATION.md) provides setup and operational procedures.
 
 ## 🧭 Quick Navigation
 
@@ -10,6 +10,7 @@ This document describes the architecture and contracts of the current source. It
 | Understand runtime ownership, client boundaries, and data flow | Sections 2–4 |
 | Review AI behavior, user-facing safeguards, or dependencies | Sections 5–7 |
 | Assess test coverage, deployment limits, and evidence | Sections 8–9 and [AUDIT_REPORT.md](AUDIT_REPORT.md) |
+| Look up domain terms or follow an AI request | [Technical glossary](#technical-glossary) and [AI request lifecycle](#ai-request-lifecycle) |
 
 The source files named in Section 1 remain authoritative when a documentation statement and executable behavior diverge.
 
@@ -86,7 +87,11 @@ Playground generates and saves flashcard/practice sessions in user subcollection
 
 The `users/{uid}/history` reader uses Zod with defaults for selected legacy omissions; records with corrupt core shape are excluded from the view rather than modified/deleted. The profile reader also normalizes selected missing fields. Forum/Arena feeds and detail views use the shared public Firestore schemas; Admin endpoints independently validate inputs and persisted parent/exam records before mutation or scoring.
 
-`activeDays` is a `YYYY-MM-DD -> boolean` map. It records the day the activity calendar runs, not proof of quiz completion. Roadmap checks, language, theme and one-time interface guidance state live in localStorage rather than Firestore. Current roadmap writes use `shark_roadmap_checks:v2:{uid}`. Topic identity is the lossless stored subject/grade/topic tuple; recommendation identity is its persisted bilingual text pair, not the display locale or list index. Exact duplicate pairs collapse; edited content creates a new task. The previous `shark_roadmap_checks:{uid}` and unscoped `shark_roadmap_checks` keys are retained unchanged but are not automatically imported because their positional/localized identities cannot be reliably matched. V2 completion starts empty. Other keys are `shark_lang`, `shark_theme`, `shark_chat_seen`, `shark_help_setup_seen`, `shark_help_dashboard_seen`, `shark_help_playground_seen` and `shark_help_forum_seen`.
+`activeDays` is a `YYYY-MM-DD -> boolean` map. It records the day the activity calendar runs, not proof of quiz completion. Roadmap checks, language, theme and one-time interface guidance state live in localStorage rather than Firestore.
+
+Roadmap writes use `shark_roadmap_checks:v2:{uid}`. Topic identity is the stored subject/grade/topic tuple; recommendation identity is its persisted bilingual text pair. Neither depends on the display locale or list index. Exact duplicate pairs collapse, while edited content creates a new task.
+
+The previous `shark_roadmap_checks:{uid}` and unscoped `shark_roadmap_checks` keys remain unchanged. Their positional/localized identities cannot be reliably matched, so they are not imported and V2 completion starts empty. Other localStorage keys are `shark_lang`, `shark_theme`, `shark_chat_seen`, `shark_help_setup_seen`, `shark_help_dashboard_seen`, `shark_help_playground_seen` and `shark_help_forum_seen`.
 
 ### 3.2. 📅 Dates and Timestamps
 
@@ -100,10 +105,21 @@ The `users/{uid}/history` reader uses Zod with defaults for selected legacy omis
 - Quiz and practice await stable-ID saves before completion. Flashcard archival is awaited but failure leaves generated cards usable with an error notice.
 - An object containing nested `undefined` can be rejected by Firestore.
 - Post deletion now uses an authenticated server cascade with an atomic parent-removal/tombstone transaction. Local Rules deny comment reads when the parent is absent or tombstoned, including pre-existing orphans. These protections require deployment of the updated Rules; old orphan records are not silently migrated or deleted by this code change.
-- New receipts have seven-day `expiresAt` and remain replayable until asynchronous deletion. AI generations use a 24-hour local/staging retention hypothesis, while AI quota documents expire after their rolling-window recovery period. Arena timing sessions have a 24-hour logical lifetime. TTL field settings for all four internal collections are declared in `firestore.indexes.json`; deployed activation remains unverified. A recorded metadata check found receipt TTL disabled and the posts index missing; an historical configuration attempt failed with IAM 403. `scripts/inspect-firestore.mjs` reads posts/Arena index metadata and all four deployed TTL policies without modifying them. `scripts/receipt-retention.ts` independently inventories legacy receipts and backfills missing receipt expiry only with `--apply`.
 - `activeDays` writes use an explicit mask for the current date leaf and `updatedAt`, independently of cached maps. Emulator tests cover stale-device ordering and offline reconciliation; the day is still based on the user's local calendar.
 
 These limitations are tracked in the audit; a descriptive data-map edit does not change finding status.
+
+Retention policies distinguish application expiry from asynchronous storage cleanup:
+
+| Record | Current retention or expiry contract |
+|---|---|
+| Request receipt | `expiresAt` is seven days after creation; retained receipts remain replayable until deletion |
+| AI generation | 24-hour retention is a local/staging hypothesis awaiting operational acceptance |
+| AI quota | Expiry follows the rolling-window recovery period |
+| Arena timing session | API enforces a 24-hour logical lifetime, independently of delayed TTL cleanup |
+| Forum deletion tombstone | No TTL; retained for owner recovery and post-ID reuse protection |
+
+`firestore.indexes.json` declares TTL settings for the first four collections. Deployed activation remains unverified. The [configuration guide](CONFIGURATION.md#retention-operations) describes metadata inspection and legacy receipt backfill; P04 in [the audit report](AUDIT_REPORT.md) retains the historical missing-index, disabled-TTL and IAM 403 evidence.
 
 ## 4. 🔐 Authentication, Rules, and Server APIs
 
@@ -138,7 +154,7 @@ Elapsed seconds are derived from server-observed start and submission receipt ti
 
 Only attempts with `timingVersion: 1` enter the leaderboard. The Firestore query orders score descending, duration ascending and document ID ascending before `limit(10)`. Legacy attempts remain stored without retroactive timing claims. The matching index and session TTL policy are declared locally; production readiness must be checked separately. The 50-coin pioneer bonus belongs to the first successful submission globally for each exam, as stated in both locales.
 
-### 4.4. 💬 Forum Comment API
+### 4.4. 💬 Forum Comment and Post Deletion APIs
 
 `POST /api/forum/{postId}/comments`
 
@@ -150,7 +166,9 @@ Content is trimmed and constrained to 1–2,000 characters. The API verifies the
 
 `DELETE /api/forum/{postId}/comments?commentId={commentId}` verifies token, existence and `authorId`, then deletes the comment and decrements the counter transactionally. Comment creation validates the parent and rejects deletion-in-progress within its transaction.
 
-`DELETE /api/forum/{postId}` verifies ownership and atomically removes the parent while creating `_forumDeletions/{postId}`. Admin SDK recursive deletion then removes descendants in bounded bulk operations. The server retains a minimal tombstone (`authorId`, status and timestamps) to prevent ID reuse and authorize retries after partial failure. Only its owner can read the recovery record; clients cannot mutate it. Pending deletion is recoverable from the Forum interface; there is no background cleanup worker. Tombstones have no TTL by design because expiry would reopen ID reuse; administrators must not expire them without a replacement policy. No production cleanup is performed merely by deploying code.
+`DELETE /api/forum/{postId}` verifies ownership and atomically removes the parent while creating `_forumDeletions/{postId}`. Admin SDK recursive deletion then removes descendants in bounded bulk operations.
+
+The minimal tombstone contains `authorId`, status and timestamps. It prevents ID reuse and authorizes retries after partial failure. Only its owner can read it; clients cannot mutate it. The Forum interface supports recovery of pending deletions, and there is no background cleanup worker. Tombstones have no TTL because expiry would reopen ID reuse; they must remain until a replacement policy exists. Deploying code alone does not clean up production data.
 
 ### 4.5. 🚨 Safe Errors
 
@@ -175,6 +193,34 @@ Gemma receives native JSON Schema; Inkling/Nemotron receive a JSON-only instruct
 The provider deadline is 20 seconds and the lease is 35 seconds. The ledger enforces two concurrent generations per user, a staging-hypothesis budget of 30 weighted attempts per 15 minutes and a global ceiling of 300. The protocol is enabled by default outside production; production creation requires `AI_GENERATION_PROTOCOL_ENABLED=true`. Visitor warm-up and process-scoped model preference do not exist. Deployment duration, quota calibration, TTL activation and canary acceptance remain pending and must not be inferred from local tests.
 
 Chat review context occurs once in the system message, prior conversation turns once in provider messages, and the current user input once at the end. The caller supplies prior turns without appending the current turn to history.
+
+<a id="ai-request-lifecycle"></a>
+
+### 5.1. AI Request Lifecycle
+
+```mermaid
+sequenceDiagram
+    participant Browser
+    participant API as Authenticated AI API
+    participant Ledger as Firestore generation ledger
+    participant Provider as OpenRouter
+    Browser->>API: Create generation with operation and input
+    API->>Ledger: Validate and create or replay record
+    API-->>Browser: Generation ID and state
+    Browser->>API: Request attempt
+    API->>Ledger: Claim allowed ordinal and lease
+    API->>Provider: One request for the claimed attempt
+    Provider-->>API: Result or failure
+    API->>Ledger: Finalize matching lease
+    API-->>Browser: Result, retryable state or terminal error
+    opt Attempt response is lost
+        Browser->>API: GET generation status
+        API->>Ledger: Read authoritative state
+        API-->>Browser: Recover state before another attempt
+    end
+```
+
+The diagram shows a successful claim. Authentication, validation, quota rejection or an active lease can end an invocation before any provider request. The browser follows the returned state and delay; the server determines whether another ordinal is available. Cancellation is recorded through `DELETE` and may remain `cancel_requested` while an attempt is active. A cancellation request does not guarantee that an already dispatched provider request stops immediately.
 
 ## 6. 🖥️ Client Behavior, Internationalization, and Focus Shield
 
@@ -238,3 +284,22 @@ The existence or success of a test suite does not establish remote CI, deployed 
 History versions 1 and 2 remain readable; absent versions identify legacy records, and unknown future versions are rejected. Numeric quiz settings are validated separately from draft and persisted strings. `usePagedCollection` limits initial live subscriptions to 50 records and cursor-fetches older pages on demand. Statistics, search and report labels describe loaded-record scope.
 
 This document defines the implemented architecture and the validation layers available in the checkout. Dated test results, finding-level evidence and unresolved acceptance criteria belong in [the audit report](AUDIT_REPORT.md); executable commands and environment requirements belong in [the configuration guide](CONFIGURATION.md). A historical result must not be treated as proof of current remote CI, deployed Firestore configuration, production runtime behavior, live-provider reliability or physical-device compatibility.
+
+<a id="technical-glossary"></a>
+
+## 10. 📖 Technical Glossary
+
+| Term | Meaning in this repository |
+|---|---|
+| Generation | One AI operation, with validated input, an owner and at most three server-ordered attempts |
+| Generation ledger | Private Firestore records that coordinate generation state, leases, cancellation and recoverable results |
+| Attempt | In AI, one claimed model ordinal; in Arena, one scored quiz submission. These are separate records and lifecycles |
+| Lease | Temporary ownership of an AI attempt; only a matching lease may finalize its result |
+| Idempotency receipt | Stored request fingerprint and result used to replay a mutation without duplicating its effects |
+| Fingerprint | A representation used to compare request content or exam questions and detect incompatible reuse |
+| Quota reservation | Transactional accounting for concurrency and weighted AI usage; it is separate from provider account limits |
+| Tombstone | Persistent Forum deletion record that supports owner recovery and prevents reuse of a deleted post ID |
+| TTL | Firestore's asynchronous deletion policy for an expiry field; distinct from expiry checks enforced by API code |
+| Loaded-record scope | Search, statistics and reports cover fetched records; older pages are included only after loading |
+| Historical evidence | A result tied to an earlier revision or environment, retained for traceability rather than assumed current |
+| Staging / canary | Pre-release validation environment / limited production exposure with defined acceptance and stop criteria |

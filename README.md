@@ -1,14 +1,14 @@
 # 🦈 Shark Empti · v1.15.1
 
-Shark Empti addresses a practical educational concern: abundant digital resources often remain disconnected from learners' actual progress. Static question banks encourage repetition, general-purpose chatbots lack sustained learning context, and conventional assessments frequently end with a score rather than meaningful guidance. Shark Empti instead approaches learning as a continuous, evidence-informed process.
+Shark Empti connects digital learning activities with learners' progress. Static question banks encourage repetition, general-purpose chatbots lack sustained learning context, and conventional assessments often end with a score rather than guidance. The project brings assessment, feedback and practice into a continuous, evidence-informed learning process.
 
 This purpose is consistent with Vietnam's wider educational modernization agenda, including **Resolution 57-NQ/TW (2024)** on science, innovation, and digital transformation; **Resolution 71-NQ/TW (2025)** on educational breakthroughs; **Decision 131/QĐ-TTg (2022)** on digital transformation in education; and **Decision 127/QĐ-TTg (2021)** on the national AI strategy. These references establish contextual alignment only; they do not imply governmental endorsement or regulatory compliance.
 
-Within this context, Shark Empti unifies assessment, reflection, focused practice, and peer learning. Configurable activities, contextual guidance, bilingual access, learning records, community participation, and optional attention support help learners understand their present position, identify appropriate goals, and exercise meaningful control over their progress. Each learning event consequently becomes a visible sequence of evidence, interpretation, and purposeful action.
+Shark Empti supports assessment, reflection, focused practice and peer learning through configurable activities, contextual guidance and bilingual access. Learning records, community participation and optional attention support help learners understand their current progress and choose appropriate goals. Together, these features connect evidence of learning with interpretation and practical next steps.
 
 ## 🏆 National Recognition and Continuing Development
 
-Shark Empti earned national recognition at **AI Young Guru 2026** through **"VTS - Cá Mập Laze"**, representing **Võ Thị Sáu High School, Hồ Chí Minh City**. From more than **26,000 participants**, over **15,000 teams**, and **1,800 upper-secondary and vocational schools**, the team progressed through the Top 250 and Top 30, ranked among the **Top 12**, and received the **Promising Award**. This repository directly continues that award-winning Shark Empti product, not a separate successor or reconstruction. It preserves the original educational purpose while advancing toward greater pedagogical maturity, operational dependability, and socially meaningful application.
+Shark Empti earned national recognition at **AI Young Guru 2026** through **"VTS - Cá Mập Laze"**, representing **Võ Thị Sáu High School, Hồ Chí Minh City**. The competition attracted more than **26,000 participants**, over **15,000 teams**, and **1,800 upper-secondary and vocational schools**. The team progressed through the Top 250 and Top 30, reached the **Top 12**, and received the **Promising Award**. This repository directly continues that award-winning Shark Empti product, not a separate successor or reconstruction. Development preserves its educational purpose while improving teaching and learning support, operational reliability, and practical social value.
 
 **AI Young Guru** is a nationwide AI creativity competition for upper-secondary and vocational students. **FPT University** organizes it under the patronage of the **Ministry of Education and Training** and professional patronage of the **Ministry of Science and Technology**, with the **Science and Education Programme Department of Vietnam Television**, the **Central Committee of the Ho Chi Minh Communist Youth Union**, the **Department of Cybersecurity and High-Tech Crime Prevention under the Ministry of Public Security**, and units of **FPT Corporation**. Its mission, **“Bình dân học AI”**-making AI learning broadly accessible-promotes innovative thinking and practical AI proficiency to improve quality of life and support sustainable development.
 
@@ -51,7 +51,7 @@ When an AI operation cannot be completed, the interface returns a safe applicati
 - npm registry access for the first clean installation.
 - A Firebase project with a Web App, Cloud Firestore and Google Authentication.
 - An OpenRouter API key when AI features are required.
-- Firebase Admin service-account credentials when Arena submission or Forum comment creation/deletion APIs must run outside the Emulator.
+- Firebase Admin service-account credentials for AI generation, Arena creation/submission and Forum post deletion or comment creation/deletion outside the Emulator.
 - JDK 21 and Playwright Chromium/WebKit/Firefox for integration/E2E tests.
 
 ### 📦 Install Dependencies and Create the Environment File
@@ -112,7 +112,7 @@ The repository is governed by `package-lock.json`; do not use pnpm or Yarn again
 | `npm run ai:smoke` | Exercise quiz and chatbot schemas through the live single-attempt OpenRouter adapter; does not exercise auth, ledger or client recovery | OpenRouter key; may consume quota |
 | `npm run clean` | Remove `.next` only; retain `node_modules` | No |
 
-Install the browser after `npm ci`:
+Install the test browsers after `npm ci`:
 
 ```powershell
 npx --no-install playwright install chromium webkit firefox
@@ -140,6 +140,8 @@ CI in `.github/workflows/ci.yml` uses Node 24, JDK 21, a demo Firebase project a
 1. Start with [Configuration](docs/CONFIGURATION.md) to install dependencies, create `.env`, and run the local application.
 2. Read [Technical Documentation](docs/TECHNICAL_DOCUMENTATION.md) for the executable architecture, data ownership, and operational boundaries.
 3. Review [Audit Report](docs/AUDIT_REPORT.md) before release work; its unresolved findings and validation gaps define the evidence that is still required.
+
+For unfamiliar terms, use the [technical glossary](docs/TECHNICAL_DOCUMENTATION.md#technical-glossary). The [AI request lifecycle](docs/TECHNICAL_DOCUMENTATION.md#ai-request-lifecycle) explains recovery and retries, while the [release procedure](docs/CONFIGURATION.md#release-procedure) connects local checks, staging verification and canary acceptance. Setup errors are covered in [local troubleshooting](docs/CONFIGURATION.md#local-troubleshooting).
 
 All repository documentation is maintained in English. The application interface itself remains bilingual, and localization behavior is described in the technical documentation.
 
