@@ -10,6 +10,6 @@ export default defineConfig({
     setupFiles: ['./tests/setup.ts'],
     include: ['tests/**/*.test.ts', 'tests/**/*.test.tsx'],
     exclude: ['tests/firebase.rules.test.ts', 'tests/integration/**'],
-    coverage: { provider: 'v8', reporter: ['text', 'html', 'json-summary'], include: ['src/**/*.{ts,tsx}'], exclude: ['src/**/*.d.ts'] },
+    coverage: { provider: 'v8', reporter: ['text', 'html', 'json-summary'], reportsDirectory: 'coverage/unit', include: ['src/**/*.{ts,tsx}'], exclude: ['src/**/*.d.ts'] },
   },
 });

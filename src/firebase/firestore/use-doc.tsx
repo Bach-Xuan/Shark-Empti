@@ -33,6 +33,7 @@ export function useDoc<
     useState<Error | null>(
       null
     );
+  const [ownerPath, setOwnerPath] = useState(path);
 
   const docRef = useMemo(() => {
     if (
@@ -53,6 +54,7 @@ export function useDoc<
   ]);
 
   useEffect(() => {
+    setOwnerPath(path);
     setError(null);
     setData(null);
     let active = true;
@@ -90,12 +92,12 @@ export function useDoc<
     );
     return () => { active = false; unsubscribe(); };
 
-  }, [docRef]);
+  }, [docRef, path]);
 
   return {
-    data,
-    loading,
-    error,
+    data: ownerPath === path ? data : null,
+    loading: ownerPath === path ? loading : Boolean(path),
+    error: ownerPath === path ? error : null,
     docRef
   };
 }

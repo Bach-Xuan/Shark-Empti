@@ -102,7 +102,10 @@ The repository is governed by `package-lock.json`; do not use pnpm or Yarn again
 | `npm run test:production` | Start the optimized build and check six routes, script payload budgets and API authentication | No production service; requires a completed build |
 | `npm run report:bundle` | Inventory production entry and deferred JavaScript chunks | No; requires a completed build |
 | `npm run report:performance` | Record synthetic 100/1,000/10,000-record processing baselines | No |
-| `npm run audit:dependencies` | Query npm's advisory endpoint for the current lockfile and write `reports/dependency-audit.json` | npm Registry; transmits dependency names and versions |
+| `npm run report:browser` | Measure production guest-route cold/warm loads, heap, DOM and Forum input timing | Local Emulators, installed Chromium and production build |
+| `npm run report:queries` | Compare unbounded and 50-record queries at three dataset scales | Local demo Firestore Emulator |
+| `npm run report:comparison` | Compare current and historical production builds | Same as browser report; `PERFORMANCE_BASELINE_ROOT` required |
+| `npm run audit:dependencies` | Query advisories and write a report; fail on high/critical findings or registry errors | npm Registry; transmits dependency names and versions |
 | `node scripts/inspect-firestore.mjs` | Read deployed posts/Arena indexes and receipt/AI/Arena-session TTL metadata; write `reports/firestore-metadata.json` | Google API and Admin credentials; read-only |
 | `node --conditions=react-server --env-file=.env --import tsx scripts/receipt-retention.ts` | Inspect receipt expiry metadata; `--apply` backfills missing `expiresAt` values only | Firebase Admin credentials; `--apply` changes receipt documents |
 | `npm run ai:health` | Authenticate the key and check fallback-model presence within 10 seconds | OpenRouter metadata only; does not prove live inference or account/model quota availability |

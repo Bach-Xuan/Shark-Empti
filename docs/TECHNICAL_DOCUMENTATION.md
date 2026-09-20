@@ -19,7 +19,7 @@ The source files named in Section 1 remain authoritative when a documentation st
 |---|---|
 | Runtime/dependency ranges | `package.json`, `.nvmrc` |
 | Dependency resolutions | `package-lock.json` |
-| Advisory review | `scripts/dependency-audit.mjs`; no checked-in exception-policy manifest |
+| Advisory review | `scripts/dependency-audit.mjs`, `config/dependency-audit-policy.json` |
 | Desired indexes and TTL | `firestore.indexes.json`; deployed readiness requires verification |
 | Next configuration | `next.config.ts` |
 | Client Firebase variables | `src/firebase/config.ts` |
@@ -178,6 +178,8 @@ Chat review context occurs once in the system message, prior conversation turns 
 
 ## 6. 🖥️ Client Behavior, Internationalization, and Focus Shield
 
+Profile biography drafts belong to one mounted account session. `useProfileBio` protects edits through delayed snapshots and failed saves, waits for acknowledgement before resuming pristine synchronization, and revokes old save completions. `useDoc` hides snapshots from a previous document path immediately when account ownership changes.
+
 `translations.ts` retains domain copy; `src/lib/i18n` retains common/error/UI messages. Tests enforce VI/EN key and interpolation parity. Brand names, error codes, model identifiers, scientific notation, LaTeX and user content are not automatically translated. Locale changes do not regenerate or translate history.
 
 Quick Notes retains a dirty draft across snapshots and reports success only after the write completes. Forum creation and coordinated edits/deletion use pending locks; editors retain drafts until persistence is confirmed. Setup academic validation uses a versioned configuration snapshot and a synchronous submit lock. Configuration, locale, callback ownership changes and unmount revoke older results, including late failures. This prevents stale client transitions; it does not claim cancellation of upstream AI work.
@@ -219,13 +221,15 @@ For upgrades, review runtime engines, peer ranges, changelogs, advisories and af
 | Build | `npm run build` | Optimized Next artifact; no font-network dependency |
 | Production smoke | `npm run test:production` | Six page routes, referenced script chunks, bundle budgets and unauthenticated Arena/AI API behavior |
 | Bundle/performance | `npm run report:bundle`, `npm run report:performance` | Build inventory and synthetic dataset baseline; not browser interaction timing |
-| Dependency assessment | `npm run audit:dependencies` | Current lockfile query against npm's advisory endpoint; writes a report and has no checked-in exception policy |
+| Dependency assessment | `npm run audit:dependencies` | Registry report tied to the lockfile hash; policy blocks high/critical findings and registry errors |
 | Infrastructure metadata | `node scripts/inspect-firestore.mjs` | Read-only deployed posts/Arena index and receipt/AI/Arena-session TTL inspection |
 | Receipt expiry inventory | `node --conditions=react-server --env-file=.env --import tsx scripts/receipt-retention.ts` | Read-only by default; `--apply` only backfills missing expiry values |
-| Browser/camera/query comparison | No checked-in command | Historical evidence is not reproducible from this checkout |
+| Browser measurement | `npm run report:browser`, `npm run report:comparison` | Production guest-route cold/warm, heap, DOM, resource and Forum input timing; historical comparison requires a separately built checkout |
+| Query comparison | `npm run report:queries` | Local demo Emulator, 100/1,000/10,000 records, unbounded versus 50-record queries |
+| Physical camera | No checked-in command | Requires independent device verification |
 | Live AI adapter | `npm run ai:smoke` | Live OpenRouter and operation schemas; quota/cost possible; does not exercise auth, ledger or recovery |
 
-CI runs `npm ci → lint → typecheck → coverage → integration → build → install Chromium/WebKit/Firefox → development E2E → production E2E → bundle report → production HTTP smoke → synthetic performance baseline` on Ubuntu with Node 24/JDK 21. It does not currently run the dependency-audit command, a browser-performance measurement, or an emulator query-comparison command. The workflow configuration does not itself prove that a remote run has succeeded.
+CI runs `npm ci → dependency audit → lint → typecheck → coverage → integration → build → install Chromium/WebKit/Firefox → development E2E → production E2E → bundle report → production HTTP smoke → synthetic performance baseline` on Ubuntu with Node 24/JDK 21. Browser-performance and query-comparison commands run independently under controlled measurement conditions. Workflow configuration does not prove a successful hosted run.
 
 The existence or success of a test suite does not establish remote CI, deployed Firestore indexes/Rules, production Vercel runtime, Safari/Firefox minimum versions, physical-camera behavior, live-provider reliability or current vulnerability applicability. Those device/browser limits remain V02 validation scope; they do not change the completed Focus Shield lifecycle remediation recorded as F11. Builds use local system font stacks and do not require Google Fonts.
 

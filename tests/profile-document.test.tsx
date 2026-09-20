@@ -1,0 +1,21 @@
+import { act, cleanup, renderHook } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+import { useDoc } from '@/firebase/firestore/use-doc';
+const mocks = vi.hoisted(() => ({ callbacks: [] as Array<(snapshot: unknown) => void> }));
+vi.mock('@/firebase/provider', () => ({ useFirestore: () => 'db' }));
+vi.mock('firebase/firestore', () => ({ doc: (_db: unknown, path: string) => path, onSnapshot: (_ref: unknown, callback: (snapshot: unknown) => void) => { mocks.callbacks.push(callback); return vi.fn(); } }));
+afterEach(() => { cleanup(); mocks.callbacks.length = 0; });
+it('never exposes a previous account snapshot on a changed path or accepts a revoked subscription', () => {
+  const seen: unknown[] = [];
+  const { result, rerender, unmount } = renderHook(({ path }) => { const doc = useDoc(path); seen.push(doc.data); return doc; }, { initialProps: { path: 'users/one' } });
+  act(() => mocks.callbacks[0]({ exists: () => true, data: () => ({ bio: 'One' }) }));
+  expect(result.current.data).toEqual({ bio: 'One' });
+  seen.length = 0;
+  rerender({ path: 'users/two' });
+  expect(seen.every(value => value === null)).toBe(true);
+  act(() => mocks.callbacks[0]({ exists: () => true, data: () => ({ bio: 'Stale' }) }));
+  expect(result.current.data).toBeNull();
+  act(() => mocks.callbacks[1]({ exists: () => true, data: () => ({ bio: 'Two' }) }));
+  expect(result.current.data).toEqual({ bio: 'Two' });
+  unmount(); act(() => mocks.callbacks[1]({ exists: () => true, data: () => ({ bio: 'Late' }) }));
+});

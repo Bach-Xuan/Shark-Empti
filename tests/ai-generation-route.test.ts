@@ -29,7 +29,7 @@ afterEach(() => { vi.clearAllMocks(); vi.unstubAllEnvs(); });
 it('authenticates before reading the request body', async () => {
   mocks.auth.mockRejectedValueOnce(Object.assign(new Error('Authentication is required.'), { code: 'AUTH-REQUIRED', status: 401 }));
   const request = new Request('http://localhost/api/ai/generations', { method: 'POST', body: '{}' });
-  const bodyRead = vi.spyOn(request, 'arrayBuffer');
+  const bodyRead = vi.spyOn(request.body!, 'getReader');
   const response = await POST(request);
   expect(response.status).toBe(401);
   expect(bodyRead).not.toHaveBeenCalled();
@@ -38,7 +38,7 @@ it('authenticates before reading the request body', async () => {
 
 it('rejects an excessive Content-Length before reading bytes or creating a ledger record', async () => {
   const request = new Request('http://localhost/api/ai/generations', { method: 'POST', headers: { 'Content-Length': '140001' }, body: '{}' });
-  const bodyRead = vi.spyOn(request, 'arrayBuffer');
+  const bodyRead = vi.spyOn(request.body!, 'getReader');
   const response = await POST(request);
   expect(response.status).toBe(413);
   expect(bodyRead).not.toHaveBeenCalled();

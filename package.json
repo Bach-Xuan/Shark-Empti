@@ -20,7 +20,10 @@
     "audit:dependencies": "node scripts/dependency-audit.mjs",
     "report:bundle": "node scripts/bundle-report.mjs",
     "test:production": "node scripts/production-smoke.mjs",
-    "report:performance": "node --import tsx scripts/performance-baseline.ts"
+    "report:performance": "node --import tsx scripts/performance-baseline.ts",
+    "report:browser": "firebase emulators:exec --project demo-shark-empti --only auth,firestore \"node scripts/browser-performance.mjs\"",
+    "report:queries": "firebase emulators:exec --project demo-shark-empti --only auth,firestore \"node scripts/query-comparison.mjs\"",
+    "report:comparison": "firebase emulators:exec --project demo-shark-empti --only auth,firestore \"node scripts/performance-comparison.mjs\""
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.6",

@@ -13,6 +13,13 @@ it('rejects missing tokens before touching Admin configuration', async () => {
   await expect(authenticatedUser(new Request('http://localhost'))).rejects.toMatchObject({ code: 'AUTH-REQUIRED', status: 401 });
   expect(mocks.auth).not.toHaveBeenCalled();
 });
+it('maps an expired Admin token rejection to the safe invalid-or-expired contract', async () => {
+  const verifyIdToken = vi.fn().mockRejectedValue({ code: 'auth/id-token-expired' });
+  mocks.auth.mockReturnValueOnce({ verifyIdToken });
+  const request = new Request('http://localhost', { headers: { Authorization: 'Bearer expired-token' } });
+  await expect(authenticatedUser(request)).rejects.toMatchObject({ code: 'AUTH-INVALID', status: 401, message: 'Authentication is invalid or expired.' });
+  expect(verifyIdToken).toHaveBeenCalledWith('expired-token');
+});
 it('returns a safe configuration error and never leaks diagnostic secrets', async () => {
   const response = apiFailure(new AdminConfigurationError());
   expect(response.status).toBe(503);

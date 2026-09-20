@@ -318,7 +318,7 @@ The fixture checks application print markup and can produce Chromium PDFs for in
 
 ### 9.1. 🔍 Dependency Assessment
 
-`npm run audit:dependencies` sends resolved package names and versions to npm, prints a JSON summary, and writes `reports/dependency-audit.json`. The current script does not read a checked-in exception-policy file and does not implement a `--write-report` mode. Rerun it before making a current dependency-risk claim; V04 in [the audit report](AUDIT_REPORT.md) records the remaining verification gap and dated evidence.
+`npm run audit:dependencies` sends resolved package names and versions to npm and writes `reports/dependency-audit.json` with the lockfile SHA-256 and measurement time. `config/dependency-audit-policy.json` blocks high/critical advisories; registry errors also fail validation. Low/moderate findings remain visible and are not approved exceptions. The checked-in CI workflow runs the command after installation. Rerun it before making a current advisory claim; V04 in [the audit report](AUDIT_REPORT.md) records dated evidence.
 
 ### 9.2. 🧾 Receipt and AI-Ledger Retention and Index Operations
 
@@ -329,6 +329,10 @@ For legacy data, `node --conditions=react-server --env-file=.env --import tsx sc
 ### 9.3. 📊 Local Measurements and Evidence Boundaries
 
 - `npm run report:performance` measures synthetic processing and serialized-data cardinality for 100, 1,000, and 10,000 history records. It is not a browser, Firestore-billing, heap, or interaction benchmark.
-- This checkout does not contain checked-in browser-performance, physical-camera, or emulator read-comparison commands. The historical claims for those activities cannot be reproduced from the current tree without restoring or replacing the missing tooling.
+- `npm run report:browser` requires a production build configured for demo Firebase and installed Playwright Chromium. It starts local Emulators and measures five cold/warm pairs for `/login`, `/forum` and `/arena`, including heap, DOM, resource bytes and Forum input-to-frame timing. Output is `reports/browser-performance-current.json`; the fixture covers guest routes with empty demo data.
+- `npm run report:queries` creates an isolated `_performanceComparison` fixture in the local demo Emulator, compares unrestricted and `limit(50)` queries at 100/1,000/10,000 records, writes `reports/query-comparison.json`, and removes its fixture. Returned documents and serialized JSON sizes are not production billing or wire-byte measurements.
+- For historical comparison, supply an independently prepared source checkout through `PERFORMANCE_BASELINE_ROOT`. Build both trees with the same Node, installed dependency graph, demo build variables and build command; then run `npm run report:comparison`. The runner controls Chromium, viewport, guest state and cache sequence, checks runtime metadata, and writes raw samples plus `reports/performance-comparison.json`. Record the source revision and normalized dependency differences. Five samples per condition support exploratory comparisons, including regressions.
+- `npm run test:coverage` writes whole-source unit/component coverage to `coverage/unit/`. Adding `--coverage` to the Vitest command inside an Emulator integration run writes the AI routes, ledger, body parser and server API coverage to `coverage/integration/`. These overlapping denominators must not be added together.
+- Physical-camera verification still requires device access and separate tooling; browser performance does not reproduce the historical camera result.
 
 Current verification scripts print or write their evidence when explicitly run. Bundle, dependency-audit, Firestore-metadata, and synthetic-performance commands generate machine-readable artifacts. GitHub operations require the user's explicit request, including pushes, pull requests and workflow actions.

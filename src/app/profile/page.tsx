@@ -3,6 +3,7 @@ import { PageControls } from '@/components/page-controls';
 import { ProfilePrintReport } from '@/components/profile-print-report';
 import { ReportSelectionRow } from '@/components/report-selection-row';
 import { useProfileReport } from '@/hooks/use-profile-report';
+import { useProfileBio } from '@/hooks/use-profile-bio';
 
 
 import { useLanguageState,useThemeState } from '@/components/app-preferences';
@@ -83,9 +84,8 @@ export default function ProfilePage() {
 
   const [lang, setLang] = useLanguageState();
   const [theme, setTheme] = useThemeState();
-  const [bio, setBio] = useState('');
-  const bioDirty = useRef(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const biography = useProfileBio(user?.uid, profile?.bio ?? '');
+  const { bio, isSaving } = biography;
   const [isCopied, setIsCopied] = useState(false);
 
   const t: TranslationSet = translations[lang];
@@ -96,7 +96,6 @@ export default function ProfilePage() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchResult, setSearchResult] = useState<LearnerProfile | null>(null);
   const searching = useRef(false);
-  const savingBio = useRef(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
 
   useEffect(() => {
@@ -105,11 +104,6 @@ if (!authLoading && !user) {
     }
   }, [user, authLoading, router, setLang, setTheme]);
 
-  useEffect(() => {
-    if (!bioDirty.current) {
-      setBio(profile?.bio ?? '');
-    }
-  }, [profile]);
 
   // Fetch History for Report
 
@@ -124,32 +118,22 @@ if (!authLoading && !user) {
   };
 
   const handleSaveBio = async () => {
-    if (!user || savingBio.current) return;
-    savingBio.current = true;
-    setIsSaving(true);
-
+    if (!user) return;
     const userRef = doc(firestore, 'users', user.uid);
-    await updateDoc(userRef, {
-      bio,
+    await biography.save(value => updateDoc(userRef, {
+      bio: value,
       updatedAt: serverTimestamp()
-    })
-    .then(() => {
-      bioDirty.current = false;
+    }), () => {
       toast({
         title: uiMessage(lang, "profile.updated"),
         description: uiMessage(lang, "profile.your_profile_has_been_saved_successfully"),
       });
-    })
-    .catch(async (error) => {
+    }, error => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({
         path: userRef.path,
         operation: 'update',
         requestResourceData: { bio },
       }, error));
-    })
-    .finally(() => {
-      savingBio.current = false;
-      setIsSaving(false);
     });
   };
 
@@ -357,7 +341,7 @@ if (!authLoading && !user) {
                   className="min-h-[120px] rounded-2xl border-4 border-border bg-muted/20 font-bold p-6 focus:ring-8 focus:ring-primary/10 focus:border-primary transition-all shadow-inner text-base"
                   placeholder={uiMessage(lang, "profile.tell_shark_guru_about_yourself")}
                   value={bio}
-                  disabled={isSaving} onChange={(e) => { bioDirty.current = true; setBio(e.target.value); }}
+                  disabled={isSaving} onChange={(e) => biography.edit(e.target.value)}
                 />
 
                 <Button

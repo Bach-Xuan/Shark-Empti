@@ -22,18 +22,14 @@
 
 | ID | Finding | Status | Last Updated |
 |---|---|---|---|
-| M01 | Multi-Model AI Fallback Can Exceed a Single Transport Lifetime and Obscure Terminal Failures | Implemented locally; staging and canary verification pending | 19 September 2026 |
-| F01 | Missing Server-Side Authentication and Quota Enforcement for AI Actions | Implemented locally; targeted and deployment verification pending | 19 September 2026 |
-| F02 | Inadequate Validation of Persisted and Legacy Firestore Data | Implemented locally; Emulator and deployed Rules verification pending | 19 September 2026 |
-| D03 | Profile Snapshots Can Overwrite an Unsaved Biography Draft | Implemented; targeted regression verification pending | 19 September 2026 |
-| D06 | Forum Edit Drafts Are Discarded Before Write Confirmation | Implemented; targeted regression verification pending | 19 September 2026 |
-| D07 | Post Deletion Leaves Publicly Readable Orphaned Comments | Implemented locally; Emulator and deployed Rules verification pending | 19 September 2026 |
+| M01 | Multi-Model AI Fallback Can Exceed a Single Transport Lifetime and Obscure Terminal Failures | Implemented locally; staging and canary verification pending | 20 September 2026 |
+| F01 | Missing Server-Side Authentication and Quota Enforcement for AI Actions | Local and Emulator verification passed; staging quota calibration pending | 20 September 2026 |
+| F02 | Inadequate Validation of Persisted and Legacy Firestore Data | Local verification passed; deployed Rules verification pending | 20 September 2026 |
+| D07 | Post Deletion Leaves Publicly Readable Orphaned Comments | Local verification passed; deployed Rules verification pending | 20 September 2026 |
 | P04 | Idempotency Receipts Have No Defined Retention Bound | Implemented; production TTL/index activation blocked by IAM | 15 September 2026 |
 | V01 | Incomplete WebKit Validation | Partial; WebKit development passed, production matrix pending | 15 September 2026 |
 | V02 | Unverified Minimum Browser Versions and Physical-Camera Behaviour | Partial; historical physical-camera result is not reproducible from the current checkout; target matrix pending | 19 September 2026 |
 | V03 | Unverified Remote CI, Production Runtime, and Firestore Index State | Partial; hosted CI failure observed, deployment verification pending | 15 September 2026 |
-| V04 | Dependency-Risk Assessment Is Not Current | Partial; registry runner exists, but no checked-in exception policy or current measurement | 19 September 2026 |
-| V05 | Inadequate Comparative Baselines and Incomplete Coverage Evidence | Partial; synthetic baseline exists, but browser and query-comparison tooling is absent | 19 September 2026 |
 
 ## ✅ Resolved Findings
 
@@ -53,8 +49,10 @@
 | F14 | False-Positive Clipboard Success Notification | Resolved | 3 September 2026 |
 | D01 | Arena Retakes Reuse the Previous Attempt Identifier | Resolved | 19 September 2026 |
 | D02 | LaTeX Corruption Caused by Redundant Escape Replacement | Resolved | 12 September 2026 |
+| D03 | Profile Snapshots Can Overwrite an Unsaved Biography Draft | Resolved | 20 September 2026 |
 | D04 | Report-Selection Checkboxes Can Toggle Twice per Interaction | Resolved | 19 September 2026 |
 | D05 | Stale Setup Validation Can Start a Quiz After Context Changes | Resolved | 19 September 2026 |
+| D06 | Forum Edit Drafts Are Discarded Before Write Confirmation | Resolved | 20 September 2026 |
 | D08 | Arena “Ask Guru” Action Has No User-Facing Effect | Resolved | 19 September 2026 |
 | D09 | Report Printing Is Constrained by the Dialog Scroll Container | Resolved | 19 September 2026 |
 | D10 | Duplicate Error Codes and English Text in Vietnamese Toasts | Resolved | 12 September 2026 |
@@ -76,6 +74,8 @@
 | P01 | Unbounded Queries and Client-Side List Processing | Resolved | 13 September 2026 |
 | P02 | Recurrent Timer Updates and Repeated KaTeX Rendering | Resolved | 13 September 2026 |
 | P03 | Duplicate Conversation Context in AI Requests | Resolved | 13 September 2026 |
+| V04 | Dependency-Risk Assessment Is Not Current | Resolved | 20 September 2026 |
+| V05 | Inadequate Comparative Baselines and Incomplete Coverage Evidence | Resolved | 20 September 2026 |
 | V06 | Production Builds Depend on Live Google Fonts Availability | Resolved | 13 September 2026 |
 
 ## 🔎 Detailed Findings
@@ -86,7 +86,7 @@
 
 **Original mechanism:** Before the implementation, all seven public AI flows executed `generateStructured` within a Server Action. The adapter performed sequential model fallback inside one invocation, and timeout rollover could produce the five-attempt sequence Inkling → Nemotron → Inkling → Gemma → Nemotron. Process-global model preference and visitor-triggered warm-up could also change the initial model for unrelated requests.
 
-**Current local implementation evidence:** The seven operations now use a server-only operation registry and one shared authenticated client protocol. A generation ledger transactionally claims at most three server-ordered attempts, and each attempt route calls the single-attempt OpenRouter adapter no more than once. The protocol provides idempotent creation, status recovery, explicit cancellation, short-lived validated input/result retention, per-user concurrency and rolling weighted quotas, a global ceiling, bounded request parsing, normalized retry classification, and content-free correlation telemetry. The process-global model preference, public warm-up flow, and `AiModelWarmup` bootstrap were removed. Firestore Rules explicitly deny browser access to `_aiGenerations` and `_aiQuota`, with TTL field overrides configured for both collections. Local lint, TypeScript, 32 unit/component test files with 88 tests, and a production build passed in the recorded validation. Firestore Emulator startup remained blocked before Rules/integration assertions by the host loopback-selector error recorded in the technical documentation.
+**Current local implementation evidence:** The seven operations now use a server-only operation registry and one shared authenticated client protocol. A generation ledger transactionally claims at most three server-ordered attempts, and each attempt route calls the single-attempt OpenRouter adapter no more than once. The protocol provides idempotent creation, status recovery, explicit cancellation, short-lived validated input/result retention, per-user concurrency and rolling weighted quotas, a global ceiling, bounded request parsing, normalized retry classification, and content-free correlation telemetry. The process-global model preference, public warm-up flow, and `AiModelWarmup` bootstrap were removed. Firestore Rules explicitly deny browser access to `_aiGenerations` and `_aiQuota`, with TTL field overrides configured for both collections. Local lint, TypeScript, 32 unit/component test files with 88 tests, and a production build passed in the recorded validation. That historical run encountered a host loopback-selector failure before Emulator assertions; the 20 September run described in F01 subsequently passed all 45 Rules/integration tests.
 
 **Remaining evidence boundary:** The repository does not prove the deployed Function maximum duration, Fluid Compute state, proxy behaviour, staging region, TTL activation, response-loss behaviour across real instances, or production cost/latency thresholds. The production feature flag therefore requires explicit enablement, and the finding is not classified as resolved until staging fault injection and production-canary criteria are satisfied. No `maxDuration` value has been invented from an unverified deployment assumption.
 
@@ -96,23 +96,25 @@
 
 ### 🔥 F01 - Missing Server-Side Authentication and Quota Enforcement for AI Actions
 
-**Status:** Implemented locally; targeted and deployment verification pending.
+**Status:** Local and Emulator verification passed; staging quota calibration pending.
 
-**Historical description:** The former exported AI Server Actions validated request shape but did not authenticate the requesting user on the server or enforce user-level quotas, request-size limits, or rate limits. A prior probe invoked an action anonymously over HTTP. This finding did not assert that an API credential was exposed.
+**Historical description:** The former exported AI Server Actions validated request shape but did not authenticate callers or enforce user quotas, body limits or rate limits. A prior probe invoked an action anonymously over HTTP; this did not establish credential exposure.
 
-**Current local implementation evidence:** All AI creation, status, attempt and cancellation routes call `authenticatedUser(request)`. Creation authenticates before bounded body parsing and operation validation. Provider calls occur only after an authenticated owner transactionally claims a ledger lease and reserves weighted per-user and global quota. Guest access is denied, operation inputs have byte limits, and the browser cannot choose a model or attempt ordinal.
+**Implementation:** All AI creation, status, attempt and cancellation routes authenticate Firebase ID tokens. Creation authenticates before reading a byte-limited stream and validating operation input. Provider calls require an owner-bound transactional lease plus weighted user/global quota reservation. The browser cannot select a model or attempt ordinal. Stream parsing now cancels immediately when the actual byte limit is exceeded, including requests without Content-Length.
 
-**Remaining verification boundary:** Local source and deterministic tests can verify authentication order, bounded parsing and rejection paths, but they do not calibrate production quota thresholds or prove sustained-burst behaviour across deployed instances. Emulator-backed concurrency tests and staging evidence must verify absent, invalid, expired and valid credentials, simultaneous reservations, oversized bodies and proof that rejected requests never reach OpenRouter before this finding is classified as resolved.
+**Verification evidence:** Four Auth/Firestore Emulator test cases in `tests/integration/ai-security.test.ts` cover absent, malformed and tampered credentials across all four routes; oversized envelope/operation input; valid-owner execution and cross-owner rejection; concurrent replay; per-user concurrency; user/global exhaustion; atomic cross-user global reservation and window reset. A server-auth regression separately simulates Firebase Admin's expired-token rejection and verifies the safe invalid-or-expired contract. Rejected requests never reach the mocked provider. Unit tests cover streaming cancellation and split UTF-8. The complete Rules/integration suite passes 45 tests.
+
+**Remaining acceptance:** Staging must establish sustained-burst behavior across deployed instances and calibrate the 30/300 weighted budgets. The user confirmed these local changes have not reached Preview. `https://shark-empti.vercel.app` is a project reference, not acceptance evidence for this revision. F01 remains open until deployed verification is available.
 
 ### 🔥 F02 - Inadequate Validation of Persisted and Legacy Firestore Data
 
-**Status:** Implemented locally; Emulator and deployed Rules verification pending.
+**Status:** Local verification passed; deployed Rules verification pending.
 
 **Historical mechanism:** Partial write constraints and unchecked snapshot casts allowed malformed persisted posts and Arena exams to cross rendering or scoring boundaries.
 
 **Local implementation:** Shared schemas validate posts, comments, Arena configurations/questions and attempts before use. Legacy missing presentation metadata receives conservative defaults; invalid core content is rejected. Mixed feeds retain valid records and report malformed ones. Rules require full post/comment shapes and constrained updates. Arena creation moved to an authenticated server route for complete per-question and cross-field checks; browser create/update is denied. Submission validates the stored exam before scoring.
 
-**Verification boundary:** Deterministic schema/API/reader regressions cover malformed and legacy data. Checked-in Rules tests require the Emulator, which currently fails during Java loopback initialization before assertions. Updated Rules and server routes must be deployed together; no production migration or validation is implied.
+**Verification boundary:** Deterministic schema/API/reader regressions cover malformed and legacy data. The 20 September local Rules/integration suite passed all 45 tests; the previous Java loopback startup failure no longer blocks local verification. Updated Rules and server routes must be deployed together; no production migration or validation is implied.
 
 ### 🔥 F03 - Non-Durable History Persistence Caused by `undefined` Values and Unawaited Writes
 
@@ -256,13 +258,13 @@
 
 ### 🧩 D03 - Profile Snapshots Can Overwrite an Unsaved Biography Draft
 
-**Status:** Implemented; targeted regression verification pending.
+**Status:** Resolved.
 
-**Historical finding:** A profile effect previously treated every incoming profile snapshot as authoritative, allowing a refresh to replace a biography draft before submission.
+**Historical finding:** Profile refreshes could replace unsaved biography edits. The earlier dirty guard preserved same-account edits but did not isolate account changes or revoke late save completions.
 
-**Current-source evidence:** The profile page now records local editing in `bioDirty`; the snapshot synchronization effect calls `setBio(profile.bio)` only while the draft is pristine. Input marks the draft dirty, and successful save resets the guard. A later snapshot therefore cannot overwrite an unsaved local draft.
+**Resolution:** `useProfileBio` owns the draft per mounted account session, preserves dirty edits and failed saves, blocks duplicate saves, and ignores obsolete success/error completion. A saved draft remains protected until its subscription acknowledges the value, after which pristine synchronization resumes. `useDoc` tags snapshot state with its source path so account changes cannot expose the previous profile while the new subscription starts.
 
-**Remaining verification:** Add a focused regression test covering a dirty draft followed by a delayed profile snapshot, a failed save, a successful save, account change, and unmount. The implementation does not attempt a multi-writer merge or conflict-resolution interface for two independently saved biography edits.
+**Evidence and boundary:** Six hook/subscription regressions pass for delayed snapshots, rejection/retry, acknowledgement, duplicate saves, account change, revoked callbacks and unmount. The biography hook covers 18/18 instrumented branches. This preserves local drafts; independently saved edits still use Firestore's last-write-wins behavior.
 
 ### 🧩 D04 - Report-Selection Checkboxes Can Toggle Twice per Interaction
 
@@ -286,23 +288,23 @@
 
 ### 🧩 D06 - Forum Edit Drafts Are Discarded Before Write Confirmation
 
-**Status:** Implemented; targeted regression verification pending.
+**Status:** Resolved.
 
-**Historical finding:** Post and comment edit handlers previously detached their writes and closed the editor before Firestore confirmed success.
+**Historical finding:** Post/comment edit handlers detached writes and closed editors before Firestore confirmed success.
 
-**Current-source evidence:** Both Forum list and detail routes await `mutation.run(() => updateDoc(...))`. They close the post or comment editor and clear list-form fields only when `result.ok` is true; a rejected write leaves the current editor state and draft available for retry.
+**Implementation:** Post editing in both Forum routes and comment editing in the detail route await `mutation.run(() => updateDoc(...))`. Editors close and list-form fields clear only when `result.ok` is true. Rejected writes retain the draft; pending fieldsets block duplicate edits/submissions.
 
-**Remaining verification:** Add focused post-edit and comment-edit rejection/retry tests in both Forum routes. Cancellation remains an explicit user action, and remote concurrent edits still follow Firestore's last-write-wins behaviour.
+**Evidence and boundary:** Three regressions in `tests/forum-edit.test.tsx` exercise the real page handlers for all three edit surfaces: reject a write, retain title/content, retry, reject duplicate submission and close only after confirmation. All pass. The list route has no comment editor. Cancellation remains an explicit user action, and concurrent remote edits retain last-write-wins semantics.
 
 ### 🧩 D07 - Post Deletion Leaves Publicly Readable Orphaned Comments
 
-**Status:** Implemented locally; Emulator and deployed Rules verification pending.
+**Status:** Local verification passed; deployed Rules verification pending.
 
 **Historical mechanism:** Deleting only the parent left comments publicly readable because Rules did not require parent existence.
 
 **Local implementation:** Authenticated owner deletion atomically removes the parent and creates a minimal `_forumDeletions` recovery record, then recursively deletes descendants using Admin SDK bulk handling. Rules gate comment access on a live, non-tombstoned parent and deny browser parent deletion. Transactional comment creation checks the parent/deletion state. Owner retries resume partial cascades from the Forum recovery interface; tombstones remain to prevent ID reuse and unauthorized recovery.
 
-**Boundary:** Existing orphan comments become unreadable under updated Rules but are not automatically swept from production. Tombstones have no expiry without a replacement identity policy. Deterministic tests verify orchestration and failure/retry behavior; Rules and real transaction concurrency require the currently blocked Emulator and subsequent authorized deployment verification.
+**Boundary:** Existing orphan comments become unreadable under updated Rules but are not automatically swept from production. Tombstones have no expiry without a replacement identity policy. Deterministic tests verify orchestration and failure/retry behavior; the 20 September Emulator suite passes, including deletion orchestration and transaction tests; deployed Rules verification remains outstanding.
 
 ### 🧩 D08 - Arena “Ask Guru” Action Has No User-Facing Effect
 
@@ -576,31 +578,33 @@
 
 **Recorded external evidence:** The previously inspected hosted run `34766457053` for revision `cc97e79` passed installation, static checks, coverage, integration and build, then failed four development WebKit cases; production E2E and later validation steps were skipped. Six deployed public routes returned HTTP 200, and the deployment status indicated success. These observations predate the user's restriction on GitHub operations; no new remote verification is implied.
 
-**Local implementation and evidence:** The repository declares the posts compound index plus receipt, AI-generation and AI-quota TTL policies in `firestore.indexes.json`, and includes production HTTP smoke and full production E2E commands. The read-only metadata script now inspects the posts index and all three TTL policies. The corrected local production build passed; the complete corrected production E2E matrix remains unverified. A historical direct Firestore metadata read found the configured posts index missing and receipt TTL disabled; the subsequent configuration attempt failed with IAM 403.
+**Local implementation and evidence:** The repository declares posts/Arena compound indexes and TTL policies for receipts, AI generations, AI quotas and Arena sessions in `firestore.indexes.json`, and includes production HTTP smoke and full production E2E commands. The read-only metadata script inspects posts/Arena indexes and all four TTL policies. The corrected local production build passed; the complete corrected production E2E matrix remains unverified. A historical direct Firestore metadata read found the configured posts index missing and receipt TTL disabled; the subsequent configuration attempt failed with IAM 403.
 
 **Remaining acceptance:** Obtain a successful complete hosted run only when the user explicitly requests GitHub activity, validate the corrected optimized runtime and deployment settings, and confirm deployed Rules, index readiness and TTL activation. Public-route HTTP responses do not establish authenticated workflows, live AI inference or production configuration correctness.
 
 ### 🧪 V04 - Dependency-Risk Assessment Is Not Current
 
-**Status:** Partial; the registry runner exists, but current policy/enforcement evidence is absent.
+**Status:** Resolved.
 
-**Historical measurement:** A registry-backed assessment recorded four moderate, zero high and zero critical findings after the `qs` override and installed resolution were updated to 6.16.0. This is historical evidence, not a current advisory claim.
+**Historical context:** A past registry assessment reported four moderate findings, but its claimed policy was absent from the checkout and the workflow did not enforce a current audit.
 
-**Current-source reconciliation:** `scripts/dependency-audit.mjs` queries npm's bulk advisory endpoint for versions in `package-lock.json` and writes `reports/dependency-audit.json`. It does not read `config/dependency-audit-policy.json`, because that file is not present in this checkout; it also does not implement exception expiry or a `--write-report` option. The current CI workflow does not run this script.
+**Resolution and evidence:** The registry runner records advisory identities, affected installed paths, measurement time and lockfile SHA-256. `config/dependency-audit-policy.json` blocks high/critical findings; registry errors fail validation. The checked-in workflow runs the audit after installation. Four regressions verify moderate reporting, high/critical failure and registry failure. On 20 September 2026, 1,429 package instances produced six moderate findings and no high/critical findings: OpenTelemetry core, csv-parse, two qs advisories, stream-json and uuid.
 
-**Remaining acceptance:** Rerun the registry query before reporting current advisory counts. If reviewed exceptions are required, add and document a checked-in policy with explicit expiry and enforce it in the script and CI; otherwise, do not describe advisory findings as approved exceptions.
+**Boundary:** Closure concerns a current, reproducible assessment and explicit policy. The six moderate advisories remain reported and are not approved exceptions or fixed vulnerabilities. No exception mechanism or `--write-report` mode is claimed. Hosted execution remains V03 scope; advisory counts must be refreshed as dependencies or registry data change.
 
 ### 🧪 V05 - Inadequate Comparative Baselines and Incomplete Coverage Evidence
 
-**Status:** Partial; the synthetic baseline exists, but browser and query-comparison tooling is absent.
+**Status:** Resolved.
 
-**Current-source reconciliation:** The repository has a production bundle inventory, route budget configuration, production smoke checks, and `scripts/performance-baseline.ts` for synthetic dataset processing. It does not contain `scripts/browser-performance.mjs` or a checked-in emulator query-comparison script. Consequently, no current command measures cold/warm browser loads, heap, DOM nodes, interaction timing, or bounded-versus-unbounded emulator reads.
+**Historical context:** Synthetic cardinality measurements and historical test totals did not provide a reproducible browser comparison or a clear coverage denominator.
 
-**Recorded historical evidence:** The reported Admin SDK emulator comparison returned 100, 1,000 and 10,000 documents for unbounded queries versus 50 documents at each scale for `limit(50)`. Serialized result sizes were 12,801 / 128,001 / 1,280,001 bytes versus 6,401 bytes for bounded results. That evidence cannot be reproduced from this checkout without restoring or replacing the missing tooling. It does not establish production billing, browser subscription behavior, or full application speed.
+**Resolution:** Checked-in browser, historical-comparison and query-comparison scripts now supplement synthetic and bundle reports. On 20 September 2026, historical source `e6e19af` (107 source/config files verified against that revision) and current source both ran with Node 24.19.0 and an identical SHA-256 of the installed dependency lock. This normalizes dependencies rather than reproducing the historical lockfile installation. Sequential measurements used the same Chromium, machine, 1280×800 viewport, guest state, empty demo database and five cold/warm pairs per route.
 
-**Coverage boundary:** A historical local record reported 106 unit/component tests in 30 files and integration passed 7/7. Following the M01 transport replacement, 88 unit/component tests in 32 files passed; the changed count reflects replacement of legacy five-attempt fallback tests with single-attempt, client-recovery and authenticated-route contract tests. Following the subsequent ten-finding remediation, the full suite passed 268 tests in 46 files, with two opt-in browser-print cases skipped in one additional file; those two cases passed separately on each of Chrome, Firefox and WebKit. Whole-project lint, typecheck and production build passed. The Firestore Emulator failed during startup before current Rules/integration assertions could run. Test counts do not imply whole-codebase branch coverage. Bundle inventory and configured budgets establish repeatability, not a before/after improvement by themselves.
+**Measured comparison:** Browser cold-load medians, baseline → current, were 402.3 → 204.8 ms for `/login`, 599.5 → 486.3 ms for `/forum`, and 401.9 → 425.1 ms for `/arena`. Warm medians were 124.6 → 80.8, 183.6 → 130.2 and 169.2 → 127.2 ms respectively. Reports preserve raw load/resource/heap/DOM samples and Forum input-to-frame p50/p95. These mixed route outcomes do not support a universal speedup claim. A real Emulator comparison returned 100/1,000/10,000 documents versus 50 at every scale, with five alternating query pairs per scale.
 
-**Remaining acceptance:** Complete a comparable historical production build, use equivalent hardware/browser/cache/dataset conditions, and compare route/chunk bytes, cold/warm loads, interaction distributions, heap and reads. Record changed-branch coverage with its actual instrumentation denominator. Do not label the exploratory measurements as proof of a performance improvement.
+**Coverage evidence:** Unit/component validation passed 300 tests across 53 files, with two opt-in print cases skipped in one additional file. V8 whole-source coverage measured 2,077/3,306 lines and 1,405/2,737 branches. Changed biography logic covered 18/18 branches; the body parser and document subscription each covered 13/18. The 45-test Rules/integration run separately covered 156/201 lines and 98/166 branches within its explicit AI/server denominator, including 60/116 ledger branches. Reports are under `coverage/unit/` and `coverage/integration/`; overlapping counters must not be summed. Lint, typecheck and the optimized build passed.
+
+**Evidence boundary:** Repeatable tooling, a controlled historical source comparison and explicit coverage denominators close this validation gap. Five samples per condition are exploratory and cover guest routes/local demo queries. They do not establish statistical significance, production billing, authenticated learning latency, physical-camera performance or live AI reliability. Raw artifacts are `reports/browser-performance-{baseline,current}.json`, `reports/performance-comparison.json` and `reports/query-comparison.json`. Reproduction prerequisites are in [CONFIGURATION.md](CONFIGURATION.md).
 
 ### 🧪 V06 - Production Builds Depend on Live Google Fonts Availability
 

@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "blockingSeverities": ["high", "critical"],
+  "description": "Every current advisory is reported. High and critical findings block validation; low and moderate findings remain visible for review and are not approved exceptions. Registry errors fail validation."
+}
