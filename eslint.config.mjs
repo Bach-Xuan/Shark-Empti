@@ -6,5 +6,9 @@ export default defineConfig([
   // Browser persistence and subscription initialization intentionally set state in effects.
   // Keep correctness checks (rules-of-hooks, dependencies, purity, static components) enabled.
   { rules: { 'react-hooks/set-state-in-effect': 'off' } },
-  globalIgnores(['.tools/**', 'reports/**', 'test-results/**', '.next/**', 'node_modules/**', 'coverage/**']),
+  globalIgnores([
+    '.tools/**', '.next/**', 'node_modules/**', '.firebase/**', 'emulator-data/**',
+    'reports/**', 'coverage/**', 'test-results/**', 'playwright-report/**',
+    'blob-report/**', 'playwright/.cache/**', 'tmp/**', 'out/**', 'build/**', 'dist/**',
+  ]),
 ]);

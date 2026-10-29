@@ -14,7 +14,7 @@ vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }
 vi.mock('@/lib/error-toast', () => ({ showErrorToast: mocks.error }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock('@/ai/client-flows', () => ({ generateQuestions: mocks.generate }));
-vi.mock('firebase/firestore', () => ({ collection: vi.fn(), query: vi.fn(), orderBy: vi.fn() }));
+vi.mock('firebase/firestore', () => ({ collection: vi.fn(), query: vi.fn(), orderBy: vi.fn(), where: vi.fn() }));
 const generated = { ok: true, data: { questions: [{ question: '2+2?', correct: '4', type: 'Short Answer', explanation: 'Addition' }] } };
 beforeEach(() => { mocks.uid = 'owner'; mocks.fetch.mockReset(); mocks.generate.mockReset(); vi.stubGlobal('fetch', mocks.fetch); });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.clearAllMocks(); });

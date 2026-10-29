@@ -30,13 +30,13 @@ Every learning activity leaves a meaningful marker: a question indicates the lea
 - **Arena and Forum:** support community learning through academic challenges, leaderboards, and constructive discussion.
 - **Focus Shield:** protects a deliberate period of concentration through an in-browser camera feature that operates only when the learner explicitly enables it.
 
-AI inputs and outputs are validated against server-side schemas. Authenticated generation records coordinate a maximum of three server-ordered model attempts, with one OpenRouter request per route invocation and status recovery after response loss. AI results remain educational support and do not replace independent verification of academic knowledge.
+AI inputs and outputs are validated against server-side schemas. Authenticated generation records coordinate a maximum of three server-ordered model attempts, with one OpenRouter request per route invocation and status lookup after response loss. Recovery limitations remain tracked in the audit. AI results remain educational support and do not replace independent verification of academic knowledge.
 
 When an AI operation cannot be completed, the interface returns a safe application error without exposing model names, attempt ordinals, prompts, raw model responses, stack traces, credentials, or provider bodies.
 
 ## 🧭 Current Technology
 
-- Next.js 16.3.4, React 19.2.8 and TypeScript 6.
+- Next.js 16.4.3, React 19.2.8 and TypeScript 6.
 - Firebase Authentication, Cloud Firestore, Firebase Admin SDK and Firestore Security Rules.
 - OpenRouter Chat Completions through a server-only single-attempt adapter, with a fixed Inkling → Gemma → Nemotron priority coordinated by an authenticated Firestore generation ledger.
 - Tailwind CSS 4, Radix UI, Recharts and KaTeX.
@@ -51,7 +51,7 @@ When an AI operation cannot be completed, the interface returns a safe applicati
 - npm registry access for the first clean installation.
 - A Firebase project with a Web App, Cloud Firestore and Google Authentication.
 - An OpenRouter API key when AI features are required.
-- Firebase Admin service-account credentials for AI generation, Arena creation/submission and Forum post deletion or comment creation/deletion outside the Emulator.
+- Firebase Admin service-account credentials for AI, Arena, Forum mutations, reporting/moderation and account-data APIs outside the Emulator.
 - JDK 21 and Playwright Chromium/WebKit/Firefox for integration/E2E tests.
 
 ### 📦 Install Dependencies and Create the Environment File
@@ -81,7 +81,7 @@ The repository is governed by `package-lock.json`; do not use pnpm or Yarn again
 |---|---|
 | Configure the Firebase browser client, sign in and access Firestore | Provide the complete six-field Firebase Web configuration for consistency. The current application initializes Auth and Firestore but not Storage or Messaging; `storageBucket` and `messagingSenderId` are carried as configuration fields rather than independently validated runtime prerequisites. Google provider and the relevant authorized domains remain required for Google sign-in. |
 | Generate quizzes, flashcards, practice, feedback and chatbot responses | `OPENROUTER_API_KEY`, three `FIREBASE_ADMIN_*` values and a signed-in user; production/canary creation additionally requires `AI_GENERATION_PROTOCOL_ENABLED=true` |
-| Create/submit Arena content; delete Forum posts; create/delete Forum comments outside the Emulator | Three `FIREBASE_ADMIN_*` values |
+| AI/Arena/Forum mutations, reporting/moderation and account-data APIs outside the Emulator | Three `FIREBASE_ADMIN_*` values; a current trusted `moderator` claim is additionally required for moderation decisions |
 | Local integration/E2E | JDK 21; Firebase CLI in dev dependencies; Playwright Chromium, WebKit and Firefox |
 
 [docs/CONFIGURATION.md](docs/CONFIGURATION.md) contains the complete process for obtaining every Firebase/OpenRouter value, mapping service-account JSON fields, enabling Google sign-in, creating Firestore, deploying Rules and configuring Vercel. Never expose `OPENROUTER_API_KEY` or `FIREBASE_ADMIN_*` through `NEXT_PUBLIC_*` variables.
@@ -92,12 +92,14 @@ The repository is governed by `package-lock.json`; do not use pnpm or Yarn again
 |---|---|---|
 | `npm run dev` | Run the Next development server on port 9002 | Not required for static pages; Firebase/AI require their respective configuration |
 | `npm run lint` | ESLint, Next and React Hooks | No |
+| `npm run check:maintenance` | Check declared imports, manifest/lock agreement, documented commands/links, TypeScript/ESLint scope and artifact ignores | No; requires local Git metadata |
 | `npm run typecheck` | TypeScript `--noEmit` | No |
 | `npm test` | Unit/component tests | Never calls production services |
 | `npm run test:coverage` | Unit/component tests with V8 coverage | Never calls production services |
 | `npm run test:rules` | Firestore Rules tests through the Emulator | JDK 21 |
 | `npm run test:integration` | Auth/Firestore Emulator, Rules and API integration | JDK 21 |
 | `npm run build` | Next production build | No font download; uses local system fonts |
+| `npm run build:demo` | Isolated demo-configured production artifact for browser verification, not deployment | No font download; Firebase client targets local Emulators |
 | `npm run test:e2e` | Real app, Auth/Firestore Emulator and AI fixture; Chromium desktop/mobile, WebKit and Firefox | JDK 21 and installed Playwright browsers |
 | `npm run test:production` | Start the optimized build and check six routes, script payload budgets and API authentication | No production service; requires a completed build |
 | `npm run report:bundle` | Inventory production entry and deferred JavaScript chunks | No; requires a completed build |
@@ -106,11 +108,13 @@ The repository is governed by `package-lock.json`; do not use pnpm or Yarn again
 | `npm run report:queries` | Compare unbounded and 50-record queries at three dataset scales | Local demo Firestore Emulator |
 | `npm run report:comparison` | Compare current and historical production builds | Same as browser report; `PERFORMANCE_BASELINE_ROOT` required |
 | `npm run audit:dependencies` | Query advisories and write a report; fail on high/critical findings or registry errors | npm Registry; transmits dependency names and versions |
-| `node scripts/inspect-firestore.mjs` | Read deployed posts/Arena indexes and receipt/AI/Arena-session TTL metadata; write `reports/firestore-metadata.json` | Google API and Admin credentials; read-only |
+| `node scripts/inspect-firestore.mjs` | Read every declared index group and expiry TTL; write `reports/firestore-metadata.json` | Google API and Admin credentials; read-only |
 | `node --conditions=react-server --env-file=.env --import tsx scripts/receipt-retention.ts` | Inspect receipt expiry metadata; `--apply` backfills missing `expiresAt` values only | Firebase Admin credentials; `--apply` changes receipt documents |
 | `npm run ai:health` | Authenticate the key and check fallback-model presence within 10 seconds | OpenRouter metadata only; does not prove live inference or account/model quota availability |
 | `npm run ai:smoke` | Exercise quiz and chatbot schemas through the live single-attempt OpenRouter adapter; does not exercise auth, ledger or client recovery | OpenRouter key; may consume quota |
 | `npm run clean` | Remove `.next` only; retain `node_modules` | No |
+| `npm run clean:artifacts` | Remove test/coverage/print outputs and Emulator debug logs older than seven days | No; retains reports and recent diagnostics |
+| `npm run clean:cache` | Remove old Next caches/development output and local tool scratch data | No; retains recent caches and installed runtimes |
 
 Install the test browsers after `npm ci`:
 
@@ -119,6 +123,8 @@ npx --no-install playwright install chromium webkit firefox
 ```
 
 CI in `.github/workflows/ci.yml` uses Node 24, JDK 21, a demo Firebase project and an AI fixture; it does not require production credentials.
+
+Preview cleanup with `-- --dry-run`. See [artifact maintenance](docs/CONFIGURATION.md#maintenance-and-generated-artifacts) for retention, evidence preservation and the distinction between generated output and installed local tools. Production E2E also requires a build prepared with demo Firebase values; runtime environment overrides cannot replace values already embedded in client JavaScript.
 
 ## 🧩 Functional and Data Scope
 

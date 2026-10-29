@@ -3,11 +3,11 @@ import { afterEach, expect, it, vi } from 'vitest';
 import type { Query } from 'firebase/firestore';
 import { usePagedCollection, PAGE_SIZE } from '@/hooks/use-paged-collection';
 import { readForumPost } from '@/lib/public-firestore-schema';
-const mocks = vi.hoisted(() => ({ callbacks: [] as Array<(snapshot: unknown) => void>, get: vi.fn(), unsubscribe: vi.fn(), limit: vi.fn(), report: vi.fn() }));
+const mocks = vi.hoisted(() => ({ callbacks: [] as Array<(snapshot: unknown) => void>, errors: [] as Array<(error: unknown) => void>, get: vi.fn(), unsubscribe: vi.fn(), limit: vi.fn(), report: vi.fn() }));
 vi.mock('@/firebase/error-emitter', () => ({ errorEmitter: { emit: mocks.report } }));
 vi.mock('firebase/firestore', () => ({ query: (...args: unknown[]) => args, limit: mocks.limit, startAfter: (cursor: unknown) => cursor, getDocs: mocks.get,
- onSnapshot: (_: unknown, callback: (snapshot: unknown) => void) => { mocks.callbacks.push(callback); return mocks.unsubscribe; } }));
-afterEach(() => { cleanup(); vi.clearAllMocks(); mocks.callbacks = []; });
+ onSnapshot: (_: unknown, callback: (snapshot: unknown) => void, error: (cause: unknown) => void) => { mocks.callbacks.push(callback); mocks.errors.push(error); return mocks.unsubscribe; } }));
+afterEach(() => { cleanup(); vi.clearAllMocks(); mocks.callbacks = []; mocks.errors = []; });
 const page = (start: number, count: number) => ({ size: count, docs: Array.from({ length: count }, (_, i) => ({ id: String(start + i), data: () => ({ value: start + i }) })) });
 const source = {} as Query;
 it('bounds reads to one page and appends a cursor page only on demand', async () => {
@@ -59,4 +59,18 @@ it('keeps valid items in a mixed feed and reports corrupt records without render
  expect(result.current.items.map(item => item.id)).toEqual(['good']);
  expect(result.current.loading).toBe(false);
  expect(mocks.report).toHaveBeenCalledTimes(2);
+ expect(result.current.invalidRecords).toBe(2);
+});
+
+it('distinguishes listener failure from empty data and resubscribes with an explicit retry', () => {
+ const { result } = renderHook(() => usePagedCollection(source, id => id));
+ act(() => mocks.callbacks[0](page(0, 1)));
+ act(() => mocks.errors[0]({ code: 'unavailable' }));
+ expect(result.current.items).toEqual([]);
+ expect(result.current.error?.code).toBe('FIRESTORE-UNAVAILABLE');
+ act(() => result.current.retry());
+ expect(mocks.unsubscribe).toHaveBeenCalled();
+ act(() => mocks.callbacks[1](page(1, 1)));
+ expect(result.current.error).toBeNull();
+ expect(result.current.items).toEqual(['1']);
 });

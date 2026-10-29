@@ -3,6 +3,7 @@ import { useLanguageState,useThemeState } from '@/components/app-preferences';
 import { UiText } from "@/components/ui-text";
 import { useGoogleSignIn } from '@/hooks/use-google-sign-in';
 import { uiMessage } from '@/lib/i18n';
+import { ServiceLinks } from './service-links';
 
 import { Logo as LogoComponent } from '@/components/logo';
 import { Button } from '@/components/ui/button';
@@ -81,34 +82,26 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
   };
 
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Loader2 className="w-12 h-12 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen flex flex-col bg-background transition-colors duration-500">
       <header className={cn(
         "fixed top-0 left-0 right-0 z-[100] w-full glass-morphism p-4 md:p-6 shrink-0 border-b-[3px] md:border-b-[5px] border-border/30 transition-all duration-500 transform bg-background/80 backdrop-blur-xl",
         isVisible ? "translate-y-0" : "-translate-y-full"
       )}>
-        <div className="flex items-center justify-between w-full max-w-7xl mx-auto">
-          <Link href="/" aria-label={t.home} className="flex items-center gap-2 md:gap-3 cursor-pointer group active:scale-95 transition-all">
-            <LogoComponent className="w-8 h-8 md:w-10 md:h-10 transition-all group-hover:scale-110" />
-            <div className="flex flex-col">
+        <div className="flex items-center justify-between gap-3 w-full max-w-7xl mx-auto">
+          <Link href="/" aria-label={t.home} className="min-w-0 flex flex-1 items-center gap-2 md:gap-3 cursor-pointer group active:scale-95 transition-all">
+            <LogoComponent className="w-8 h-8 md:w-10 md:h-10 shrink-0 transition-all group-hover:scale-110" />
+            <div className="min-w-0 flex flex-col">
               <div className="flex items-baseline gap-1.5 md:gap-2">
-                <span className="font-headline font-black text-lg md:text-2xl leading-none text-primary tracking-tight uppercase">SHARK EMPTI</span>
-                <span className="text-[8px] md:text-[10px] font-black text-muted-foreground/50 tracking-widest uppercase ml-1">v1.15.1</span>
+                <span className="font-headline font-black text-base sm:text-lg md:text-2xl leading-none text-primary tracking-tight uppercase">SHARK EMPTI</span>
+                <span className="hidden sm:inline text-[8px] md:text-[10px] font-black text-muted-foreground tracking-widest uppercase ml-1">v1.15.1</span>
               </div>
               <span className="text-[7px] md:text-[9px] font-black text-muted-foreground uppercase tracking-[0.15em] leading-tight whitespace-normal break-words">
                 {t.appTagline}
               </span>
             </div>
           </Link>
-          <div className="flex items-center gap-3">
+          <div className="flex shrink-0 items-center gap-3">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button aria-label={uiMessage(lang, "navigation.language")} variant="ghost" className="rounded-2xl hover:bg-muted h-10 px-3 md:h-12 md:px-5 border-[3px] border-transparent hover:border-border transition-all btn-duo bg-card">
@@ -137,8 +130,8 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
         </div>
       </header>
 
-      <div className="flex-1 flex items-center justify-center p-4 pt-24 md:pt-32 md:pb-24">
-        <Card className="card-duo w-full max-w-md p-8 md:p-12 space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-500 bg-card">
+      <main className="flex-1 flex items-center justify-center p-4 pt-24 md:pt-32 md:pb-24">
+        <Card className="card-duo min-w-0 w-full max-w-md p-8 md:p-12 space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-500 bg-card">
           <div className="flex flex-col items-center text-center space-y-4">
             <div className="w-20 h-20 md:w-24 md:h-24 bg-primary/10 rounded-[2.5rem] flex items-center justify-center shadow-[0_6px_0_0_var(--duo-shadow)] border-[4px] border-primary/20 animate-bounce-subtle">
               <LogoComponent className="w-12 h-12 md:w-16 md:h-16" />
@@ -153,8 +146,8 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
 
           <Button
             onClick={handleGoogleSignIn}
-            disabled={isSigningIn}
-            className="w-full h-16 rounded-[2rem] btn-duo bg-card dark:bg-muted/10 hover:bg-muted text-foreground border-[4px] border-border font-black text-lg uppercase tracking-wider flex items-center justify-center gap-4 transition-all"
+            disabled={isSigningIn || loading}
+            className="w-full h-auto min-h-16 py-4 rounded-[2rem] btn-duo bg-card dark:bg-muted/10 hover:bg-muted text-foreground border-[4px] border-border font-black text-sm sm:text-lg uppercase tracking-wide flex items-center justify-center gap-2 whitespace-normal transition-all"
           >
             {isSigningIn ? (
               <Loader2 className="w-6 h-6 animate-spin" />
@@ -166,21 +159,22 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" />
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
                 </svg>
-                {uiMessage(lang, register ? "auth.register_with_google" : "auth.continue_with_google")}
+                <span className="min-w-0 break-words leading-snug">{uiMessage(lang, register ? "auth.register_with_google" : "auth.continue_with_google")}</span>
               </>
             )}
           </Button>
 
           <div className="text-center">
-            <Button variant="link" onClick={() => router.push(register ? '/login' : '/register')} className="text-xs font-black uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors active:scale-95">
+            <Button variant="link" onClick={() => router.push(register ? '/login' : '/register')} className="w-full h-auto min-h-10 whitespace-normal break-words text-xs font-black uppercase tracking-widest text-muted-foreground hover:text-primary transition-colors active:scale-95">
               {uiMessage(lang, register ? "auth.already_have_an_account_log_in" : "auth.don_t_have_an_account_sign_up")}
             </Button>
           </div>
         </Card>
-      </div>
+      </main>
 
       <footer className="p-8 text-center border-t-[5px] border-border/30 bg-card/30">
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60">
+        <ServiceLinks />
+        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
           <UiText id="copyright" />
         </p>
       </footer>

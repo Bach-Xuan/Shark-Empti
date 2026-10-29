@@ -46,7 +46,15 @@ service cloud.firestore {
     // Server-controlled transport state. Browser access is always denied.
     match /_aiGenerations/{document=**} { allow read, write: if false; }
     match /_aiQuota/{document=**} { allow read, write: if false; }
+    match /_requestBudgets/{document=**} { allow read, write: if false; }
     match /_arenaSessions/{document=**} { allow read, write: if false; }
+    match /_arenaAnswerKeys/{document=**} { allow read, write: if false; }
+    match /_arenaLegacyBackups/{document=**} { allow read, write: if false; }
+    match /_arenaEligibility/{document=**} { allow read, write: if false; }
+    match /_communityReports/{document=**} { allow read, write: if false; }
+    match /_moderationArchives/{document=**} { allow read, write: if false; }
+    match /_moderationActions/{document=**} { allow read, write: if false; }
+    match /_accountRequests/{document=**} { allow read, write: if false; }
     // Minimal owner-visible recovery queue; only the server can mutate tombstones.
     match /_forumDeletions/{postId} {
       allow read: if owner(resource.data.authorId);
@@ -54,10 +62,14 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow get, list: if signedIn();
-      allow create: if owner(userId) && !request.resource.data.keys().hasAny(['sharkCoins']);
-      allow update: if owner(userId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['sharkCoins']);
-      allow delete: if owner(userId);
+      // Known-UID lookup only. Legacy profiles with private/unknown fields are
+      // owner-only until repaired; Rules cannot hide individual document fields.
+      allow get: if owner(userId) || (signedIn() && resource.data.keys().hasOnly(['displayName', 'photoURL', 'bio', 'createdAt', 'updatedAt', 'sharkCoins']));
+      allow list: if false;
+      allow create: if owner(userId) && request.resource.data.keys().hasOnly(['displayName', 'photoURL', 'bio', 'createdAt', 'updatedAt']);
+      allow update: if owner(userId) && !request.resource.data.keys().hasAny(['email'])
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'photoURL', 'bio', 'createdAt', 'updatedAt', 'email']);
+      allow delete: if false;
       match /{collection}/{document=**} {
         allow read, write: if owner(userId);
       }
@@ -65,25 +77,23 @@ service cloud.firestore {
 
     match /posts/{postId} {
       allow read: if true;
-      allow create: if signedIn() && !exists(/databases/$(database)/documents/_forumDeletions/$(postId)) && validPost() && request.resource.data.createdAt == request.time && request.resource.data.authorId == request.auth.uid && request.resource.data.likesCount == 0 && request.resource.data.commentsCount == 0 && request.resource.data.likedBy.size() == 0;
-      allow update: if signedIn() && livePost(postId) && validPost() && (validLikeUpdate() || (resource.data.authorId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title', 'content', 'subject', 'updatedAt'])));
-      allow delete: if false;
+      // All contribution/reaction mutations pass through budgeted Admin APIs.
+      allow create, update, delete: if false;
       match /comments/{commentId} {
         allow read: if livePost(postId);
-        allow create: if false;
-        allow update: if signedIn() && livePost(postId) && validComment(postId) && (validLikeUpdate() || (resource.data.authorId == request.auth.uid && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content', 'updatedAt'])));
-        allow delete: if false;
+        allow create, update, delete: if false;
       }
     }
 
     match /arenaExams/{examId} {
-      allow read: if true;
+      allow read: if resource.data.schemaVersion == 2;
       // Full per-question/cross-field validation is enforced by the authenticated
       // server creation route. Rules cannot iterate arbitrary question arrays.
       allow create, update: if false;
-      allow delete: if signedIn() && resource.data.authorId == request.auth.uid;
+      allow delete: if false;
       match /attempts/{attemptId} {
-        allow read: if true;
+        allow read: if exists(/databases/$(database)/documents/arenaExams/$(examId))
+          && get(/databases/$(database)/documents/arenaExams/$(examId)).data.schemaVersion == 2;
         allow create: if false;
         allow update, delete: if false;
       }

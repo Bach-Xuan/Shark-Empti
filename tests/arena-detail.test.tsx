@@ -37,10 +37,10 @@ vi.mock('@/components/result-view', () => ({ default: (props: { onRetakeSame: ()
 </div> }));
 vi.mock('@/ai/client-flows', () => ({ aiCoachingChatbotForQuizReview: mocks.chat }));
 
-function examSnapshot(data: unknown = { title: 'Test exam', authorId: 'author', createdAt: null, config: history.config, questions: [question], totalAttempts: 0 }) {
+function examSnapshot(data: unknown = { schemaVersion: 2, questionCount: 1, title: 'Test exam', authorId: 'author', createdAt: null, config: history.config, totalAttempts: 0 }) {
   return { id: mocks.examId, exists: () => true, data: () => data };
 }
-function receipt() { return new Response(JSON.stringify({ coinsAwarded: 100, isFirstAttempt: false })); }
+function receipt() { return new Response(JSON.stringify({ coinsAwarded: 100, isFirstAttempt: false, reviewResults: history.quizResults, duration: history.totalTime })); }
 async function start() { await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Start Challenge|Bắt đầu/i })); }); }
 async function finish(result = history) { let saved = false; await act(async () => { saved = await mocks.finish!(result); }); return saved; }
 function listener(ref: string) { return mocks.listeners.filter(item => item.ref === ref).at(-1)!; }
@@ -48,7 +48,10 @@ beforeEach(() => {
   vi.clearAllMocks(); mocks.listeners = []; mocks.initialError = ''; mocks.lang = 'en'; mocks.examId = 'exam'; mocks.finish = null; mocks.db = 'database'; mocks.holdSnapshot = false;
   mocks.user = { uid: 'player', getIdToken: async () => 'fixture' };
   mocks.request.mockImplementation(async () => receipt());
-  mocks.startRequest.mockImplementation(async (_url: string, init: RequestInit) => new Response(init.body as string));
+  mocks.startRequest.mockImplementation(async (_url: string, init: RequestInit) => {
+    const { correct: _correct, explanation: _explanation, ...prompt } = question;
+    return new Response(JSON.stringify({ ...JSON.parse(init.body as string), questions: [prompt], startedAtMs: Date.now() }));
+  });
   mocks.chat.mockResolvedValue({ ok: true, data: { aiResponse: 'Review explanation' } });
   localStorage.clear(); vi.stubGlobal('fetch', (url: string, init: RequestInit) => url.endsWith('/start') ? mocks.startRequest(url, init) : mocks.request(url, init));
 });

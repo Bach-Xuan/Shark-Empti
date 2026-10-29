@@ -1,8 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
+import { readPerformanceBuild, requireMatchingDependencies } from './lib/performance-build.mjs';
+import { requireDemoBuild } from './lib/demo-build.mjs';
 const baseline = process.env.PERFORMANCE_BASELINE_ROOT;
 if (!baseline || !fs.existsSync(path.join(baseline, '.next/BUILD_ID'))) throw new Error('PERFORMANCE_BASELINE_ROOT must identify an already-built historical checkout using the same dependency graph and demo build variables.');
+requireMatchingDependencies(readPerformanceBuild(baseline), readPerformanceBuild(process.cwd()));
+requireDemoBuild(baseline);
+requireDemoBuild(process.cwd());
 async function measure(label, root) {
   await new Promise((resolve, reject) => {
     const child = spawn(process.execPath, ['scripts/browser-performance.mjs'], { windowsHide: true, stdio: 'inherit', env: { ...process.env, PERFORMANCE_LABEL: label, PERFORMANCE_ROOT: root } });

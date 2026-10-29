@@ -32,6 +32,7 @@ const ERROR_TYPES = [
   "Careless Mistake",
   "Misinterpretation",
   "Time Expired",
+  "Unclassified",
 ] as const;
 
 type ErrorType = (typeof ERROR_TYPES)[number];
@@ -120,7 +121,8 @@ export function calculateDashboardStats(
       totalErrors++;
       currentTopic.errorCount++;
 
-      const errorType = (result.errorCategory || "Concept Error") as ErrorType;
+      const candidate = result.errorCategory as ErrorType;
+      const errorType = ERROR_TYPES.includes(candidate) ? candidate : 'Unclassified';
 
       errorFrequency[errorType] = (errorFrequency[errorType] || 0) + 1;
     });
@@ -181,6 +183,7 @@ export function calculateDashboardStats(
     "Careless Mistake": t.carelessMistake,
     Misinterpretation: t.misinterpretation,
     'Time Expired': uiMessage(currentLang, 'quiz.time_expired'),
+    Unclassified: currentLang === 'vi' ? 'Chưa phân loại' : 'Unclassified',
   };
 
   const dominantError = Object.entries(errorFrequency).reduce((prev, current) =>

@@ -22,6 +22,8 @@ import { getAiError } from '@/lib/ai-error-message';
 import { showErrorToast } from '@/lib/error-toast';
 import { BaseViewProps,QuizConfig } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { numericQuizConfigSchema, QUIZ_LIMITS } from '@/lib/quiz-config';
+import { useAiRequestScope } from '@/hooks/use-ai-request-scope';
 import {
 BookOpen,
 Clock,
@@ -37,10 +39,10 @@ XCircle
 import React,{ useCallback,useLayoutEffect,useRef,useState } from 'react';
 import FeatureHelp from './feature-help';
 
-const RequiredLabel = ({ children, icon }: { children: React.ReactNode, icon?: React.ReactNode }) => (
-    <div className="text-[10px] md:text-xs font-black uppercase text-muted-foreground flex items-center gap-2 select-none tracking-[0.2em] mb-3 group-hover:text-primary transition-colors">
-      {icon} {children} <span className="text-destructive font-bold ml-1 animate-pulse">*</span>
-    </div>
+const RequiredLabel = ({ children, icon, htmlFor }: { children: React.ReactNode, icon?: React.ReactNode, htmlFor?: string }) => (
+    <Label htmlFor={htmlFor} className="text-[10px] md:text-xs font-black uppercase text-muted-foreground flex items-center gap-2 select-none tracking-[0.2em] mb-3 group-hover:text-primary transition-colors">
+      {icon} {children} <span aria-hidden="true" className="text-destructive font-bold ml-1">*</span>
+    </Label>
   );
 
 interface SetupViewProps extends BaseViewProps {
@@ -48,14 +50,16 @@ interface SetupViewProps extends BaseViewProps {
 }
 
 export default function SetupView({ t, lang, onStart }: SetupViewProps) {
+  const aiRequest = useAiRequestScope();
   const { toast } = useToast();
   const [isValidating, setIsValidating] = useState(false);
   const validationVersion = useRef(0);
   const pending = useRef(false);
   const revokeValidation = useCallback(() => {
+    aiRequest.cancel();
     validationVersion.current++;
     pending.current = false;
-  }, []);
+  }, [aiRequest]);
   const [config, updateConfig] = useState<QuizConfig>({
     subject: 'none',
     grade: 'none',
@@ -68,11 +72,12 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
   });
 
   const setConfig = useCallback((next: QuizConfig) => {
+    aiRequest.cancel();
     validationVersion.current++;
     pending.current = false;
     setIsValidating(false);
     updateConfig(next);
-  }, []);
+  }, [aiRequest]);
 
   // Locale/navigation ownership changes revoke every outstanding response.
   useLayoutEffect(() => {
@@ -101,15 +106,7 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
   ];
 
   const handleNumQuestionsChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/\D/g, '');
-    if (val === '') {
-      setConfig({ ...config, numQuestions: '' });
-      return;
-    }
-    let num = parseInt(val);
-    if (num > 50) num = 50;
-    if (num < 1 && val !== '') num = 1;
-    setConfig({ ...config, numQuestions: num.toString() });
+    setConfig({ ...config, numQuestions: e.target.value });
   };
 
   const handleNumQuestionsBlur = () => {
@@ -120,20 +117,18 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
   };
 
   const handleTimeLimitMinutesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value.replace(/\D/g, '');
-    if (val === '') {
-      setConfig({ ...config, timeLimit: '' });
-      return;
-    }
-    let num = parseInt(val);
-    if (num >= 1000) num = 999;
-    if (num < 1 && val !== '') num = 1;
-    setConfig({ ...config, timeLimit: num.toString() });
+    setConfig({ ...config, timeLimit: e.target.value });
   };
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (pending.current) return;
+    if (!numericQuizConfigSchema.safeParse(config).success) {
+      toast({ variant: 'destructive', title: t.requiredFields, description: lang === 'vi'
+        ? `Số câu hỏi phải là số nguyên 1–${QUIZ_LIMITS.questions}; thời gian là 1–${QUIZ_LIMITS.minutes} phút hoặc để trống.`
+        : `Questions must be an integer from 1–${QUIZ_LIMITS.questions}; time must be 1–${QUIZ_LIMITS.minutes} minutes or empty.` });
+      return;
+    }
     const num = parseInt(config.numQuestions);
 
     if (!config.topic || !config.type || !config.difficulty || isNaN(num) || num < 1 || num > 50) {
@@ -155,7 +150,7 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
         subject: config.subject === 'none' ? undefined : subjects.find(s => s.id === config.subject)?.label,
         grade: config.grade === 'none' ? undefined : config.grade,
         language: lang as 'en' | 'vi'
-      });
+      }, { signal: aiRequest.start() });
       if (version !== validationVersion.current) return;
       if (!result.ok) {
         showErrorToast(result.error, lang as 'en' | 'vi');
@@ -183,7 +178,7 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
     }
 
     if (version === validationVersion.current) onStart(snapshot);
-  }, [config, lang, onStart, t, subjects, toast]);
+  }, [config, lang, onStart, t, subjects, toast, aiRequest]);
 
 
   return (
@@ -192,7 +187,7 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
         <div className="bg-primary/5 p-10 md:p-20 border-b-[4px] border-border text-center relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000 pointer-events-none" />
           <div className="relative z-10">
-            <CardTitle className="font-headline text-3xl md:text-7xl font-black text-primary mb-4 md:mb-8 uppercase tracking-tighter leading-none animate-in zoom-in-95 duration-700 flex items-center justify-center gap-4">
+            <CardTitle role="heading" aria-level={1} className="font-headline text-3xl md:text-7xl font-black text-primary mb-4 md:mb-8 uppercase tracking-tighter leading-none animate-in zoom-in-95 duration-700 flex items-center justify-center gap-4">
               {t.setupTitle}
               <FeatureHelp
                 helpTitle={t.helpTitle}
@@ -201,7 +196,7 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
                 storageKey="shark_help_setup_seen"
               />
             </CardTitle>
-            <CardDescription className="text-muted-foreground text-[10px] md:text-xl font-black uppercase tracking-[0.2em] leading-relaxed max-w-4xl mx-auto opacity-80 group-hover:opacity-100 transition-opacity">
+            <CardDescription className="text-muted-foreground text-[10px] md:text-xl font-black uppercase tracking-[0.2em] leading-relaxed max-w-4xl mx-auto">
               {t.setupDesc}
             </CardDescription>
           </div>
@@ -211,11 +206,11 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
           <form onSubmit={handleSubmit} className="space-y-12 md:space-y-20">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:gap-16">
               <div className="space-y-4 group">
-                <Label className="text-[10px] md:text-xs font-black uppercase text-muted-foreground flex items-center gap-3 select-none tracking-[0.2em] group-hover:text-primary transition-colors">
+                <Label htmlFor="setup-subject" className="text-[10px] md:text-xs font-black uppercase text-muted-foreground flex items-center gap-3 select-none tracking-[0.2em] group-hover:text-primary transition-colors">
                   <BookOpen className="w-5 h-5 text-primary transition-transform group-hover:-translate-y-1" /> {t.subjectOptional}
                 </Label>
                 <Select value={config.subject} onValueChange={(v) => setConfig({ ...config, subject: v })}>
-                  <SelectTrigger className="h-16 md:h-20 rounded-[1.5rem] md:rounded-3xl bg-muted/20 border-4 border-border font-black text-sm md:text-xl focus:ring-4 focus:ring-primary/10 hover:bg-primary/5 hover:border-primary/50 transition-all shadow-duo active:translate-y-1">
+                  <SelectTrigger id="setup-subject" className="h-16 md:h-20 rounded-[1.5rem] md:rounded-3xl bg-muted/20 border-4 border-border font-black text-sm md:text-xl focus:ring-4 focus:ring-primary/10 hover:bg-primary/5 hover:border-primary/50 transition-all shadow-duo active:translate-y-1">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="rounded-3xl border-4 shadow-2xl p-2 animate-in slide-in-from-top-2">
@@ -226,11 +221,11 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
               </div>
 
               <div className="space-y-4 group">
-                <Label className="text-[10px] md:text-xs font-black uppercase text-muted-foreground flex items-center gap-3 select-none tracking-[0.2em] group-hover:text-primary transition-colors">
+                <Label htmlFor="setup-grade" className="text-[10px] md:text-xs font-black uppercase text-muted-foreground flex items-center gap-3 select-none tracking-[0.2em] group-hover:text-primary transition-colors">
                   <GraduationCap className="w-5 h-5 text-primary transition-transform group-hover:-translate-y-1" /> {t.gradeOptional}
                 </Label>
                 <Select value={config.grade} onValueChange={(v) => setConfig({ ...config, grade: v })}>
-                  <SelectTrigger className="h-16 md:h-20 rounded-[1.5rem] md:rounded-3xl bg-muted/20 border-4 border-border font-black text-sm md:text-xl hover:bg-primary/5 hover:border-primary/50 transition-all shadow-duo active:translate-y-1">
+                  <SelectTrigger id="setup-grade" className="h-16 md:h-20 rounded-[1.5rem] md:rounded-3xl bg-muted/20 border-4 border-border font-black text-sm md:text-xl hover:bg-primary/5 hover:border-primary/50 transition-all shadow-duo active:translate-y-1">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="rounded-3xl border-4 shadow-2xl p-2 animate-in slide-in-from-top-2">
@@ -241,11 +236,13 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
               </div>
 
               <div className="space-y-4 md:col-span-2 group">
-                <RequiredLabel icon={<Target className="w-5 h-5 text-primary transition-transform group-hover:-translate-y-1" />}>{t.topic}</RequiredLabel>
+                <RequiredLabel htmlFor="setup-topic" icon={<Target className="w-5 h-5 text-primary transition-transform group-hover:-translate-y-1" />}>{t.topic}</RequiredLabel>
                 <div className="relative">
                   <Input
+                    id="setup-topic"
+                    aria-required="true"
                     placeholder={uiMessage(lang, "setupview.e_g_calculus_redox_reactions")}
-                    className="h-18 md:h-24 rounded-[2rem] border-4 border-border font-black text-xl md:text-3xl focus-visible:ring-8 focus-visible:ring-primary/10 focus:border-primary bg-background transition-all hover:border-primary/50 shadow-duo px-10 placeholder:text-muted-foreground/30"
+                    className="h-18 md:h-24 rounded-[2rem] border-4 border-border font-black text-xl md:text-3xl focus-visible:ring-8 focus-visible:ring-primary/10 focus:border-primary bg-background transition-all hover:border-primary/50 shadow-duo px-10 placeholder:text-muted-foreground"
                     value={config.topic}
                     onChange={(e) => setConfig({ ...config, topic: e.target.value })}
                     disabled={isValidating}
@@ -259,12 +256,13 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
               </div>
 
               <div className="space-y-4 md:col-span-2 group">
-                <Label className="text-[10px] md:text-xs font-black uppercase text-muted-foreground flex items-center gap-3 select-none tracking-[0.2em] group-hover:text-primary transition-colors">
+                <Label htmlFor="setup-exclude" className="text-[10px] md:text-xs font-black uppercase text-muted-foreground flex items-center gap-3 select-none tracking-[0.2em] group-hover:text-primary transition-colors">
                   <XCircle className="w-5 h-5 text-primary transition-transform group-hover:-translate-y-1" /> {t.excludeOptional}
                 </Label>
                 <Textarea
+                  id="setup-exclude"
                   placeholder={t.excludePlaceholder}
-                  className="min-h-[120px] rounded-[2rem] border-4 border-border font-bold text-base md:text-xl focus-visible:ring-8 focus-visible:ring-primary/10 focus:border-primary bg-background transition-all hover:border-primary/50 shadow-duo p-8 placeholder:text-muted-foreground/30"
+                  className="min-h-[120px] rounded-[2rem] border-4 border-border font-bold text-base md:text-xl focus-visible:ring-8 focus-visible:ring-primary/10 focus:border-primary bg-background transition-all hover:border-primary/50 shadow-duo p-8 placeholder:text-muted-foreground"
                   value={config.excludeNotes}
                   onChange={(e) => setConfig({ ...config, excludeNotes: e.target.value })}
                   disabled={isValidating}
@@ -274,6 +272,8 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
               <div className="space-y-6 md:col-span-2">
                 <RequiredLabel icon={<Layers className="w-5 h-5 text-primary" />}>{t.questionType}</RequiredLabel>
                 <RadioGroup
+                  aria-label={t.questionType}
+                  aria-required="true"
                   value={config.type}
                   onValueChange={(v) => setConfig({ ...config, type: v })}
                   className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-8"
@@ -284,7 +284,7 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
                       <RadioGroupItem value={type.id} id={type.id} className="peer sr-only" />
                       <Label
                         htmlFor={type.id}
-                        className="flex items-center justify-center p-4 h-full min-h-[80px] md:min-h-[100px] rounded-[1.5rem] md:rounded-3xl border-4 border-border cursor-pointer transition-all peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/10 peer-data-[state=checked]:text-primary peer-data-[state=checked]:translate-y-[-4px] peer-data-[state=checked]:shadow-[0_8px_0_0_var(--duo-shadow)] font-black text-center text-[10px] md:text-sm select-none tracking-normal md:tracking-[0.1em] uppercase hover:bg-primary/5 shadow-duo active:translate-y-1 active:shadow-none whitespace-normal leading-tight"
+                        className="flex items-center justify-center p-4 h-full min-h-[80px] md:min-h-[100px] rounded-[1.5rem] md:rounded-3xl border-4 border-border cursor-pointer transition-all peer-focus-visible:outline-2 peer-focus-visible:outline-offset-4 peer-focus-visible:outline-primary peer-data-[state=checked]:border-primary peer-data-[state=checked]:bg-primary/10 peer-data-[state=checked]:text-primary peer-data-[state=checked]:translate-y-[-4px] peer-data-[state=checked]:shadow-[0_8px_0_0_var(--duo-shadow)] font-black text-center text-[10px] md:text-sm select-none tracking-normal md:tracking-[0.1em] uppercase hover:bg-primary/5 shadow-duo active:translate-y-1 active:shadow-none whitespace-normal leading-tight"
                       >
                         {type.label}
                       </Label>
@@ -298,17 +298,18 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
 
               <div className="space-y-6 md:col-span-2">
                 <RequiredLabel icon={<Settings2 className="w-5 h-5 text-primary" />}>{t.difficulty}</RequiredLabel>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-8">
+                <div role="group" aria-label={t.difficulty} className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-8">
                   {difficulties.map(diff => (
                     <Button
                       key={diff.id}
                       type="button"
                       disabled={isValidating}
+                      aria-pressed={config.difficulty === diff.id}
                       variant={config.difficulty === diff.id ? "default" : "outline"}
                       className={cn(
                         "h-16 md:h-20 rounded-[1.5rem] md:rounded-3xl border-4 font-black text-[10px] md:text-sm select-none tracking-normal md:tracking-[0.05em] uppercase transition-all btn-duo px-4 whitespace-normal leading-tight",
                         config.difficulty === diff.id
-                          ? 'border-primary bg-primary text-white translate-y-[-4px]'
+                          ? 'border-primary bg-primary text-primary-foreground translate-y-[-4px]'
                           : 'border-border hover:bg-primary/5 hover:border-primary/50 shadow-duo'
                       )}
                       onClick={() => setConfig({ ...config, difficulty: diff.id })}
@@ -329,6 +330,8 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
                       className="h-16 md:h-20 rounded-[1.5rem] md:rounded-3xl border-4 border-border font-black text-2xl md:text-4xl focus-visible:ring-8 focus-visible:ring-primary/10 transition-all shadow-duo max-w-[120px] md:max-w-[180px] text-center bg-background"
                       value={config.numQuestions}
                       aria-label={t.numQuestions}
+                      aria-required="true"
+                      aria-invalid={!numericQuizConfigSchema.shape.numQuestions.safeParse(config.numQuestions).success}
                       onChange={handleNumQuestionsChange}
                       onBlur={handleNumQuestionsBlur}
                       disabled={isValidating}
@@ -338,7 +341,7 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
                 </div>
 
                 <div className="space-y-4 group">
-                  <Label className="text-[10px] md:text-xs font-black uppercase text-muted-foreground flex items-center gap-3 select-none tracking-[0.2em] group-hover:text-primary transition-colors">
+                  <Label htmlFor="setup-minutes" className="text-[10px] md:text-xs font-black uppercase text-muted-foreground flex items-center gap-3 select-none tracking-[0.2em] group-hover:text-primary transition-colors">
                     <Clock className="w-5 h-5 text-primary transition-transform group-hover:-translate-y-1" /> {t.timeLimitOptional}
                   </Label>
                   <div className="flex items-center gap-6">
@@ -348,9 +351,13 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
                       placeholder={uiMessage(lang, "setupview.mins")}
                       className="h-16 md:h-20 rounded-[1.5rem] md:rounded-3xl border-4 border-border font-black text-2xl md:text-4xl focus-visible:ring-8 focus-visible:ring-primary/10 transition-all shadow-duo max-w-[120px] md:max-w-[180px] text-center bg-background"
                       value={config.timeLimit}
+                      id="setup-minutes"
+                      aria-invalid={!numericQuizConfigSchema.shape.timeLimit.safeParse(config.timeLimit).success}
+                      aria-describedby="setup-minutes-help"
                       onChange={handleTimeLimitMinutesChange}
                       disabled={isValidating}
                     />
+                    <span id="setup-minutes-help" className="text-xs text-muted-foreground">{lang === 'vi' ? `1–${QUIZ_LIMITS.minutes} phút hoặc để trống` : `1–${QUIZ_LIMITS.minutes} minutes or empty`}</span>
                   </div>
                 </div>
               </div>

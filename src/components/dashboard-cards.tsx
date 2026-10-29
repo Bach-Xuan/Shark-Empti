@@ -29,7 +29,7 @@ export function DashboardMetricCard({ title, value, icon, highlight, onExpand }:
   return (
     <Card className={cn(
       "card-duo p-4 md:p-8 flex items-center gap-3 md:gap-6 group overflow-hidden relative transition-all duration-300 shadow-none",
-      highlight ? "bg-primary text-white border-primary z-10" : "bg-card"
+      highlight ? "bg-primary text-primary-foreground border-primary z-10" : "bg-card"
     )}>
       {onExpand && (
         <Button
@@ -39,7 +39,7 @@ export function DashboardMetricCard({ title, value, icon, highlight, onExpand }:
           aria-label={title}
           className={cn(
             "absolute top-2 md:top-4 right-2 md:right-4 h-7 w-7 md:h-10 md:w-10 rounded-lg md:rounded-2xl transition-all hover:bg-muted/20 border-2 border-transparent hover:border-border",
-            highlight && "hover:bg-white/20 hover:border-white/30 text-white"
+            highlight && "hover:bg-white/20 hover:border-white/30 text-primary-foreground"
           )}
         >
           <Maximize2 className="w-3.5 h-3.5 md:w-5 md:h-5 transition-transform group-hover:scale-110" />
@@ -54,7 +54,7 @@ export function DashboardMetricCard({ title, value, icon, highlight, onExpand }:
       <div className="flex flex-col gap-0.5 md:gap-1 min-w-0 flex-1 text-left">
         <p className={cn(
           "text-[8px] md:text-[10px] font-black uppercase tracking-[0.05em] opacity-60 leading-tight whitespace-normal break-words",
-          highlight ? 'text-white' : 'text-muted-foreground'
+          highlight ? 'text-primary-foreground' : 'text-muted-foreground'
         )}>
           {title}
         </p>
@@ -63,7 +63,7 @@ export function DashboardMetricCard({ title, value, icon, highlight, onExpand }:
         </p>
       </div>
       {highlight && (
-        <Sparkles className="absolute bottom-2 md:bottom-4 right-2 md:right-4 w-5 h-5 md:w-10 md:h-10 text-white/10 group-hover:text-white/30 transition-colors animate-pulse" />
+        <Sparkles className="absolute bottom-2 md:bottom-4 right-2 md:right-4 w-5 h-5 md:w-10 md:h-10 text-primary-foreground/10 group-hover:text-primary-foreground/30 transition-colors animate-pulse" />
       )}
     </Card>
   );
@@ -126,7 +126,7 @@ export function DashboardInsightList({ title, icon, data, type, t, onCopy, isCop
                   <div className={cn("flex items-center justify-between gap-2 md:gap-4 pb-2 md:pb-4 border-b-2 md:border-b-[4px]", type === 'insights' ? 'border-orange-500/10' : 'border-primary/10')}>
                     <h3 className={cn(
                       "font-headline font-black text-[10px] md:text-2xl uppercase tracking-tight whitespace-normal break-words flex-1 transition-all text-left",
-                      isTopicDone ? "line-through text-muted-foreground/60" : "text-foreground"
+                      isTopicDone ? "line-through text-muted-foreground" : "text-foreground"
                     )}>
                       <LatexText text={group.topic} />
                     </h3>
@@ -144,7 +144,7 @@ export function DashboardInsightList({ title, icon, data, type, t, onCopy, isCop
                         <Button
                           size="sm"
                           onClick={() => onAction(group.topic, 'practice')}
-                          className="h-7 w-7 md:h-10 md:w-10 p-0 rounded-lg md:rounded-xl bg-primary text-white border-2 border-white/20 btn-duo shadow-none flex items-center justify-center"
+                          className="h-7 w-7 md:h-10 md:w-10 p-0 rounded-lg md:rounded-xl bg-primary text-primary-foreground border-2 border-white/20 btn-duo shadow-none flex items-center justify-center"
                           aria-label={t.fixMyWeakness} title={t.fixMyWeakness}
                         >
                           <Zap className="w-4 h-4 md:w-5 md:h-5" />

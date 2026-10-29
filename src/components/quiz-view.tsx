@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { getAiError } from '@/lib/ai-error-message';
-import { answersMatch } from '@/lib/arena-scoring';
+import { answersMatch, parseNumericAnswer } from '@/lib/arena-scoring';
 import { showErrorToast } from '@/lib/error-toast';
 import { translatedError } from '@/lib/i18n/errors';
 import type { QuizQuestion } from '@/lib/learning-session';
@@ -18,6 +18,12 @@ import { QuizAnalysis,QuizConfig,QuizHistoryItem,QuizResultItem } from '@/lib/ty
 import { cn } from '@/lib/utils';
 import { AlertTriangle,BookOpen,CheckCircle2,Clock,Loader2,Sparkles,XCircle } from 'lucide-react';
 import { useCallback,useEffect,useMemo,useRef,useState } from 'react';
+import { useAiRequestScope } from '@/hooks/use-ai-request-scope';
+import { useLearningDraft, useLearningLeaveGuard } from '@/hooks/use-learning-draft';
+import { quizDraftSchema, removeDraft, type QuizDraft } from '@/lib/learning-drafts';
+import { readHistoryItem } from '@/lib/history-schema';
+import { DraftNotice } from './draft-notice';
+import { learningNotices } from '@/lib/i18n/learning-notices';
 
 interface QuizViewProps {
   t: TranslationSet;
@@ -29,14 +35,21 @@ interface QuizViewProps {
   onAskGuru: (message: string) => void;
   askGuruDisabledReason?: string;
   numericShortAnswers?: boolean;
+  blindAnswers?: boolean;
+  draftOwner?: string;
+  draftId?: string | null;
+  draftAvailable?: boolean;
+  startedAtMs?: number;
 }
 
-export default function QuizView({ t, lang, config, initialQuestions, onFinish, onReady, onAskGuru, askGuruDisabledReason, numericShortAnswers = false }: QuizViewProps) {
+export default function QuizView({ t, lang, config, initialQuestions, onFinish, onReady, onAskGuru, askGuruDisabledReason, numericShortAnswers = false, blindAnswers = false, draftOwner, draftId, draftAvailable = true, startedAtMs }: QuizViewProps) {
+  const aiRequest = useAiRequestScope();
   const [currentIdx, setCurrentIdx] = useState(0);
   const [questions, setQuestions] = useState<QuizQuestion[]>(initialQuestions || []);
   const [answers, setAnswers] = useState<QuizResultItem[]>([]);
   const [currentFeedback, setCurrentFeedback] = useState<QuizResultItem | null>(null);
   const [shortAnswerInput, setShortAnswerInput] = useState("");
+  const [answerError, setAnswerError] = useState<string | null>(null);
   const [overallTimer, setOverallTimer] = useState(0);
   const [remainingTime, setRemainingTime] = useState<number | null>(null);
   const [questionStartTime, setQuestionStartTime] = useState(() => Date.now());
@@ -48,10 +61,13 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
   const finishingRef = useRef(false);
   const answerPending = useRef(false);
   const pendingResult = useRef<{ results: Omit<QuizHistoryItem, 'date' | 'lang'>; analysis?: QuizAnalysis } | null>(null);
+  const [failedCompletion, setFailedCompletion] = useState<typeof pendingResult.current>(null);
   const [saveFailed, setSaveFailed] = useState(false);
   const [questionLanguage] = useState(lang);
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
   const hasCountdown = remainingTime !== null;
+  const [clockStartedAt, setClockStartedAt] = useState(() => startedAtMs ?? Date.now());
+  useLearningLeaveGuard(questions.length > 0 && !isFinishing, lang === 'vi' ? 'vi' : 'en');
 
   useEffect(() => {
     if (config.timeLimit && !isNaN(parseInt(config.timeLimit))) {
@@ -79,7 +95,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
           difficulty: config.difficulty,
           numQuestions: validateQuizConfig(config).numQuestions,
           language: questionLanguage as 'en' | 'vi',
-        });
+        }, { signal: aiRequest.start() });
         if (!active) return;
         if (!result.ok) {
           showErrorToast(result.error, questionLanguage as 'en' | 'vi');
@@ -99,8 +115,38 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
       }
     }
     loadQuestions();
-    return () => { active = false; };
-  }, [config, questionLanguage, initialQuestions, onReady]);
+    return () => { active = false; aiRequest.cancel(); };
+  }, [config, questionLanguage, initialQuestions, onReady, aiRequest]);
+
+  const draftKind = blindAnswers ? 'arena-progress' : 'quiz-progress';
+  const draftValue = useMemo<QuizDraft | null>(() => draftId && questions.length ? ({
+    id: draftId, index: currentIdx, answers, feedback: currentFeedback, input: shortAnswerInput,
+    startedAtMs: clockStartedAt, questionStartedAtMs: questionStartTime,
+    ...(failedCompletion ? { completion: failedCompletion } : {}),
+  }) : null, [draftId, questions.length, currentIdx, answers, currentFeedback, shortAnswerInput, questionStartTime, clockStartedAt, failedCompletion]);
+  const draft = useLearningDraft<QuizDraft>(draftOwner, draftKind, draftValue, value => {
+    const parsed = quizDraftSchema.safeParse(value);
+    if (!parsed.success || parsed.data.id !== draftId || parsed.data.index >= questions.length
+      || parsed.data.answers.length > questions.length || parsed.data.answers.some((answer, index) => answer.question !== questions[index]?.question)
+      || (parsed.data.answers.length !== parsed.data.index && parsed.data.answers.length !== questions.length)
+      || (parsed.data.feedback && parsed.data.feedback.question !== questions[parsed.data.index]?.question)) return null;
+    return parsed.data;
+  }, value => {
+    setClockStartedAt(value.startedAtMs);
+    const elapsed = Math.max(0, Math.floor((Date.now() - value.startedAtMs) / 1000));
+    setOverallTimer(elapsed);
+    if (config.timeLimit) setRemainingTime(Math.max(0, Number(config.timeLimit) * 60 - elapsed));
+    setCurrentIdx(value.index); setAnswers(value.answers); setCurrentFeedback(value.feedback);
+    setShortAnswerInput(value.input); setQuestionStartTime(value.questionStartedAtMs);
+    if (value.completion && typeof value.completion === 'object' && 'results' in value.completion) {
+      const stored = readHistoryItem('draft-completion', { ...value.completion.results as object, ...('analysis' in value.completion ? { analysis: value.completion.analysis } : {}), date: new Date().toISOString(), lang });
+      if (stored && stored.quizResults.length === questions.length) {
+        pendingResult.current = { results: stored, ...(stored.analysis ? { analysis: stored.analysis } : {}) };
+        setFailedCompletion(pendingResult.current);
+        finishingRef.current = true; setSaveFailed(true);
+      }
+    }
+  });
 
   const saveResult = useCallback(async () => {
     if (!pendingResult.current) return;
@@ -109,10 +155,11 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
     try {
       const saved = await onFinish(pendingResult.current.results, pendingResult.current.analysis);
       if (!saved) throw new Error('Save failed');
+      if (draftOwner) removeDraft(draftOwner, draftKind);
     } catch {
-      if (mountedRef.current) { setSaveFailed(true); setIsFinishing(false); }
+      if (mountedRef.current) { setFailedCompletion(pendingResult.current); setSaveFailed(true); setIsFinishing(false); }
     }
-  }, [onFinish]);
+  }, [onFinish, draftOwner, draftKind]);
 
   const completeQuiz = useCallback(async (finalAnswers: QuizResultItem[]) => {
     if (finishingRef.current || !mountedRef.current) return;
@@ -120,8 +167,9 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
     setIsFinishing(true);
     let analysis: QuizAnalysis | undefined;
     let finalConfig = config;
+    if (!blindAnswers) {
     try {
-      const result = await personalizedQuizPerformanceFeedback({ quizResults: finalAnswers, originalTopic: config.topic });
+      const result = await personalizedQuizPerformanceFeedback({ quizResults: finalAnswers, originalTopic: config.topic }, { signal: aiRequest.start() });
       if (!mountedRef.current) return;
       if (result.ok) {
         analysis = result.data;
@@ -130,11 +178,15 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
     } catch {
       if (!mountedRef.current) return;
     }
+    }
     if (mountedRef.current) {
       pendingResult.current = { results: { quizResults: finalAnswers, totalTime: overallTimer, config: finalConfig }, analysis };
       await saveResult();
     }
-  }, [config, lang, saveResult, overallTimer]);
+  }, [config, lang, saveResult, overallTimer, aiRequest, blindAnswers]);
+  useEffect(() => {
+    if (questions.length > 0 && answers.length === questions.length && !saveFailed) void completeQuiz(answers);
+  }, [questions.length, answers, completeQuiz, saveFailed]);
 
   const handleAutoFinish = useCallback(async () => {
     const completed = currentFeedback ? [...answers, currentFeedback] : [...answers];
@@ -146,13 +198,14 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
     if (isLoading || isFinishing || saveFailed || error) return;
 
     const interval = setInterval(() => {
-      setOverallTimer(prev => prev + 1);
+      const elapsed = Math.max(0, Math.floor((Date.now() - clockStartedAt) / 1000));
+      setOverallTimer(elapsed);
       if (hasCountdown) {
-        setRemainingTime(prev => (prev !== null && prev > 0 ? prev - 1 : prev));
+        setRemainingTime(Math.max(0, Number(config.timeLimit) * 60 - elapsed));
       }
     }, 1000);
     return () => clearInterval(interval);
-  }, [isLoading, isFinishing, hasCountdown, saveFailed, error]);
+  }, [isLoading, isFinishing, hasCountdown, saveFailed, error, config.timeLimit, clockStartedAt]);
 
   useEffect(() => {
     if (remainingTime === 0 && !isFinishing) {
@@ -163,6 +216,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
   const handleAnswer = useCallback(async (userAnswer: string) => {
     if (answerPending.current || finishingRef.current || isAnalyzing || !!currentFeedback || !userAnswer.trim()) return;
     answerPending.current = true;
+    setAnswerError(null);
 
     const currentQ = questions[currentIdx];
     const timeTaken = (Date.now() - questionStartTime) / 1000;
@@ -170,7 +224,13 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
     let isCorrect = false;
     let aiFeedback = null;
 
-    if (currentQ.type === 'Short Answer' && !numericShortAnswers) {
+    if (blindAnswers) {
+      // Arena has no local answer key or AI grading before submission.
+    } else if (userAnswer.trim().toLowerCase() === currentQ.correct.trim().toLowerCase()) {
+      isCorrect = true;
+    } else if (currentQ.type === 'Short Answer' && parseNumericAnswer(userAnswer) !== null && parseNumericAnswer(currentQ.correct) !== null) {
+      isCorrect = answersMatch(currentQ, userAnswer);
+    } else if (currentQ.type === 'Short Answer' && !numericShortAnswers) {
       setIsAnalyzing(true);
       try {
         const result = await shortAnswerAnalysis({
@@ -178,13 +238,18 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
           questionText: currentQ.question,
           correctAnswer: currentQ.correct,
           language: lang as 'en' | 'vi'
-        });
+        }, { signal: aiRequest.start() });
         if (!mountedRef.current || finishingRef.current) return;
         if (!result.ok) {
           answerPending.current = false;
           showErrorToast(result.error, lang as 'en' | 'vi');
           return;
         } else {
+          if (!Number.isFinite(result.data.confidence) || result.data.confidence < 0.8) {
+            answerPending.current = false;
+            setAnswerError(learningNotices[lang === 'vi' ? 'vi' : 'en'].uncertain);
+            return;
+          }
           isCorrect = result.data.isCorrect;
           aiFeedback = result.data.feedback;
         }
@@ -199,7 +264,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
       isCorrect = answersMatch(currentQ, userAnswer);
     }
 
-    const errorCategory = !isCorrect ? (timeTaken < 5 ? "Careless Mistake" : "Concept Error") : null;
+    const errorCategory = null; // Elapsed time alone cannot establish a cognitive diagnosis.
 
     const result = {
       ...currentQ,
@@ -211,7 +276,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
     };
 
     if (mountedRef.current && !finishingRef.current) setCurrentFeedback(result);
-  }, [questions, currentIdx, questionStartTime, isAnalyzing, currentFeedback, lang, numericShortAnswers]);
+  }, [questions, currentIdx, questionStartTime, isAnalyzing, currentFeedback, lang, numericShortAnswers, aiRequest, blindAnswers]);
 
   const handleNextAction = useCallback(async () => {
     if (!currentFeedback || finishingRef.current) return;
@@ -264,8 +329,8 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
     return (
       <Card className="card-duo p-8 md:p-16 text-center space-y-6 max-w-xl mx-auto mt-20">
         <AlertTriangle className="w-16 h-16 md:w-20 md:h-20 text-destructive mx-auto" />
-        <h2 className="text-xl md:text-3xl font-headline font-black uppercase text-destructive whitespace-normal break-words">{error}</h2>
-        <Button onClick={() => window.location.reload()} className="btn-duo h-14 md:h-18 px-10 md:px-14 rounded-2xl bg-primary text-white text-lg font-black uppercase tracking-wider">
+        <h1 className="text-xl md:text-3xl font-headline font-black uppercase text-destructive whitespace-normal break-words">{error}</h1>
+        <Button onClick={() => window.location.reload()} className="btn-duo h-14 md:h-18 px-10 md:px-14 rounded-2xl bg-primary text-primary-foreground text-lg font-black uppercase tracking-wider">
           {uiMessage(lang, "quizview.retry_2")}
         </Button>
       </Card>
@@ -280,6 +345,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 md:space-y-10 animate-in fade-in slide-in-from-bottom-6 duration-700 px-1">
+      {draftOwner && <DraftNotice {...draft} available={draft.available && draftAvailable} lang={lang === 'vi' ? 'vi' : 'en'} />}
       <div className="space-y-4 md:space-y-6">
         <div className="flex justify-between items-center text-[10px] md:text-xs font-black text-muted-foreground uppercase tracking-[0.2em] px-1">
           <span>{t.progress} {currentIdx + 1} / {questions.length}</span>
@@ -308,9 +374,9 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
                 <BookOpen className="w-3 h-3 md:w-4 md:h-4 mr-1.5 md:mr-2" /> {currentQ.section}
               </Badge>
             )}
-            <h2 className="text-xl md:text-4xl font-headline font-black leading-relaxed tracking-tight text-foreground whitespace-normal break-words">
+            <h1 className="text-xl md:text-4xl font-headline font-black leading-relaxed tracking-tight text-foreground whitespace-normal break-words">
               <LatexText text={currentQ.question} />
-            </h2>
+            </h1>
           </div>
 
           <div className="grid grid-cols-1 gap-4">
@@ -324,9 +390,9 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
                     onClick={() => handleAnswer(opt)}
                     className={cn(
                       "min-h-[4.5rem] h-auto py-4 rounded-2xl md:rounded-3xl border-[3px] font-black text-sm md:text-xl text-left justify-start px-6 md:px-8 btn-duo shadow-duo whitespace-normal break-words flex items-center transition-all",
-                      currentFeedback && opt === currentQ.correct
+                      !blindAnswers && currentFeedback && opt === currentQ.correct
                         ? "border-green-500 bg-green-50 text-green-700 dark:bg-green-900/30 dark:text-green-400"
-                        : currentFeedback && opt === currentFeedback.userAnswer && !currentFeedback.isCorrect
+                        : !blindAnswers && currentFeedback && opt === currentFeedback.userAnswer && !currentFeedback.isCorrect
                         ? "border-red-500 bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400"
                         : "border-border text-foreground hover:border-primary/50 hover:bg-primary/5 hover:-translate-y-1"
                     )}
@@ -344,7 +410,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
                     type="text"
                     placeholder={t.typeYourAnswer}
                     disabled={!!currentFeedback || isAnalyzing}
-                    className="w-full h-16 md:h-28 px-6 md:px-10 rounded-2xl md:rounded-3xl border-[3px] border-border font-black text-lg md:text-3xl focus:outline-hidden focus:border-primary focus:ring-[4px] focus:ring-primary/10 bg-muted/20 text-foreground disabled:opacity-50 transition-all placeholder:text-muted-foreground/30 shadow-inner"
+                    className="w-full h-16 md:h-28 px-6 md:px-10 rounded-2xl md:rounded-3xl border-[3px] border-border font-black text-lg md:text-3xl focus:outline-hidden focus:border-primary focus:ring-[4px] focus:ring-primary/10 bg-muted/20 text-foreground disabled:opacity-50 transition-all placeholder:text-muted-foreground shadow-inner"
                     value={shortAnswerInput}
                     onChange={(e) => setShortAnswerInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleAnswer(shortAnswerInput)}
@@ -360,7 +426,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
                   <Button
                     onClick={() => handleAnswer(shortAnswerInput)}
                     disabled={!shortAnswerInput.trim()}
-                    className="w-full h-14 md:h-20 rounded-[1.2rem] md:rounded-[2rem] font-black text-lg md:text-2xl bg-primary text-white btn-duo shadow-duo border-[4px] border-primary/20 uppercase tracking-widest"
+                    className="w-full h-14 md:h-20 rounded-[1.2rem] md:rounded-[2rem] font-black text-lg md:text-2xl bg-primary text-primary-foreground btn-duo shadow-duo border-[4px] border-primary/20 uppercase tracking-widest"
                   >
                     <span className="whitespace-normal break-words leading-tight">{t.submitAnswer}</span>
                   </Button>
@@ -370,7 +436,12 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
           </div>
         </div>
 
-        {currentFeedback && (
+        {currentFeedback && blindAnswers && <div className="mt-8 space-y-4" role="status">
+          <p>{lang === 'vi' ? 'Đã ghi nhận câu trả lời. Kết quả được chấm trên máy chủ sau khi nộp bài.' : 'Answer recorded. The server grades your answers after submission.'}</p>
+          <Button className="w-full min-h-12" onClick={handleNextAction}>{currentIdx + 1 === questions.length ? t.finish : t.continue}</Button>
+        </div>}
+        {answerError && <p role="alert" className="mt-6 rounded-xl border p-4">{answerError}</p>}
+        {currentFeedback && !blindAnswers && (
           <div className={cn(
             "mt-10 md:mt-12 p-6 md:p-10 rounded-2xl md:rounded-3xl border-[3px] animate-in slide-in-from-top-6 duration-500 shadow-2xl relative overflow-hidden",
             currentFeedback.isCorrect
@@ -431,7 +502,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
                 <div className="text-xs md:text-lg text-primary font-black mt-4 flex items-start gap-3 md:gap-4 bg-primary/10 p-4 md:p-6 rounded-2xl md:rounded-3xl border-[3px] border-primary/20 animate-in zoom-in-95 duration-300">
                   <Sparkles className="w-5 h-5 md:w-8 md:h-8 shrink-0 mt-0.5 text-primary" />
                   <div className="text-foreground">
-                    <span className="text-primary/70 uppercase text-[9px] md:text-[10px] tracking-widest block mb-1">{t.sharkFeedback}</span>
+                    <span className="text-primary uppercase text-[9px] md:text-[10px] tracking-widest block mb-1">{t.sharkFeedback}</span>
                     <div className="whitespace-normal break-words">
                       <LatexText text={currentFeedback.aiFeedback} />
                     </div>

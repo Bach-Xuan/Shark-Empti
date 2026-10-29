@@ -1,9 +1,10 @@
 import 'server-only';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
 import { ApiError } from './server-api';
+import { isDocumentId } from './document-id';
 
 export function requireDocumentId(id: string) {
-  if (!id || id === '.' || id === '..' || id.includes('/') || id.length > 128)
+  if (!isDocumentId(id))
     throw new ApiError('APP-INVALID-INPUT', 400, 'Invalid document ID.');
 }
 

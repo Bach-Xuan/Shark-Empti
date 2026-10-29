@@ -80,6 +80,8 @@ export interface BaseViewProps {
 }
 
 export interface ArenaExam {
+  schemaVersion?: 2;
+  practiceOnly?: boolean;
   id: string;
   title: string;
   config: QuizConfig;

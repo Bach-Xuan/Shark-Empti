@@ -46,7 +46,7 @@ export default function PlaygroundView({ t, lang, weakPoints, totalAttempts, tot
               storageKey="shark_help_playground_seen"
             />
           </h1>
-          <p className="text-muted-foreground font-black text-[9px] md:text-lg uppercase tracking-[0.2em] opacity-60">
+          <p className="text-muted-foreground font-black text-[9px] md:text-lg uppercase tracking-[0.2em] ">
             {t.appTagline}
           </p>
         </div>
@@ -57,14 +57,14 @@ export default function PlaygroundView({ t, lang, weakPoints, totalAttempts, tot
           <TabsList className="h-14 md:h-20 p-1.5 md:p-2 bg-muted/30 border-[3px] md:border-[4px] border-border rounded-full w-full max-w-md shadow-inner">
             <TabsTrigger
               value="flashcards"
-              className="flex-1 rounded-full h-full font-black uppercase text-[8px] md:text-xs tracking-[0.1em] md:tracking-[0.15em] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-[0_4px_0_0_rgba(0,0,0,0.2)] md:data-[state=active]:shadow-[0_8px_0_0_rgba(0,0,0,0.2)] transition-all duration-300 gap-1.5 md:gap-3 group active:translate-y-1"
+              className="flex-1 rounded-full h-full font-black uppercase text-[8px] md:text-xs tracking-[0.1em] md:tracking-[0.15em] data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_4px_0_0_rgba(0,0,0,0.2)] md:data-[state=active]:shadow-[0_8px_0_0_rgba(0,0,0,0.2)] transition-all duration-300 gap-1.5 md:gap-3 group active:translate-y-1"
             >
               <Layers className="w-3.5 h-3.5 md:w-5 md:h-5 group-data-[state=active]:animate-pulse" />
               {t.flashcards}
             </TabsTrigger>
             <TabsTrigger
               value="practice"
-              className="flex-1 rounded-full h-full font-black uppercase text-[8px] md:text-xs tracking-[0.1em] md:tracking-[0.15em] data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:shadow-[0_4px_0_0_rgba(0,0,0,0.2)] md:data-[state=active]:shadow-[0_8px_0_0_rgba(0,0,0,0.2)] transition-all duration-300 gap-1.5 md:gap-3 group active:translate-y-1"
+              className="flex-1 rounded-full h-full font-black uppercase text-[8px] md:text-xs tracking-[0.1em] md:tracking-[0.15em] data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:shadow-[0_4px_0_0_rgba(0,0,0,0.2)] md:data-[state=active]:shadow-[0_8px_0_0_rgba(0,0,0,0.2)] transition-all duration-300 gap-1.5 md:gap-3 group active:translate-y-1"
             >
               <Zap className="w-3.5 h-3.5 md:w-5 md:h-5 group-data-[state=active]:animate-pulse" />
               {t.practice}

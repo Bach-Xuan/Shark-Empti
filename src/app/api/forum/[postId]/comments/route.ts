@@ -6,6 +6,7 @@ import { ApiError,apiFailure,authenticatedUser,idempotentTransaction } from '@/l
 import { FieldValue } from 'firebase-admin/firestore';
 import { NextRequest,NextResponse } from 'next/server';
 import { z } from 'zod';
+import { prepareRequestBudget } from '@/lib/request-budget';
 
 export const runtime = 'nodejs';
 
@@ -30,6 +31,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const parsed = readForumPost(postId, post.data());
       if (!parsed) throw new ApiError('FORUM-INVALID-POST', 409, 'This post cannot accept comments.');
 
+      const commitBudget = await prepareRequestBudget(transaction, uid, 'comment-create', Buffer.byteLength(content));
+      commitBudget();
       transaction.create(postRef.collection('comments').doc(), {
         ...commentData,
         postId,

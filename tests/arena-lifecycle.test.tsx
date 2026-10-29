@@ -17,7 +17,7 @@ vi.mock('next/navigation', () => ({ useParams: () => ({ examId: 'exam' }), useRo
 vi.mock('firebase/firestore', () => ({
   doc: () => 'exam', collection: () => 'attempts', query: () => 'attempts', orderBy: vi.fn(), limit: vi.fn(), where: vi.fn(), documentId: () => '__name__',
   onSnapshot: (ref: string, callback: (snapshot: unknown) => void) => {
-    callback(ref === 'exam' ? { id: 'exam', exists: () => true, data: () => ({ title: 'Test exam', authorId: 'author', createdAt: null, config: history.config, questions: [question], totalAttempts: 0 }) } : { docs: [] });
+    callback(ref === 'exam' ? { id: 'exam', exists: () => true, data: () => ({ schemaVersion: 2, questionCount: 1, title: 'Test exam', authorId: 'author', createdAt: null, config: history.config, totalAttempts: 0 }) } : { docs: [] });
     return vi.fn();
   },
 }));
@@ -25,15 +25,16 @@ vi.mock('@/ai/client-flows', () => ({ generateQuestions: vi.fn(), shortAnswerAna
 beforeEach(() => {
   vi.clearAllMocks(); mocks.user = { uid: 'player', getIdToken: async () => 'fixture' };
   mocks.feedback.mockResolvedValue({ ok: true, data: analysis });
-  mocks.request.mockResolvedValue(new Response(JSON.stringify({ coinsAwarded: 100, isFirstAttempt: false })));
-  vi.stubGlobal('fetch', (url: string, init: RequestInit) => url.endsWith('/start') ? Promise.resolve(new Response(init.body as string)) : mocks.request(url, init));
+  mocks.request.mockImplementation(async () => new Response(JSON.stringify({ coinsAwarded: 100, isFirstAttempt: false, reviewResults: history.quizResults, duration: 1 })));
+  vi.stubGlobal('fetch', (url: string, init: RequestInit) => url.endsWith('/start') ? Promise.resolve(new Response(JSON.stringify({ ...JSON.parse(init.body as string), startedAtMs: Date.now(), questions: [{ ...question, correct: undefined, explanation: undefined }] }))) : mocks.request(url, init));
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
-it('carries the first feedback through submission without another AI request', async () => {
+it('requests feedback only once, after server grading rather than during the blind attempt', async () => {
   render(<ArenaDetailPage />);
   await act(async () => { fireEvent.click(screen.getByRole('button', { name: /Start Challenge/i })); });
   fireEvent.click(screen.getByRole('button', { name: '4' }));
-  expect((screen.getByRole('button', { name: /Ask Shark Guru/i }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.queryByRole('button', { name: /Ask Shark Guru/i })).toBeNull();
+  expect(mocks.feedback).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: /finish|results/i }));
   await screen.findByRole('heading', { name: /100%/ });
   await act(async () => {});

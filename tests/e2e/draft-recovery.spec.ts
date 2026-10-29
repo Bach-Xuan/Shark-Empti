@@ -1,0 +1,58 @@
+import { expect, test } from './fixtures';
+import { signInDemo } from './auth';
+import { getApps, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import { translations } from '../../src/lib/translations';
+
+test('999-minute quiz restores its original history ID, answers and clock without regenerating', async ({ page }) => {
+  test.setTimeout(180000);
+  const db = getFirestore(getApps()[0] ?? initializeApp({ projectId: 'demo-shark-empti' }));
+  const ownersBefore = new Set((await db.collection('users').get()).docs.map(document => document.id));
+  await signInDemo(page);
+  const owners = (await db.collection('users').get()).docs.filter(document => !ownersBefore.has(document.id));
+  expect(owners).toHaveLength(1);
+  const uid = owners[0].id;
+  const creations: string[] = [];
+  page.on('request', request => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/ai/generations') creations.push(request.url());
+  });
+  await page.getByLabel(translations.en.topic).fill('Addition');
+  await page.getByLabel(translations.en.numQuestions, { exact: true }).fill('2');
+  const minutes = page.getByLabel(translations.en.timeLimitOptional, { exact: true });
+  await minutes.fill('1000');
+  await page.getByRole('button', { name: /start learning/i }).click();
+  await expect(minutes).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.getByText(/Questions must be an integer from 1–50/).first()).toBeVisible();
+  expect(creations).toHaveLength(0);
+  await minutes.fill('999');
+  await page.getByRole('button', { name: /start learning/i }).click();
+  await expect(page.getByText('2 + 2 = ?', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^99[0-9]:[0-5][0-9]$/)).toBeVisible();
+  await page.getByRole('button', { name: '4', exact: true }).click();
+  await page.getByRole('button', { name: translations.en.continue, exact: true }).click();
+  const progress = () => page.evaluate(() => {
+    const key = Object.keys(sessionStorage).find(name => name.startsWith('shark:draft:v1:') && name.endsWith(':quiz-progress'));
+    return key ? JSON.parse(sessionStorage.getItem(key)!).data : null;
+  });
+  await expect.poll(async () => (await progress())?.index).toBe(1);
+  const before = await progress();
+  const paidCreates = creations.length;
+  page.once('dialog', dialog => dialog.accept());
+  await page.reload();
+  await expect(page.getByText('2 + 2 = ?', { exact: true })).toBeVisible();
+  await expect.poll(async () => (await progress())?.index).toBe(1);
+  const restored = await progress();
+  expect(restored.id).toBe(before.id);
+  expect(restored.startedAtMs).toBe(before.startedAtMs);
+  expect(restored.answers).toHaveLength(1);
+  expect(creations).toHaveLength(paidCreates);
+  await page.getByRole('button', { name: '4', exact: true }).click();
+  await page.getByRole('button', { name: translations.en.finish, exact: true }).click();
+  await expect(page.getByRole('heading', { name: /100%/ })).toBeVisible();
+  const history = await db.collection(`users/${uid}/history`).get();
+  expect(history.size).toBe(1);
+  expect(history.docs[0].id).toBe(before.id);
+  expect(history.docs[0].get('config.timeLimit')).toBe('999');
+  expect(history.docs[0].get('quizResults')).toHaveLength(2);
+  expect(await progress()).toBeNull();
+});

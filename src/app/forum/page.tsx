@@ -2,13 +2,15 @@
 import Link from 'next/link';
 import { useLanguageState,useThemeState } from '@/components/app-preferences';
 import { PageControls } from '@/components/page-controls';
+import { ReportContent } from '@/components/report-content';
 import { UiText } from "@/components/ui-text";
 import { usePagedCollection } from '@/hooks/use-paged-collection';
 import { formatForumDate } from '@/lib/date-format';
 import { readForumPost } from '@/lib/public-firestore-schema';
-import { deleteForumPost } from '@/lib/forum-client';
+import { deleteForumPost, communityRequest, mutateForum } from '@/lib/forum-client';
+import { isDocumentId } from '@/lib/document-id';
 import { uiMessage } from '@/lib/i18n';
-import { subjectOptions } from '@/lib/subjects';
+import { subjectBadgeClassName, subjectOptions } from '@/lib/subjects';
 import { useMemo as usePageMemo } from 'react';
 
 import ActivityCalendar from '@/components/activity-calendar';
@@ -60,16 +62,10 @@ import { translations,TranslationSet } from '@/lib/translations';
 import { ForumPost } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import {
-addDoc,
-arrayRemove,
-arrayUnion,
 collection,
 doc,
-increment,
 orderBy,
 query,
-serverTimestamp,
-updateDoc,
 where
 } from 'firebase/firestore';
 import {
@@ -109,6 +105,7 @@ export default function ForumPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const publishing = useRef(false);
+  const creationRequest = useRef<{ signature: string; id: string } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
   // Create/Edit States
@@ -174,19 +171,16 @@ export default function ForumPage() {
       title: newTitle,
       content: newContent,
       subject: newSubject,
-      authorId: user.uid,
-      authorName: user.displayName || 'Learner',
-      authorPhoto: user.photoURL || '',
-      createdAt: serverTimestamp(),
-      likesCount: 0,
-      commentsCount: 0,
-      likedBy: []
     };
 
     publishing.current = true;
     setIsPublishing(true);
     try {
-      await addDoc(collection(db, 'posts'), postData);
+      const signature = JSON.stringify(postData);
+      if (creationRequest.current?.signature !== signature) creationRequest.current = { signature, id: crypto.randomUUID() };
+      const saved = await communityRequest(user, '/api/forum', { ...postData, requestId: creationRequest.current.id });
+      if (!('id' in saved) || !isDocumentId(saved.id)) throw { code: 'APP-DATA-INVALID' };
+      creationRequest.current = null;
       setIsCreateDialogOpen(false);
       setNewTitle('');
       setNewContent('');
@@ -209,10 +203,9 @@ export default function ForumPage() {
       title: newTitle,
       content: newContent,
       subject: newSubject,
-      updatedAt: serverTimestamp()
     };
 
-    const result = await mutation.run(() => updateDoc(postRef, updateData), cause => {
+    const result = await mutation.run(() => mutateForum(user, editingPost.id, { action: 'edit-post', ...updateData }), cause => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'update', requestResourceData: updateData }, cause));
     });
     if (result.ok) { setEditingPost(null);
@@ -267,10 +260,7 @@ export default function ForumPage() {
     const postRef = doc(db, 'posts', post.id);
     const hasLiked = post.likedBy?.includes(user.uid);
 
-    updateDoc(postRef, {
-      likedBy: hasLiked ? arrayRemove(user.uid) : arrayUnion(user.uid),
-      likesCount: increment(hasLiked ? -1 : 1)
-    }).catch(async cause => {
+    mutateForum(user, post.id, { action: 'like', liked: !hasLiked }).catch(async cause => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'update', requestResourceData: { userId: user.uid } }, cause));
     });
   };
@@ -287,18 +277,6 @@ export default function ForumPage() {
   const getSubjectLabel = (id: string) => {
     const s = subjectsList.find(sub => sub.id === id);
     return s ? s.label : t.other;
-  };
-
-  const getSubjectColor = (id: string) => {
-    switch (id) {
-      case 'math': return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
-      case 'physics': return 'bg-purple-500/10 text-purple-600 border-purple-500/20';
-      case 'chemistry': return 'bg-green-500/10 text-green-600 border-green-500/20';
-      case 'biology': return 'bg-teal-500/10 text-teal-600 border-teal-500/20';
-      case 'literature': return 'bg-orange-500/10 text-orange-600 border-orange-500/20';
-      case 'english': return 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20';
-      default: return 'bg-muted/50 text-muted-foreground border-border';
-    }
   };
 
 
@@ -346,7 +324,7 @@ export default function ForumPage() {
                 storageKey="shark_help_forum_seen"
               />
             </h1>
-            <p className="text-[8px] md:text-sm font-black text-muted-foreground uppercase tracking-[0.15em] md:tracking-[0.2em] opacity-60">
+            <p className="text-[8px] md:text-sm font-black text-muted-foreground uppercase tracking-[0.15em] md:tracking-[0.2em] ">
               {uiMessage(lang, "forum.shark_empti_learning_community")}
             </p>
           </div>
@@ -392,7 +370,7 @@ export default function ForumPage() {
             </DropdownMenu>
 
             <Dialog open={!authLoading && isCreateDialogOpen} onOpenChange={open => { if (!publishing.current && !authLoading) setIsCreateDialogOpen(open); }}>
-              <Button disabled={authLoading} onClick={() => setIsCreateDialogOpen(true)} className="btn-duo h-9 md:h-12 px-3 md:px-6 rounded-xl md:rounded-2xl bg-primary text-white border-[2px] md:border-[3px] border-primary/20 font-black uppercase text-[9px] md:text-xs tracking-widest gap-1.5">
+              <Button disabled={authLoading} onClick={() => setIsCreateDialogOpen(true)} className="btn-duo h-9 md:h-12 px-3 md:px-6 rounded-xl md:rounded-2xl bg-primary text-primary-foreground border-[2px] md:border-[3px] border-primary/20 font-black uppercase text-[9px] md:text-xs tracking-widest gap-1.5">
                 <Plus className="w-3.5 h-3.5 md:w-5 md:h-5" /> {t.createPost}
               </Button>
               <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto rounded-[1.5rem] md:rounded-[2.5rem] border-[3px] md:border-[4px] border-border shadow-2xl p-5 md:p-8 bg-card animate-in zoom-in-95 duration-300 custom-scrollbar"><fieldset disabled={mutation.pending} className="contents">
@@ -462,7 +440,7 @@ export default function ForumPage() {
                     onClick={handleCreatePost}
                     disabled={isPublishing}
                     aria-busy={isPublishing}
-                    className="w-full h-14 md:h-16 rounded-xl md:rounded-2xl btn-duo bg-primary text-white font-black uppercase text-xs md:text-base tracking-widest border-[3px] border-primary/20"
+                    className="w-full h-14 md:h-16 rounded-xl md:rounded-2xl btn-duo bg-primary text-primary-foreground font-black uppercase text-xs md:text-base tracking-widest border-[3px] border-primary/20"
                   >
                     {t.publish}
                   </Button>
@@ -490,8 +468,8 @@ export default function ForumPage() {
               <Card key={i} className="card-duo h-28 md:h-48 bg-muted/20 animate-pulse border-dashed" />
             ))}
           </div>
-        ) : filteredPosts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 md:py-24 text-center space-y-4 opacity-50 px-4">
+        ) : page.error ? null : filteredPosts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 md:py-24 text-center space-y-4 px-4">
             <Search className="w-12 h-12 md:w-20 md:h-20 text-muted-foreground" />
             <p className="font-black uppercase tracking-widest text-[10px] md:text-lg max-w-xs md:max-w-md">
               {searchQuery ? (lang === 'vi' ? `Không tìm thấy cho "${searchQuery}"` : `No results for "${searchQuery}"`) : t.noPosts}
@@ -507,14 +485,14 @@ export default function ForumPage() {
               >
                 <div className="flex gap-3 md:gap-6">
                   <Avatar className="w-9 h-9 md:w-16 md:h-16 rounded-xl md:rounded-2xl border-2 md:border-4 border-border shadow-duo group-hover:border-primary/30 transition-colors shrink-0">
-                    <AvatarImage src={post.authorPhoto} />
+                    <AvatarImage src={post.authorPhoto} alt="" />
                     <AvatarFallback className="bg-primary/10 text-primary font-black text-[10px] md:text-lg">{post.authorName[0]}</AvatarFallback>
                   </Avatar>
 
                   <div className="flex-1 space-y-2 md:space-y-4 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex flex-col gap-2 min-w-0 flex-1">
-                        <Badge variant="outline" className={cn("w-fit font-black uppercase text-[7px] md:text-[9px] tracking-widest border-2 py-0.5 md:py-1", getSubjectColor(post.subject))}>
+                        <Badge variant="outline" className={cn("w-fit font-black uppercase text-[7px] md:text-[9px] tracking-widest border-2 py-0.5 md:py-1", subjectBadgeClassName(post.subject))}>
                           {getSubjectLabel(post.subject)}
                         </Badge>
                         <h2 className="text-[13px] sm:text-lg md:text-2xl font-headline font-black text-foreground uppercase tracking-tight truncate group-hover:text-primary transition-colors leading-tight">
@@ -573,6 +551,7 @@ export default function ForumPage() {
                     <div className="flex items-center justify-between pt-2 md:pt-4 border-t-2 border-border/30">
                       <span className="text-[7px] md:text-[10px] font-black text-primary uppercase tracking-widest truncate max-w-[80px] md:max-w-[150px]">{post.authorName}</span>
                       <div className="flex items-center gap-2 md:gap-6">
+                        <ReportContent target={{ kind: 'post', id: post.id }} lang={lang} />
                         <button
                           aria-label={lang === 'vi' ? 'Thích bài viết' : 'Like post'} aria-pressed={post.likedBy?.includes(user?.uid || '') ?? false}
                           onClick={(e) => toggleLike(e, post)}
@@ -661,7 +640,7 @@ export default function ForumPage() {
 
             <div className="flex gap-3 pt-4">
               <Button variant="ghost" onClick={() => setEditingPost(null)} className="btn-duo flex-1 h-12 md:h-14 rounded-xl font-black uppercase text-[10px] md:text-xs tracking-widest bg-card">{t.cancel}</Button>
-              <Button disabled={mutation.pending} onClick={handleUpdatePost} className="btn-duo flex-1 h-12 md:h-14 rounded-xl bg-primary text-white font-black uppercase text-[10px] md:text-xs tracking-widest border-2 md:border-[3px] border-primary/20">{t.update}</Button>
+              <Button disabled={mutation.pending} onClick={handleUpdatePost} className="btn-duo flex-1 h-12 md:h-14 rounded-xl bg-primary text-primary-foreground font-black uppercase text-[10px] md:text-xs tracking-widest border-2 md:border-[3px] border-primary/20">{t.update}</Button>
             </div>
           </div>
         </fieldset></DialogContent>
@@ -676,7 +655,7 @@ export default function ForumPage() {
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-6 md:mt-8 flex flex-row gap-3">
             <AlertDialogCancel className="btn-duo flex-1 h-11 md:h-12 rounded-xl font-black uppercase text-[10px] md:text-xs tracking-widest m-0 bg-card">{t.cancel}</AlertDialogCancel>
-            <AlertDialogAction disabled={mutation.pending} onClick={handleDeletePost} className="btn-duo flex-1 h-11 md:h-12 rounded-xl bg-destructive text-white font-black uppercase text-[10px] md:text-xs tracking-widest border-2 md:border-[3px] border-destructive/20 m-0 min-w-[80px] flex items-center justify-center px-4 md:px-8">
+            <AlertDialogAction disabled={mutation.pending} onClick={handleDeletePost} className="btn-duo flex-1 h-11 md:h-12 rounded-xl bg-destructive text-destructive-foreground font-black uppercase text-[10px] md:text-xs tracking-widest border-2 md:border-[3px] border-destructive/20 m-0 min-w-[80px] flex items-center justify-center px-4 md:px-8">
               {t.delete.toUpperCase()}
             </AlertDialogAction>
           </AlertDialogFooter>

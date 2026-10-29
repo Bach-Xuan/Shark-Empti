@@ -5,6 +5,7 @@ import { readLimitedJson } from '@/lib/server-json';
 import { FieldValue } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { prepareRequestBudget } from '@/lib/request-budget';
 
 export const runtime = 'nodejs';
 const createSchema = z.object({
@@ -26,7 +27,11 @@ export async function POST(request: NextRequest) {
     const data = JSON.parse(JSON.stringify(exam));
     const examRef = getAdminDb().collection('arenaExams').doc();
     const result = await idempotentTransaction('arena-create', uid, requestId, input, async transaction => {
-      transaction.create(examRef, { ...data, createdAt: FieldValue.serverTimestamp() });
+      const commitBudget = await prepareRequestBudget(transaction, uid, 'arena-create', Buffer.byteLength(JSON.stringify(input)));
+      const { questions, ...metadata } = data;
+      commitBudget();
+      transaction.create(examRef, { ...metadata, schemaVersion: 2, questionCount: questions.length, practiceOnly: false, firstRewardClaimed: false, createdAt: FieldValue.serverTimestamp() });
+      transaction.create(getAdminDb().collection('_arenaAnswerKeys').doc(examRef.id), { schemaVersion: 2, authorId: uid, questions, createdAt: FieldValue.serverTimestamp() });
       return { id: examRef.id };
     });
     return NextResponse.json(result, { status: 201 });

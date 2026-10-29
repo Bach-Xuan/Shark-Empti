@@ -1,4 +1,5 @@
 "use client";
+import { learningNotices } from '@/lib/i18n/learning-notices';
 import { formatStoredDate } from '@/lib/date-format';
 import { useUser } from '@/firebase';
 import { copyTextToClipboard } from '@/lib/clipboard';
@@ -191,11 +192,11 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
 
   const getErrorIcon = (errorLabel: string) => {
     const label = errorLabel.toUpperCase();
-    if (label === t.carelessMistake.toUpperCase()) return <Zap className="text-white w-5 h-5 md:w-10 md:h-10" />;
-    if (label === t.conceptError.toUpperCase()) return <BookOpen className="text-white w-5 h-5 md:w-10 md:h-10" />;
-    if (label === t.reasoningError.toUpperCase()) return <BrainCircuit className="text-white w-5 h-5 md:w-10 md:h-10" />;
-    if (label === t.misinterpretation.toUpperCase()) return <SearchX className="text-white w-5 h-5 md:w-10 md:h-10" />;
-    return <TrendingUp className="text-white w-5 h-5 md:w-10 md:h-10" />;
+    if (label === t.carelessMistake.toUpperCase()) return <Zap className="text-primary-foreground w-5 h-5 md:w-10 md:h-10" />;
+    if (label === t.conceptError.toUpperCase()) return <BookOpen className="text-primary-foreground w-5 h-5 md:w-10 md:h-10" />;
+    if (label === t.reasoningError.toUpperCase()) return <BrainCircuit className="text-primary-foreground w-5 h-5 md:w-10 md:h-10" />;
+    if (label === t.misinterpretation.toUpperCase()) return <SearchX className="text-primary-foreground w-5 h-5 md:w-10 md:h-10" />;
+    return <TrendingUp className="text-primary-foreground w-5 h-5 md:w-10 md:h-10" />;
   };
 
   const toggleAttemptExpand = (idx: number) => {
@@ -216,8 +217,8 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
         <div className="w-20 h-20 md:w-40 md:h-40 rounded-[2rem] md:rounded-[3rem] bg-muted/30 flex items-center justify-center mb-6 md:mb-10 border-2 md:border-[3px] border-border shadow-duo">
           <History className="w-10 h-10 md:w-20 md:h-20 text-muted-foreground opacity-40" />
         </div>
-        <h2 className="text-2xl md:text-6xl font-headline font-black uppercase text-primary mb-4 md:mb-6 tracking-tighter whitespace-normal break-words">{t.noHistory}</h2>
-        <p className="max-w-md text-muted-foreground font-black text-xs md:text-2xl uppercase tracking-[0.15em] md:tracking-[0.2em] leading-relaxed opacity-60 whitespace-normal break-words">
+        <h1 className="text-2xl md:text-6xl font-headline font-black uppercase text-primary mb-4 md:mb-6 tracking-tighter whitespace-normal break-words">{t.noHistory}</h1>
+        <p className="max-w-md text-muted-foreground font-black text-xs md:text-2xl uppercase tracking-[0.15em] md:tracking-[0.2em] leading-relaxed  whitespace-normal break-words">
           {t.completeQuizHint}
         </p>
       </div>
@@ -269,6 +270,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
         />
       </div>
 
+      <p role="note" className="text-sm text-muted-foreground">{learningNotices[lang].estimates}</p>
       <div id="charts-section" className="grid grid-cols-1 lg:grid-cols-2 gap-8 md:gap-16 scroll-mt-32 px-2">
         <Card className="card-duo p-4 md:p-12 group border-primary/20 shadow-none hover:shadow-[0_20px_0_0_var(--duo-shadow)] overflow-hidden">
           <CardHeader className="px-0 pt-0 mb-4 md:mb-8">
@@ -426,12 +428,12 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
               />
 
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
-                <p className="text-[7px] md:text-[10px] font-black text-muted-foreground/60 uppercase tracking-widest flex items-center gap-1.5 md:gap-3">
+                <p className="text-[7px] md:text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5 md:gap-3">
                   <Sigma className="w-2.5 h-2.5 md:w-5 md:h-5" /> {t.latexHelp}
                 </p>
                 <div className="flex gap-3 md:gap-4 justify-end">
                   <Button disabled={isSavingNotes} variant="ghost" onClick={() => setIsEditingNotes(false)} className="btn-duo rounded-xl md:rounded-2xl px-6 md:px-8 h-9 md:h-14 text-[9px] md:text-xs font-black uppercase tracking-widest bg-card">{t.cancel}</Button>
-                  <Button disabled={isSavingNotes} onClick={handleSaveNotes} className="btn-duo bg-primary text-white rounded-xl md:rounded-2xl px-8 md:px-16 h-9 md:h-14 text-[9px] md:text-xs font-black uppercase tracking-widest border-2 md:border-[3px] border-white/20 shadow-none">{t.save}</Button>
+                  <Button disabled={isSavingNotes} onClick={handleSaveNotes} className="btn-duo bg-primary text-primary-foreground rounded-xl md:rounded-2xl px-8 md:px-16 h-9 md:h-14 text-[9px] md:text-xs font-black uppercase tracking-widest border-2 md:border-[3px] border-white/20 shadow-none">{t.save}</Button>
                 </div>
               </div>
             </div>
@@ -445,7 +447,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
 
       <Dialog open={isRoadmapOpen} onOpenChange={setIsRoadmapOpen}>
         <DialogContent className="max-w-7xl w-[95vw] rounded-[2rem] border-[4px] border-border shadow-2xl p-0 overflow-hidden bg-background">
-          <div className="bg-primary p-6 md:p-10 text-white border-b-[4px] border-border relative">
+          <div className="bg-primary p-6 md:p-10 text-primary-foreground border-b-[4px] border-border relative">
              <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="space-y-1">
                   <DialogTitle className="text-2xl md:text-5xl font-headline font-black uppercase tracking-tight flex items-center gap-4 text-left">
@@ -488,7 +490,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                            </div>
                            <Button
                              onClick={() => { setIsRoadmapOpen(false); if(onFixWeakness) onFixWeakness(topic.topic, 'practice'); }}
-                             className="btn-duo bg-red-500 text-white h-12 md:h-14 rounded-xl font-black uppercase text-[9px] md:text-xs tracking-widest w-full mt-4"
+                             className="btn-duo bg-destructive text-destructive-foreground h-12 md:h-14 rounded-xl font-black uppercase text-[9px] md:text-xs tracking-widest w-full mt-4"
                            >
                              <Zap className="w-4 h-4 mr-2" /> {t.fixMyWeakness}
                            </Button>
@@ -531,7 +533,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                             <div className="flex flex-col gap-1 text-left">
                               <h4 className={cn(
                                 "font-headline font-black text-lg md:text-3xl uppercase tracking-tight transition-all",
-                                isTopicDone ? "line-through text-muted-foreground/60" : "text-foreground"
+                                isTopicDone ? "line-through text-muted-foreground" : "text-foreground"
                               )}>
                                 <LatexText text={group.topic} />
                               </h4>
@@ -598,7 +600,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                     >
                       <span className="flex items-center gap-3 md:gap-6 flex-1 min-w-0">
                         <span className="w-8 h-8 md:w-14 md:h-14 rounded-lg md:rounded-2xl bg-muted flex flex-col items-center justify-center border-2 border-border shrink-0">
-                          <span className="text-[6px] md:text-[10px] font-black uppercase tracking-tighter opacity-60">
+                          <span className="text-[6px] md:text-[10px] font-black uppercase tracking-tighter ">
                             {new Date(item.date).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', { month: 'short' })}
                           </span>
                           <span className="text-xs md:text-xl font-black leading-none">{new Date(item.date).getDate()}</span>
@@ -714,7 +716,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                   <div className="flex flex-col gap-3 md:gap-6">
                     <div className="flex flex-col gap-2 md:gap-3 flex-1 min-w-0 text-left">
                       <div className="flex flex-wrap items-center gap-1.5 md:gap-3">
-                        <div className="px-2 md:px-4 py-1 md:py-2 bg-destructive text-white rounded-lg md:rounded-2xl text-[6px] md:text-[10px] font-black uppercase tracking-widest border-2 border-white/20 shadow-duo flex items-center gap-1 md:gap-1.5">
+                        <div className="px-2 md:px-4 py-1 md:py-2 bg-destructive text-destructive-foreground rounded-lg md:rounded-2xl text-[6px] md:text-[10px] font-black uppercase tracking-widest border-2 border-white/20 shadow-duo flex items-center gap-1 md:gap-1.5">
                           <AlertCircle className="w-2 md:w-3 h-2 md:h-3" /> {errorCategoryLabel(error.errorCategory, t, lang)}
                         </div>
                         <div className="px-2 md:px-4 py-1 md:py-2 bg-primary/10 text-primary rounded-lg md:rounded-2xl text-[6px] md:text-[10px] font-black uppercase tracking-widest border-2 border-primary/20 flex items-center gap-1 md:gap-1.5">
@@ -734,16 +736,16 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                       </h4>
                       <div className="space-y-4 md:space-y-4 bg-muted/30 p-4 md:p-6 rounded-xl md:rounded-[2rem] border-2 md:border-[4px] border-border/50 mt-2">
                         <div className="text-[9px] md:text-xs font-bold text-muted-foreground whitespace-normal break-words">
-                          <span className="uppercase text-[7px] md:text-[10px] tracking-widest mr-2 opacity-60 block mb-1">{t.yourAnswer}:</span>
+                          <span className="uppercase text-[7px] md:text-[10px] tracking-widest mr-2  block mb-1">{t.yourAnswer}:</span>
                           <div className="text-destructive p-3 rounded-lg bg-red-50/50 border border-red-100"><LatexText text={error.userAnswer} /></div>
                         </div>
                         <div className="text-[9px] md:text-xs font-bold text-green-600 whitespace-normal break-words">
-                          <span className="uppercase text-[7px] md:text-[10px] tracking-widest mr-2 opacity-60 block mb-1">{t.correctAnswer}:</span>
+                          <span className="uppercase text-[7px] md:text-[10px] tracking-widest mr-2  block mb-1">{t.correctAnswer}:</span>
                           <div className="p-3 rounded-lg bg-green-50/50 border-green-100"><LatexText text={error.correct} /></div>
                         </div>
                         {error.explanation && (
                           <div className="text-[9px] md:text-xs font-bold text-foreground whitespace-normal break-words pt-2 border-t border-border/50 text-left">
-                            <span className="uppercase text-[7px] md:text-[10px] tracking-widest mr-2 opacity-60 block mb-1">{t.explanation}:</span>
+                            <span className="uppercase text-[7px] md:text-[10px] tracking-widest mr-2  block mb-1">{t.explanation}:</span>
                             <div className="italic opacity-80 leading-relaxed"><LatexText text={error.explanation} /></div>
                           </div>
                         )}

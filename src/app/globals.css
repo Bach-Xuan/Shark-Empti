@@ -13,7 +13,7 @@
     --card-foreground: 20 20% 10%;
     --popover: 0 0% 100%;
     --popover-foreground: 20 20% 10%;
-    --primary: 25 67% 50%;
+    --primary: 25 75% 35%;
     --primary-foreground: 0 0% 100%;
     --secondary: 43 100% 70%;
     --secondary-foreground: 25 67% 20%;
@@ -21,11 +21,11 @@
     --muted-foreground: 20 10% 40%;
     --accent: 43 100% 90%;
     --accent-foreground: 25 67% 30%;
-    --destructive: 0 84% 60%;
+    --destructive: 0 75% 40%;
     --destructive-foreground: 0 0% 98%;
     --border: 20 20% 85%;
     --input: 20 20% 85%;
-    --ring: 25 67% 50%;
+    --ring: 25 75% 35%;
     --radius: 1.5rem;
     --chart-1: 25 67% 50%;
     --chart-2: 43 100% 70%;
@@ -43,15 +43,15 @@
     --popover: 220 25% 12%;
     --popover-foreground: 220 10% 95%;
     --primary: 25 80% 55%;
-    --primary-foreground: 0 0% 100%;
+    --primary-foreground: 220 20% 8%;
     --secondary: 43 100% 60%;
     --secondary-foreground: 25 67% 10%;
     --muted: 220 20% 18%;
     --muted-foreground: 220 10% 70%;
     --accent: 25 67% 25%;
     --accent-foreground: 25 67% 85%;
-    --destructive: 0 70% 50%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 80% 65%;
+    --destructive-foreground: 220 20% 8%;
     --border: 220 20% 30%;
     --input: 220 20% 25%;
     --ring: 25 80% 55%;
@@ -63,7 +63,7 @@
   * {
     @apply border-border;
   }
-  
+
   html {
     /* The default scale is 100% on mobile viewports. */
     font-size: 16px;
@@ -78,7 +78,7 @@
   }
 
   body {
-    @apply bg-background text-foreground select-none overflow-x-hidden transition-colors duration-500;
+    @apply bg-background text-foreground overflow-x-hidden transition-colors duration-500;
   }
 }
 
@@ -86,7 +86,7 @@
   .btn-duo {
     @apply relative border-[3px] active:translate-y-[4px] md:active:translate-y-[8px] active:shadow-none transition-all duration-150 select-none shadow-[0_6px_0_0_var(--duo-shadow)] md:shadow-[0_10px_0_0_var(--duo-shadow)] hover:translate-y-[-2px] hover:shadow-[0_8px_0_0_var(--duo-shadow)] md:hover:shadow-[0_12px_0_0_var(--duo-shadow)];
   }
-  
+
   .card-duo {
     @apply rounded-[1.5rem] md:rounded-[2.5rem] border-[3px] md:border-[4px] border-border shadow-none bg-card transition-all duration-300 hover:translate-y-[-4px] md:hover:translate-y-[-8px] hover:shadow-[0_10px_0_0_var(--duo-shadow)] md:hover:shadow-[0_20px_0_0_var(--duo-shadow)];
   }
@@ -130,7 +130,7 @@
   .main-container {
     @apply w-full mx-auto px-4 sm:px-6 transition-all duration-500;
   }
-  
+
   @media (min-width: 1024px) {
     .main-container {
       max-width: 80vw;
@@ -197,4 +197,17 @@
 }
 
 /* Offline system stacks: no build-time or runtime font request. */
-:root { --font-inter: Arial, Helvetica, sans-serif; --font-space-grotesk: Arial, Helvetica, sans-serif; }
+:root {
+  --font-system-sans: Arial, Helvetica, sans-serif;
+}
+
+/* Preserve final visual states without forced motion or smooth scrolling. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-delay: 0ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

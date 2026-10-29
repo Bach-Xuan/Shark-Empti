@@ -4,6 +4,10 @@ import { uiMessage } from '@/lib/i18n';
 import type { DashboardStats } from '@/lib/stats-utils';
 
 import { generateFlashcards,validateAcademicTopic } from '@/ai/client-flows';
+import { useAiRequestScope } from '@/hooks/use-ai-request-scope';
+import { useLearningDraft, useLearningLeaveGuard } from '@/hooks/use-learning-draft';
+import { flashcardDraftSchema, parseWith, removeDraft } from '@/lib/learning-drafts';
+import { DraftNotice } from '@/components/draft-notice';
 import { LatexText } from '@/components/latex-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -30,11 +34,12 @@ MessageSquare,
 Sparkles,
 Target
 } from 'lucide-react';
-import React,{ useEffect,useId,useRef,useState } from 'react';
+import React,{ useEffect,useId,useRef,useState,useMemo } from 'react';
 
 export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: { t: TranslationSet, lang: Language, weakPoints: DashboardStats['processedGroupedInsights'], totalAttempts: number, initialConcept?: string }) {
   const { user } = useUser();
   const db = useFirestore();
+  const aiRequest = useAiRequestScope();
   const { toast } = useToast();
   const [topic, setTopic] = useState(initialConcept || (weakPoints[0]?.topic || ""));
   const [numCards, setNumCards] = useState(10);
@@ -46,6 +51,12 @@ export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, init
   const cardId = useId();
   const pending = useRef(false);
   const mounted = useRef(false);
+  const confirmLeave = useLearningLeaveGuard(cards.length > 0, lang);
+  const draftValue = useMemo(() => cards.length ? { topic, cards, index: currentIndex, flipped: isFlipped } : null, [topic, cards, currentIndex, isFlipped]);
+  const draft = useLearningDraft(user?.uid, 'flashcards', draftValue, parseWith(flashcardDraftSchema), value => {
+    setTopic(value.topic); setCards(value.cards); setCurrentIndex(value.index); setIsFlipped(value.flipped);
+  });
+  const discard = () => { if (confirmLeave()) { if (user) removeDraft(user.uid, 'flashcards'); setCards([]); } };
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   const startSession = async () => {
@@ -61,7 +72,7 @@ export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, init
       const validation = await validateAcademicTopic({
         topic: topic,
         language: lang as 'en' | 'vi'
-      });
+      }, { signal: aiRequest.start() });
 
       if (!mounted.current) return;
       if (!validation.ok) {
@@ -82,7 +93,7 @@ export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, init
       setIsValidating(false);
       setIsGenerating(true);
 
-      const result = await generateFlashcards({ topic, numCards, language: lang as 'en' | 'vi' });
+      const result = await generateFlashcards({ topic, numCards, language: lang as 'en' | 'vi' }, { signal: aiRequest.start() });
       if (!mounted.current) return;
       if (!result.ok) {
         showErrorToast(result.error, lang);
@@ -169,10 +180,11 @@ export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, init
 
     return (
       <div className="w-full max-w-4xl space-y-6 md:space-y-12 px-4 animate-in fade-in duration-500">
+        <DraftNotice {...draft} lang={lang} />
         <div className="space-y-3 md:space-y-4">
           <div className="flex justify-between items-center px-1">
             <span className="text-[9px] md:text-sm font-black text-muted-foreground uppercase tracking-[0.2em]">{t.progress}: {currentIndex + 1} / {cards.length}</span>
-            <Button variant="ghost" onClick={() => setCards([])} className="h-8 md:h-10 px-3 md:px-4 rounded-lg md:rounded-xl font-black uppercase text-[9px] md:text-xs tracking-widest hover:bg-destructive/10 hover:text-destructive transition-colors border-2 border-transparent">{t.cancel}</Button>
+            <Button variant="ghost" onClick={discard} className="h-8 md:h-10 px-3 md:px-4 rounded-lg md:rounded-xl font-black uppercase text-[9px] md:text-xs tracking-widest hover:bg-destructive/10 hover:text-destructive transition-colors border-2 border-transparent">{t.cancel}</Button>
           </div>
           <div className="progress-duo h-2.5 md:h-4 border-[2px]">
             <div className="progress-duo-bar" style={{ width: `${((currentIndex + 1) / cards.length) * 100}%` }} />
@@ -198,7 +210,7 @@ export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, init
                     <LatexText text={card.front} />
                   </span>
                 </span>
-                <span className="text-[7px] md:text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40 animate-pulse mt-3 md:mt-4">
+                <span className="text-[7px] md:text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground  animate-pulse mt-3 md:mt-4">
                   {uiMessage(lang, "playgroundview.tap_to_reveal")}
                 </span>
               </span>
@@ -213,7 +225,7 @@ export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, init
                     <LatexText text={card.back} />
                   </span>
                 </span>
-                <span className="text-[7px] md:text-[10px] font-black uppercase tracking-[0.3em] text-primary opacity-60 mt-3 md:mt-4">
+                <span className="text-[7px] md:text-[10px] font-black uppercase tracking-[0.3em] text-primary  mt-3 md:mt-4">
                   {uiMessage(lang, "playgroundview.reverse")}
                 </span>
               </span>
@@ -241,7 +253,7 @@ export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, init
           ) : (
             <Button
               onClick={handleNext}
-              className="btn-duo flex-1 h-12 md:h-20 rounded-xl md:rounded-[2rem] bg-primary text-white border-[3px] border-white/20 font-black uppercase tracking-[0.1em] md:tracking-[0.15em] text-[9px] md:text-lg"
+              className="btn-duo flex-1 h-12 md:h-20 rounded-xl md:rounded-[2rem] bg-primary text-primary-foreground border-[3px] border-white/20 font-black uppercase tracking-[0.1em] md:tracking-[0.15em] text-[9px] md:text-lg"
             >
               {t.nextCard} <ArrowRight className="ml-1.5 md:ml-3 w-3.5 h-3.5 md:w-6 md:h-6" />
             </Button>
@@ -266,21 +278,22 @@ export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, init
 
       <div className="space-y-8 md:space-y-10">
         <div className="space-y-4 group">
-          <Label className="text-[9px] md:text-xs font-black uppercase text-muted-foreground tracking-[0.2em] px-1 flex items-center gap-2 group-hover:text-primary transition-colors">
+          <Label id={`${cardId}-topic-label`} className="text-[9px] md:text-xs font-black uppercase text-muted-foreground tracking-[0.2em] px-1 flex items-center gap-2 group-hover:text-primary transition-colors">
             <Target className="w-3.5 h-3.5 md:w-4 md:h-4 transition-transform group-hover:-translate-y-0.5" /> {t.topic}
           </Label>
 
           {!isFlashcardsDisabled ? (
-            <div className="flex flex-wrap gap-2 md:gap-3">
+            <div role="group" aria-labelledby={`${cardId}-topic-label`} className="flex flex-wrap gap-2 md:gap-3">
               {weakPoints.map((wp, i) => (
                 <Button
                   key={i}
                   variant={topic === wp.topic ? "default" : "outline"}
                   onClick={() => setTopic(wp.topic)}
+                  aria-pressed={topic === wp.topic}
                   className={cn(
                     "h-10 md:h-16 rounded-lg md:rounded-[1.5rem] text-[9px] md:text-sm font-black uppercase tracking-widest border-[2px] md:border-[3px] px-4 md:px-10 btn-duo shadow-none transition-all",
                     topic === wp.topic
-                      ? "bg-primary text-white border-primary/20 translate-y-[-4px] shadow-duo"
+                      ? "bg-primary text-primary-foreground border-primary/20 translate-y-[-4px] shadow-duo"
                       : "bg-card border-border hover:border-primary/40 hover:bg-primary/5"
                   )}
                 >
@@ -288,7 +301,7 @@ export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, init
                 </Button>
               ))}
               {weakPoints.length === 0 && (
-                <p className="text-[10px] md:text-sm font-black text-muted-foreground uppercase tracking-widest opacity-50 px-2 italic">
+                <p className="text-[10px] md:text-sm font-black text-muted-foreground uppercase tracking-widest  px-2 italic">
                   {t.noWeakPoints}
                 </p>
               )}
@@ -306,12 +319,13 @@ export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, init
         </div>
 
         <div className="space-y-4 group">
-          <Label className="text-[9px] md:text-xs font-black uppercase text-muted-foreground tracking-[0.2em] px-1 flex items-center gap-2 group-hover:text-primary transition-colors">
+          <Label htmlFor={`${cardId}-count`} className="text-[9px] md:text-xs font-black uppercase text-muted-foreground tracking-[0.2em] px-1 flex items-center gap-2 group-hover:text-primary transition-colors">
             <Layers className="w-3.5 h-3.5 md:w-4 md:h-4" /> {t.numCards} (1-50)
           </Label>
           <div className="flex items-center gap-3 md:gap-6">
             <Input
               type="number"
+              id={`${cardId}-count`}
               value={numCards}
               onChange={handleNumChange}
               onBlur={handleNumBlur}
@@ -326,7 +340,7 @@ export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, init
         <Button
           onClick={startSession}
           disabled={!topic.trim() || isGenerating || isValidating || isFlashcardsDisabled}
-          className="w-full h-14 md:h-24 rounded-xl md:rounded-[2.5rem] btn-duo bg-primary text-white border-[3px] md:border-[5px] border-white/20 font-black text-base md:text-3xl uppercase tracking-[0.1em] shadow-duo group active:translate-y-2"
+          className="w-full h-14 md:h-24 rounded-xl md:rounded-[2.5rem] btn-duo bg-primary text-primary-foreground border-[3px] md:border-[5px] border-white/20 font-black text-base md:text-3xl uppercase tracking-[0.1em] shadow-duo group active:translate-y-2"
         >
           {isValidating ? (
              <div className="flex items-center gap-2 md:gap-3">

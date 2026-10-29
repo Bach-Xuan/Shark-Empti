@@ -1,9 +1,10 @@
 
 "use client";
+import { learningNotices } from '@/lib/i18n/learning-notices';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import { uiMessage } from '@/lib/i18n';
 
-import { personalizedQuizPerformanceFeedback } from '@/ai/client-flows';
+import { personalizedQuizPerformanceFeedback, type PersonalizedQuizFeedbackOutput } from '@/ai/client-flows';
 import { LatexText } from '@/components/latex-text';
 import { UiText } from "@/components/ui-text";
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ import { Language,QuizAnalysis,QuizHistoryItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { AlertCircle,ArrowRight,BrainCircuit,Check,Copy,Loader2,RefreshCw,RotateCcw,Trophy } from 'lucide-react';
 import { useCallback,useEffect,useRef,useState } from 'react';
+import { useAiRequestScope } from '@/hooks/use-ai-request-scope';
 
 interface ResultViewProps {
   t: TranslationSet;
@@ -26,9 +28,11 @@ interface ResultViewProps {
   onRetakeSame: (questions: QuizQuestion[]) => void;
   onRetakeNew: () => void;
   isArena?: boolean;
+  onRecoverAnalysis?: (feedback: PersonalizedQuizFeedbackOutput) => Promise<boolean>;
 }
 
-export default function ResultView({ t, lang, results, onViewDashboard, onRetakeSame, onRetakeNew, isArena }: ResultViewProps) {
+export default function ResultView({ t, lang, results, onViewDashboard, onRetakeSame, onRetakeNew, isArena, onRecoverAnalysis }: ResultViewProps) {
+  const aiRequest = useAiRequestScope();
   const { toast } = useToast();
   const [analysisData, setAnalysisData] = useState<QuizAnalysis | null>(results.analysis || null);
   const [requestLanguage] = useState(lang);
@@ -45,14 +49,21 @@ export default function ResultView({ t, lang, results, onViewDashboard, onRetake
       const data = await personalizedQuizPerformanceFeedback({
         quizResults: results.quizResults,
         originalTopic: results.config.topic
-      });
+      }, { signal: aiRequest.start() });
       if (!mounted.current) return;
       if (!data.ok) {
         showErrorToast(data.error, requestLanguage);
         setError(true);
         return;
       }
-      setAnalysisData(data.data);
+      if (!isArena && !await onRecoverAnalysis?.(data.data)) {
+        if (mounted.current) {
+          setError(true);
+          showUnexpectedErrorToast('APP-PERSISTENCE-UNAVAILABLE', '', {}, requestLanguage);
+        }
+        return;
+      }
+      if (mounted.current) setAnalysisData(data.data);
     } catch (e) {
       console.error("AI Performance Analysis failed", e);
       if (!mounted.current) return;
@@ -61,7 +72,7 @@ export default function ResultView({ t, lang, results, onViewDashboard, onRetake
     } finally {
       if (mounted.current) setIsAnalyzing(false);
     }
-  }, [results, requestLanguage]);
+  }, [results, requestLanguage, isArena, onRecoverAnalysis, aiRequest]);
 
   useEffect(() => {
     if (!results.analysis) {
@@ -108,11 +119,12 @@ export default function ResultView({ t, lang, results, onViewDashboard, onRetake
 
   return (
     <div className="space-y-8 md:space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-700 pb-20 px-2 md:px-0">
+      <p role="note" className="text-sm text-muted-foreground">{learningNotices[lang].estimates}</p>
       {/* Header Section */}
       <div className="text-center space-y-4">
         <div className="inline-block p-6 md:p-8 rounded-full bg-secondary shadow-duo relative mt-16 mb-4 group">
           <Trophy className={cn("w-16 h-16 md:w-24 md:h-24 fill-current transition-all group-hover:scale-105 duration-500", quizScore < 50 ? 'text-muted-foreground' : 'text-primary')} />
-          <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-primary text-white text-[10px] md:text-xs font-black px-4 md:px-6 py-2 md:py-3 rounded-2xl shadow-xl whitespace-nowrap border-2 border-white/20 z-10 animate-in zoom-in-50 duration-500 delay-300">
+          <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground text-[10px] md:text-xs font-black px-4 md:px-6 py-2 md:py-3 rounded-2xl shadow-xl whitespace-nowrap border-2 border-white/20 z-10 animate-in zoom-in-50 duration-500 delay-300">
             {scoreFeedback.text}
           </div>
         </div>
@@ -147,7 +159,7 @@ export default function ResultView({ t, lang, results, onViewDashboard, onRetake
               title={t.strengths}
               copyLabel={t.copy}
               items={currentAnalysis.strengths}
-              variantClass="text-green-700 border-green-500/20 bg-green-500/5 hover-lift"
+              variantClass="text-green-800 dark:text-green-300 border-green-500/20 bg-green-500/5 hover-lift"
               onCopy={() => handleCopyToClipboard(currentAnalysis.strengths, t.strengths, 'strengths')}
               isCopied={activeCopiedId === 'strengths'}
             />
@@ -155,7 +167,7 @@ export default function ResultView({ t, lang, results, onViewDashboard, onRetake
               title={t.weaknesses}
               copyLabel={t.copy}
               items={currentAnalysis.weaknesses}
-              variantClass="text-red-700 border-red-500/20 bg-red-500/5 hover-lift"
+              variantClass="text-red-800 dark:text-red-300 border-red-500/20 bg-red-500/5 hover-lift"
               onCopy={() => handleCopyToClipboard(currentAnalysis.weaknesses, t.weaknesses, 'weaknesses')}
               isCopied={activeCopiedId === 'weaknesses'}
             />
@@ -184,7 +196,7 @@ export default function ResultView({ t, lang, results, onViewDashboard, onRetake
             </Button>
           )}
         </div>
-        <Button size="lg" onClick={onViewDashboard} className="btn-duo h-16 md:h-22 w-full md:w-auto rounded-[2rem] px-16 text-xl md:text-3xl font-black bg-primary text-white border-[4px] border-white/20 uppercase tracking-tight">
+        <Button size="lg" onClick={onViewDashboard} className="btn-duo h-16 md:h-22 w-full md:w-auto rounded-[2rem] px-16 text-xl md:text-3xl font-black bg-primary text-primary-foreground border-[4px] border-white/20 uppercase tracking-tight">
           {t.dashboard} <ArrowRight className="ml-3 w-8 h-8 md:w-10 md:h-10" />
         </Button>
       </div>
@@ -225,7 +237,7 @@ function PerformanceInsightCard({ title, copyLabel, items, variantClass, onCopy,
               </li>
             ))
           ) : (
-            <li className="text-xs italic opacity-50"><UiText id="noData" /></li>
+            <li className="text-xs italic"><UiText id="noData" /></li>
           )}
         </ul>
       </CardContent>

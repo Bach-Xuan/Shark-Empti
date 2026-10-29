@@ -13,6 +13,7 @@ import { TranslationSet } from '@/lib/translations';
 import type { QuizHistoryItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Loader2,Minus,Send,Sparkles,User } from 'lucide-react';
+import { useAiRequestScope } from '@/hooks/use-ai-request-scope';
 import React,{ useCallback,useEffect,useRef,useState } from 'react';
 
 interface ChatMessage {
@@ -28,6 +29,7 @@ interface AiChatbotProps {
 }
 
 export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps) {
+  const aiRequest = useAiRequestScope();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
@@ -41,8 +43,8 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
     lifecycle.current++;
     requestPending.current = false;
     setIsTyping(false);
-    return () => { lifecycle.current++; };
-  }, [results]);
+    return () => { lifecycle.current++; aiRequest.cancel(); };
+  }, [results, aiRequest]);
 
   /**
    * Welcome message management
@@ -112,7 +114,7 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
         quizSummary: summary,
         quizQuestions: questions,
         chatHistory: currentHistory
-      });
+      }, { signal: aiRequest.start() });
 
       if (requestGeneration !== generation.current) return;
       if (!response.ok) {
@@ -134,7 +136,7 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
     } finally {
       if (requestGeneration === generation.current) { requestPending.current = false; setIsTyping(false); }
     }
-  }, [results, lang]);
+  }, [results, lang, aiRequest]);
 
   const handleExternalMessage = useCallback(async (msg: string) => {
     if (isTyping || requestPending.current) return;
@@ -170,19 +172,19 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
   };
 
   return (
-    <div className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-[100] flex flex-col items-end gap-4 pointer-events-none select-none max-w-[calc(100vw-32px)]">
+    <div className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-[100] flex flex-col items-end gap-4 pointer-events-none max-w-[calc(100vw-32px)]">
       {isOpen && (
-        <Card className="card-duo w-full sm:w-[350px] md:w-[420px] h-[500px] md:h-[600px] flex flex-col overflow-hidden animate-in slide-in-from-bottom-12 fade-in duration-500 pointer-events-auto border-[3px] shadow-2xl">
+        <Card className="card-duo w-full sm:w-[350px] md:w-[420px] h-[500px] max-h-[calc(100dvh-2rem)] md:h-[600px] md:max-h-[calc(100dvh-3rem)] flex flex-col overflow-hidden animate-in slide-in-from-bottom-12 fade-in duration-500 pointer-events-auto border-[3px] shadow-2xl">
           {/* Enhanced Header */}
-          <div className="bg-primary p-4 md:p-5 flex items-center justify-between text-white shadow-xl relative overflow-hidden group shrink-0">
+          <div className="bg-primary p-4 md:p-5 flex items-center justify-between text-primary-foreground shadow-xl relative overflow-hidden group shrink-0">
             <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
             <div className="flex items-center gap-3 md:gap-4 relative z-10">
               <div className="w-8 h-8 md:w-10 md:h-10 bg-white/20 rounded-xl md:rounded-2xl flex items-center justify-center border-2 border-white/30 backdrop-blur-md shadow-inner">
-                <Sparkles className="w-4 h-4 md:w-5 md:h-5 fill-current text-white" />
+                <Sparkles className="w-4 h-4 md:w-5 md:h-5 fill-current text-primary-foreground" />
               </div>
               <div className="flex flex-col">
                 <span className="font-headline font-black text-base md:text-lg tracking-tight uppercase leading-none">{t.sharkCoach}</span>
-                <span className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] opacity-80 mt-1">{t.aiAssistant}</span>
+                <span className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] mt-1">{t.aiAssistant}</span>
               </div>
             </div>
             <Button
@@ -191,26 +193,26 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
               size="icon"
               onClick={handleClose}
               aria-label={uiMessage(lang, "aichatbot.minimize_chat")}
-              className="relative z-20 text-white hover:bg-white/20 h-9 w-9 md:h-10 md:w-10 rounded-xl transition-all active:scale-90 border-2 border-transparent hover:border-white/30"
+              className="relative z-20 text-primary-foreground hover:bg-white/20 h-9 w-9 md:h-10 md:w-10 rounded-xl transition-all active:scale-90 border-2 border-transparent hover:border-white/30"
             >
               <Minus className="w-5 h-5 md:w-6 md:h-6" />
             </Button>
           </div>
 
           {/* Chat Messages */}
-          <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 md:p-5 space-y-4 md:space-y-6 bg-background/50 backdrop-blur-xs custom-scrollbar">
+          <div ref={scrollRef} role="log" aria-label={uiMessage(lang, 'aichatbot.messages')} tabIndex={0} className="flex-1 min-h-0 overflow-y-auto p-4 md:p-5 space-y-4 md:space-y-6 bg-background/50 backdrop-blur-xs custom-scrollbar focus-visible:outline-2 focus-visible:outline-primary">
             {messages.map((m, i) => (
               <div key={i} className={cn("flex items-end gap-2", m.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
                 <div className={cn(
                   "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border-2",
                   m.role === 'user' ? 'bg-primary border-primary/20' : 'bg-muted border-border'
                 )}>
-                  {m.role === 'user' ? <User className="w-3 h-3 text-white" /> : <Sparkles className="w-3 h-3 text-primary" />}
+                  {m.role === 'user' ? <User className="w-3 h-3 text-primary" /> : <Sparkles className="w-3 h-3 text-primary" />}
                 </div>
                 <div className={cn(
                   "max-w-[85%] p-3 md:p-4 rounded-xl md:rounded-2xl text-xs md:text-sm font-bold leading-relaxed shadow-duo border-[2px] md:border-[3px] transition-all",
                   m.role === 'user'
-                    ? 'bg-primary text-white border-primary/20 rounded-br-none'
+                    ? 'bg-primary text-primary-foreground border-primary/20 rounded-br-none'
                     : 'bg-card text-foreground border-border rounded-bl-none'
                 )}>
                   <LatexText text={m.message} />
@@ -235,7 +237,8 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
           <div className="p-4 md:p-5 bg-card border-t-[3px] border-border flex gap-2 md:gap-3 items-center shrink-0">
             <div className="flex-1 relative">
               <input
-                className="w-full bg-muted/30 rounded-xl md:rounded-2xl px-4 md:px-5 py-2.5 md:py-3.5 text-xs md:text-sm font-bold focus:outline-hidden focus:ring-[3px] focus:ring-primary/30 border-[2px] md:border-[3px] border-border focus:border-primary transition-all placeholder:text-muted-foreground/50"
+                aria-label={t.chatPlaceholder}
+                className="w-full bg-muted/30 rounded-xl md:rounded-2xl px-4 md:px-5 py-2.5 md:py-3.5 text-xs md:text-sm font-bold focus:outline-hidden focus:ring-[3px] focus:ring-primary/30 border-[2px] md:border-[3px] border-border focus:border-primary transition-all placeholder:text-muted-foreground"
                 placeholder={t.chatPlaceholder}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
@@ -245,9 +248,10 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
             </div>
             <Button
               size="icon"
+              aria-label={lang === 'vi' ? 'Gửi tin nhắn' : 'Send message'}
               onClick={handleSend}
               disabled={!input.trim() || isTyping}
-              className="h-11 w-11 md:h-14 md:w-14 rounded-xl md:rounded-2xl btn-duo shadow-duo bg-primary hover:bg-primary/90 text-white border-[2px] md:border-[3px] border-primary/20 shrink-0 transition-transform active:scale-90"
+              className="h-11 w-11 md:h-14 md:w-14 rounded-xl md:rounded-2xl btn-duo shadow-duo bg-primary hover:bg-primary/90 text-primary-foreground border-[2px] md:border-[3px] border-primary/20 shrink-0 transition-transform active:scale-90"
             >
               {isTyping ? <Loader2 className="w-5 h-5 md:w-6 md:h-6 animate-spin" /> : <Send className="w-5 h-5 md:w-6 md:h-6" />}
             </Button>
@@ -260,7 +264,7 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
         <Button
           size="lg"
           aria-label={t.askShark} onClick={() => setIsOpen(true)}
-          className="h-16 w-16 md:h-20 md:w-20 rounded-2xl md:rounded-[2rem] shadow-[0_10px_30px_-5px_rgba(255,107,0,0.4)] btn-duo pointer-events-auto transition-all hover:scale-110 active:scale-95 bg-primary text-white border-[3px] md:border-[4px] border-white/20 group relative overflow-hidden"
+          className="h-16 w-16 md:h-20 md:w-20 rounded-2xl md:rounded-[2rem] shadow-[0_10px_30px_-5px_rgba(255,107,0,0.4)] btn-duo pointer-events-auto transition-all hover:scale-110 active:scale-95 bg-primary text-primary-foreground border-[3px] md:border-[4px] border-white/20 group relative overflow-hidden"
         >
           <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity animate-pulse" />
           <Sparkles className="w-8 h-8 md:w-10 md:h-10 fill-current relative z-10 drop-shadow-lg" />

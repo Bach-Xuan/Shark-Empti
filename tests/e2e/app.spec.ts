@@ -1,20 +1,8 @@
-import { expect,test,type Page } from '@playwright/test';
+import { expect, test } from './fixtures';
+import { signInDemo as signIn } from './auth';
+import { randomUUID } from 'node:crypto';
 import { getApps,initializeApp } from 'firebase-admin/app';
 import { getFirestore,Timestamp } from 'firebase-admin/firestore';
-async function signIn(page: Page, route = '/login') {
-  await page.goto(route);
-  const popupReady = page.waitForEvent('popup');
-  await page.getByRole('button', { name: /Google/i }).click();
-  const popup = await popupReady;
-  await popup.waitForLoadState('load');
-  await popup.getByText('Add new account', { exact: true }).click();
-  await popup.getByText('Auto-generate user information', { exact: true }).click();
-  await popup.getByRole('button', { name: /sign in with google/i }).click();
-  await expect(page).toHaveURL('http://127.0.0.1:9002/');
-  await page.getByRole('button', { name: 'GOT IT', exact: true }).click();
-  await page.getByRole('button', { name: 'Minimize chat' }).click();
-  await expect(page.getByRole('button', { name: 'ACTIVITY CALENDAR', exact: true })).toBeVisible();
-}
 test('account isolation, quiz, history, notes and preferences', async ({ page }) => {
   test.setTimeout(180000);
   await signIn(page);
@@ -74,28 +62,29 @@ test('dashboard boundary isolates a browser failure and recovers on retry', asyn
   });
   await page.getByRole('navigation').getByRole('button', { name: 'Overview', exact: true }).click();
   await expect(page.getByText('Unable to display this content.', { exact: true })).toBeVisible();
-  await expect(page.getByRole('navigation')).toBeVisible();
+  await expect(page.getByRole('navigation').filter({ has: page.getByRole('button', { name: 'Overview', exact: true }) })).toBeVisible();
   await page.getByRole('button', { name: 'Retry', exact: true }).click();
   await expect(page.getByText('Unable to display this content.', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'No history available yet.', exact: true })).toBeVisible();
 });
 
-test('Forum comment and Arena submission use real demo APIs', async ({ page }) => {
+test('Forum comment and Arena submission use real demo APIs', async ({ page, faultRoutes }) => {
   test.setTimeout(180000);
   if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) throw new Error('Demo emulators required');
   const db = getFirestore(getApps()[0] ?? initializeApp({ projectId: 'demo-shark-empti' }));
-  const id = `browser-${test.info().project.name}`;
+  const id = `browser-${test.info().project.name}-${randomUUID()}`;
   await db.doc(`posts/${id}`).set({ title: 'Browser discussion', content: 'Addition practice', subject: 'math', authorId: 'fixture', authorName: 'Fixture', authorPhoto: '', createdAt: Timestamp.now(), likesCount: 0, likedBy: [], commentsCount: 0 });
-  await db.doc(`arenaExams/${id}`).set({ title: 'Browser exam', authorId: 'fixture', authorName: 'Fixture', authorPhoto: '', createdAt: Timestamp.now(), totalAttempts: 0, config: { topic: 'Addition', subject: 'math', grade: 'none', numQuestions: '1', difficulty: 'Easy', type: 'Multiple Choice', timeLimit: '' }, questions: [{ question: '2 + 2 = ?', correct: '4', options: ['4', '3', '2', '1'], type: 'Multiple Choice', difficulty: 'Easy', explanation: 'Addition', section: 'Addition' }] });
-  await signIn(page);
-  await page.goto(`/forum/${id}`);
+  await db.doc(`arenaExams/${id}`).set({ schemaVersion: 2, questionCount: 1, title: 'Browser exam', authorId: 'fixture', authorName: 'Fixture', authorPhoto: '', createdAt: Timestamp.now(), totalAttempts: 0, config: { topic: 'Addition', subject: 'math', grade: 'none', numQuestions: '1', difficulty: 'Easy', type: 'Multiple Choice', timeLimit: '' } });
+  await db.doc(`_arenaAnswerKeys/${id}`).set({ schemaVersion: 2, authorId: 'fixture', questions: [{ question: '2 + 2 = ?', correct: '4', options: ['4', '3', '2', '1'], type: 'Multiple Choice', difficulty: 'Easy', explanation: 'Addition', section: 'Addition' }] });
   let failOnce = true;
   const requestIds: string[] = [];
-  await page.route(`**/api/forum/${id}/comments`, async route => {
+  faultRoutes.set(`/api/forum/${id}/comments`, async route => {
     requestIds.push(route.request().postDataJSON().requestId);
     if (failOnce) { failOnce = false; await route.abort('failed'); }
     else await route.continue();
   });
+  await signIn(page);
+  await page.goto(`/forum/${id}`);
   await page.getByPlaceholder('Add a comment...').fill('Browser comment');
   await page.getByRole('button', { name: 'Send', exact: true }).click();
   await expect(page.getByText('COULD NOT ADD COMMENT.', { exact: true })).toBeVisible();
@@ -105,8 +94,19 @@ test('Forum comment and Arena submission use real demo APIs', async ({ page }) =
   expect(requestIds).toHaveLength(2);
   expect(requestIds[0]).toBe(requestIds[1]);
   await page.goto(`/arena/${id}`);
+  const starts: string[] = [];
+  page.on('request', request => {
+    if (request.method() === 'POST' && new URL(request.url()).pathname === `/api/arena/${id}/start`) starts.push(request.postDataJSON().requestId);
+  });
+  await page.getByRole('button', { name: 'Start Challenge', exact: true }).click();
+  await expect(page.getByRole('button', { name: '4', exact: true })).toBeVisible();
+  page.once('dialog', dialog => dialog.accept());
+  await page.reload();
+  await expect(page.getByText(/An unfinished attempt is available/)).toBeVisible();
   await page.getByRole('button', { name: 'Start Challenge', exact: true }).click();
   await page.getByRole('button', { name: '4', exact: true }).click();
+  expect(starts).toHaveLength(2);
+  expect(starts[0]).toBe(starts[1]);
   await page.getByRole('button', { name: /finish|results/i }).click();
   await expect(page.getByRole('heading', { name: /100%/ })).toBeVisible();
   expect((await db.doc(`arenaExams/${id}`).get()).get('totalAttempts')).toBe(1);
@@ -139,11 +139,11 @@ for (const language of ['en', 'vi']) {
   });
 }
 
-// Engine acceptance without request interception isolates SDK/emulator behavior.
-test('Forum comment reaches the subscription without network interception', async ({ page }) => {
+// No injected failures: the destination allowlist still protects all contexts.
+test('Forum comment reaches the subscription without injected failures', async ({ page }) => {
   if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) throw new Error('Demo emulators required');
   const db = getFirestore(getApps()[0] ?? initializeApp({ projectId: 'demo-shark-empti' }));
-  const id = 'unintercepted-' + test.info().project.name;
+  const id = 'subscription-' + test.info().project.name + '-' + randomUUID();
   await db.doc('posts/' + id).set({ title: 'Direct subscription', content: 'Addition', subject: 'math', authorId: 'fixture', authorName: 'Fixture', authorPhoto: '', createdAt: Timestamp.now(), likesCount: 0, likedBy: [], commentsCount: 0 });
   await signIn(page);
   await page.goto('/forum/' + id);

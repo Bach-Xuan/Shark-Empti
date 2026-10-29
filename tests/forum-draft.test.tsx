@@ -4,6 +4,7 @@ import { translations } from '@/lib/translations';
 import { act,cleanup,fireEvent,render,screen,waitFor } from '@testing-library/react';
 import { afterEach,beforeEach,expect,it,vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ write: vi.fn(), toast: vi.fn(), emit: vi.fn(), user: { uid: 'author' } as { uid: string } | null, loading: false }));
+vi.mock('@/lib/forum-client', () => ({ communityRequest: async (_user: unknown, _path: string, body: unknown) => { await mocks.write(body); return { id: 'created-post' }; }, mutateForum: vi.fn(), deleteForumPost: vi.fn() }));
 vi.mock('@/components/navigation', () => ({ default: () => null }));
 vi.mock('@/components/feature-help', () => ({ default: () => null }));
 vi.mock('@/components/activity-calendar', () => ({ default: () => null }));

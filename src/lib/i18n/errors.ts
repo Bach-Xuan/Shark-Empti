@@ -22,7 +22,7 @@ export function translatedError(code: string, language: 'en' | 'vi') {
   if (/CONFIG/.test(code)) return t.configuration;
   if (/PERMISSION|FORBIDDEN/.test(code)) return t.permission;
   if (/AUTH/.test(code)) return t.authentication;
-  if (/429|RATE/.test(code)) return t.rate;
+  if (/429|RATE|QUOTA|CONCURRENT|BUDGET/.test(code)) return t.rate;
   if (/TIMEOUT/.test(code)) return t.timeout;
   if (/TRANSPORT|NETWORK|UNAVAILABLE/.test(code)) return t.network;
   if (/FALLBACK-EXHAUSTED/.test(code)) return t.fallback;

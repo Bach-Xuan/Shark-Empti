@@ -32,14 +32,27 @@
   },
   "include": [
     "next-env.d.ts",
-    "**/*.ts",
-    "**/*.tsx",
+    "*.ts",
+    "*.mts",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "scripts/**/*.ts",
+    "tests/**/*.ts",
+    "tests/**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
     "coverage",
-    "test-results"
+    "test-results",
+    "playwright-report",
+    "blob-report",
+    "reports",
+    "tmp",
+    ".tools",
+    "out",
+    "build",
+    "dist"
   ]
 }

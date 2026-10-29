@@ -2,6 +2,7 @@
 import { POST } from '@/app/api/ai/generations/route';
 import { afterEach,beforeEach,expect,it,vi } from 'vitest';
 vi.mock('server-only', () => ({}));
+vi.mock('@/lib/request-budget', () => ({ enforceRequestBudget: vi.fn() }));
 
 const mocks = vi.hoisted(() => ({ auth: vi.fn(), create: vi.fn() }));
 vi.mock('@/lib/server-api', () => {

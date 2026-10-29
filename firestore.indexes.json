@@ -1,6 +1,22 @@
 {
   "indexes": [
     {
+      "collectionGroup": "_communityReports",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "arenaExams",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "schemaVersion", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "posts",
       "queryScope": "COLLECTION",
       "fields": [
@@ -22,6 +38,7 @@
           "fieldPath": "timingVersion",
           "order": "ASCENDING"
         },
+        { "fieldPath": "rankingVersion", "order": "ASCENDING" },
         {
           "fieldPath": "score",
           "order": "DESCENDING"
@@ -38,6 +55,12 @@
     }
   ],
   "fieldOverrides": [
+    {
+      "collectionGroup": "_requestBudgets",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
     {
       "collectionGroup": "_requestReceipts",
       "fieldPath": "expiresAt",

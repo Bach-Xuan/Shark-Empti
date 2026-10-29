@@ -1,6 +1,6 @@
 'use client';
 import { PageControls } from '@/components/page-controls';
-import { ProfilePrintReport } from '@/components/profile-print-report';
+import dynamic from 'next/dynamic';
 import { ReportSelectionRow } from '@/components/report-selection-row';
 import { useProfileReport } from '@/hooks/use-profile-report';
 import { useProfileBio } from '@/hooks/use-profile-bio';
@@ -71,11 +71,15 @@ User as UserIcon,
 X
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { DataNotice } from '@/components/data-notice';
+import { AccountDataControls } from '@/components/account-data-controls';
+import { learningNotices } from '@/lib/i18n/learning-notices';
 import { useEffect,useMemo,useRef,useState } from 'react';
+const ProfilePrintReport = dynamic(() => import('@/components/profile-print-report').then(module => module.ProfilePrintReport), { ssr: false });
 
 export default function ProfilePage() {
   const { user, loading: authLoading } = useUser();
-  const { data: profileData, loading: profileLoading } = useDoc(user ? `users/${user.uid}` : null);
+  const { data: profileData, loading: profileLoading, error: profileError, retry: retryProfile } = useDoc(user ? `users/${user.uid}` : null);
   const profile = useMemo(() => readLearnerProfile(profileData), [profileData]);
   const auth = useAuth();
   const firestore = useFirestore();
@@ -87,6 +91,7 @@ export default function ProfilePage() {
   const biography = useProfileBio(user?.uid, profile?.bio ?? '');
   const { bio, isSaving } = biography;
   const [isCopied, setIsCopied] = useState(false);
+  const [printStatus, setPrintStatus] = useState<'loading' | 'ready' | 'error'>('loading');
 
   const t: TranslationSet = translations[lang];
   const { historyPage, history, isReportSelectOpen, setIsReportSelectOpen, isReportViewOpen, setIsReportViewOpen, selectedSessionIds, setSelectedSessionIds, roadmapStatus, reportSearchQuery, setReportSearchQuery, reportSortOrder, setReportSortOrder, reportStats, filteredReportHistory } = useProfileReport(user, t, lang);
@@ -182,6 +187,7 @@ if (!authLoading && !user) {
   };
 
   const handleGenerateReport = () => {
+    setPrintStatus('loading');
     if (selectedSessionIds.length === 0) {
       toast({
         variant: "destructive",
@@ -194,6 +200,7 @@ if (!authLoading && !user) {
   };
 
   const handlePrintReport = () => {
+    if (printStatus !== 'ready' || !document.querySelector('.profile-print-report')) return;
     window.print();
   };
 
@@ -255,6 +262,7 @@ if (!authLoading && !user) {
   }
 
   if (!user) return null;
+  if (profileError || !profile) return <main className="min-h-screen grid place-content-center p-4"><DataNotice lang={lang} error={profileError} invalid={!profile && !!profileData} onRetry={retryProfile} /></main>;
 
   return (
     <div className="min-h-screen flex flex-col bg-background transition-colors duration-500">
@@ -276,6 +284,7 @@ if (!authLoading && !user) {
       />
 
       <main className="flex-1 main-container pt-24 md:pt-36 space-y-8 pb-20">
+        <AccountDataControls lang={lang} />
       <PageControls lang={lang} {...historyPage} />
         <div className="text-center mb-8">
           <h1 className="text-4xl md:text-6xl font-headline font-black text-primary uppercase tracking-tighter">
@@ -287,7 +296,7 @@ if (!authLoading && !user) {
           <div className="bg-primary/5 p-8 md:p-12 border-b-[4px] border-border flex flex-col items-center gap-6">
             <div className="relative">
               <Avatar className="w-32 h-32 md:w-40 md:h-40 border-[6px] border-background shadow-duo rounded-[3rem] transition-transform">
-                <AvatarImage src={user.photoURL || ''} />
+                <AvatarImage src={user.photoURL || ''} alt="" />
                 <AvatarFallback className="bg-primary/10 text-primary text-4xl font-black">
                   {user.email?.[0].toUpperCase()}
                 </AvatarFallback>
@@ -347,7 +356,7 @@ if (!authLoading && !user) {
                 <Button
                   onClick={handleSaveBio}
                   disabled={isSaving}
-                  className="w-full h-14 rounded-2xl btn-duo bg-primary text-white font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 border-4 border-primary/20"
+                  className="w-full h-14 rounded-2xl btn-duo bg-primary text-primary-foreground font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 border-4 border-primary/20"
                 >
                   {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                   {uiMessage(lang, "profile.save_bio")}
@@ -364,7 +373,7 @@ if (!authLoading && !user) {
                   {t.exportReport}
                 </Button>
                 {history.length === 0 && (
-                   <p className="text-center text-[10px] font-black uppercase text-muted-foreground mt-3 opacity-60">
+                   <p className="text-center text-[10px] font-black uppercase text-muted-foreground mt-3 ">
                      {t.noHistory}
                    </p>
                 )}
@@ -467,12 +476,12 @@ if (!authLoading && !user) {
                         <span className="font-black text-xs md:text-xl uppercase tracking-tight block truncate text-foreground group-hover/item:text-primary transition-colors">
                           <LatexText text={topic} />
                         </span>
-                        <div className="flex items-center gap-3 text-muted-foreground/60">
+                        <div className="flex items-center gap-3 text-muted-foreground">
                            <div className="flex items-center gap-1.5 text-[8px] md:text-[10px] font-black uppercase tracking-widest">
                              <Clock className="w-3 h-3" />
                              {formatSessionDate(item.date)}
                            </div>
-                           <div className="flex items-center gap-1.5 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-primary/70">
+                           <div className="flex items-center gap-1.5 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-primary">
                              <CheckCircle2 className="w-3 h-3" />
                              {item.quizResults.filter(r => r.isCorrect).length}/{item.quizResults.length}
                            </div>
@@ -499,7 +508,7 @@ if (!authLoading && !user) {
                 <Button
                   onClick={handleGenerateReport}
                   disabled={selectedSessionIds.length === 0}
-                  className="btn-duo min-w-[200px] h-14 rounded-xl bg-primary text-white font-black uppercase text-xs tracking-widest border-4 border-primary/20 shadow-duo"
+                  className="btn-duo min-w-[200px] h-14 rounded-xl bg-primary text-primary-foreground font-black uppercase text-xs tracking-widest border-4 border-primary/20 shadow-duo"
                 >
                   {t.generateReport} <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
@@ -513,22 +522,23 @@ if (!authLoading && !user) {
       {isReportViewOpen && reportStats && <ProfilePrintReport
         stats={reportStats} roadmapStatus={roadmapStatus} name={user.displayName ?? ''}
         issued={new Date().toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
-        t={t} lang={lang}
+        t={t} lang={lang} onStatus={setPrintStatus}
       />}
       <Dialog open={isReportViewOpen} onOpenChange={setIsReportViewOpen}>
-        <DialogContent className="max-w-5xl w-[95vw] rounded-[2.5rem] border-[4px] shadow-2xl p-0 overflow-hidden bg-background">
-          <div className="flex items-center justify-between p-6 md:p-8 bg-card border-b-4 border-border shrink-0">
+        <DialogContent className="max-w-5xl w-[95vw] h-[90dvh] max-h-[90dvh] flex flex-col rounded-[2.5rem] border-[4px] shadow-2xl p-0 overflow-hidden bg-background">
+          <div className="flex flex-wrap gap-3 items-center justify-between p-6 md:p-8 bg-card border-b-4 border-border shrink-0">
             <DialogTitle className="text-xl md:text-3xl font-headline font-black text-primary uppercase tracking-tight flex items-center gap-4">
               <FileText className="w-8 h-8" /> {t.academicReport}
             </DialogTitle>
             <div className="flex gap-2 md:gap-4 no-print">
               <Button variant="outline" size="icon" aria-label={t.copy} onClick={copyReportToClipboard} className="h-12 w-12 rounded-xl border-2 hover:bg-primary/10 hover:border-primary/30 transition-all"><Copy className="w-5 h-5 text-primary" /></Button>
-              <Button variant="outline" size="icon" aria-label={t.printReport} onClick={handlePrintReport} className="h-12 w-12 rounded-xl border-2 hover:bg-primary/10 hover:border-primary/30 transition-all"><Download className="w-5 h-5 text-primary" /></Button>
+              <Button variant="outline" size="icon" aria-label={t.printReport} onClick={handlePrintReport} disabled={printStatus !== 'ready'} className="h-12 w-12 rounded-xl border-2 hover:bg-primary/10 hover:border-primary/30 transition-all"><Download className="w-5 h-5 text-primary" /></Button>
               <Button variant="ghost" size="icon" aria-label={t.back} onClick={() => setIsReportViewOpen(false)} className="h-12 w-12 rounded-xl border-2"><X className="w-5 h-5" /></Button>
             </div>
           </div>
 
-          <ScrollArea className="h-[80vh] p-6 md:p-12" id="report-content">
+          {printStatus !== 'ready' && <p role={printStatus === 'error' ? 'alert' : 'status'} className="shrink-0 px-6 text-sm text-muted-foreground">{learningNotices[lang][printStatus === 'error' ? 'printError' : 'printLoading']}</p>}
+          <ScrollArea className="min-h-0 flex-1 p-6 md:p-12" id="report-content">
             <div className="space-y-12 max-w-4xl mx-auto bg-white dark:bg-card p-6 md:p-16 rounded-[2rem] border-2 border-border shadow-inner">
               <div className="text-center space-y-6 border-b-4 border-primary/10 pb-10">
                 <div className="inline-flex p-4 bg-primary/10 rounded-2xl border-2 border-primary/20 mb-2">
@@ -601,7 +611,7 @@ if (!authLoading && !user) {
                                 <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400 stroke-[3.5px] shrink-0 mt-0.5" />
                                 <p className="text-xs md:text-sm font-bold line-through"><LatexText text={r.text} /></p>
                               </div>
-                            )) : <p className="text-xs italic opacity-40 px-2">---</p>}
+                            )) : <p className="text-xs italic  px-2">---</p>}
                          </div>
 
                          <div className="space-y-3">
@@ -611,7 +621,7 @@ if (!authLoading && !user) {
                                 <Circle className="w-5 h-5 text-orange-500 shrink-0 mt-0.5" />
                                 <p className="text-xs md:text-sm font-bold"><LatexText text={r.text} /></p>
                               </div>
-                            )) : <p className="text-xs italic opacity-40 px-2">---</p>}
+                            )) : <p className="text-xs italic  px-2">---</p>}
                          </div>
                        </div>
                     </div>
@@ -619,7 +629,7 @@ if (!authLoading && !user) {
                 );
               })}
               {reportStats?.processedGroupedInsights.length === 0 && (
-                <div className="text-center py-20 italic opacity-50">
+                <div className="text-center py-20 italic">
                   {t.noHistory}
                 </div>
               )}
@@ -639,7 +649,7 @@ if (!authLoading && !user) {
             <div className="bg-primary h-32 w-full opacity-10" />
             <div className="px-8 pb-12 -mt-16 flex flex-col items-center gap-6">
               <Avatar className="w-32 h-32 md:w-40 md:h-40 border-[8px] border-background shadow-2xl rounded-[3rem]">
-                <AvatarImage src={searchResult?.photoURL || ''} />
+                <AvatarImage src={searchResult?.photoURL || ''} alt="" />
                 <AvatarFallback className="bg-primary/10 text-primary text-4xl font-black">
                   {searchResult?.displayName?.[0]?.toUpperCase() || <UserIcon className="w-16 h-16" />}
                 </AvatarFallback>
@@ -654,7 +664,7 @@ if (!authLoading && !user) {
                     {uiMessage(lang, "profile.learner")}
                   </p>
                   <div className="flex items-center gap-2 bg-muted/40 px-3 py-1 rounded-full border border-border/50">
-                    <CalendarDays className="w-3 h-3 text-primary/70" />
+                    <CalendarDays className="w-3 h-3 text-primary" />
                     <span className="text-[9px] md:text-[10px] font-bold text-muted-foreground">
                       {t.memberSince}: {searchMemberSince}
                     </span>

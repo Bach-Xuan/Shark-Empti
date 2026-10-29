@@ -9,7 +9,8 @@ out/
 build/
 dist/
 /reports/
-/tmp/pdfs/
+# Local scratch files, including rendered print fixtures.
+/tmp/
 
 node_modules/
 jspm_packages/

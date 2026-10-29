@@ -22,10 +22,11 @@ describe('Firestore access policy', () => {
   it('orders all tied Arena scores by duration and ID before limiting, excluding legacy timing', async () => {
     await testEnv.withSecurityRulesDisabled(async context => {
       const db = context.firestore();
+      await setDoc(doc(db, 'arenaExams/exam'), { schemaVersion: 2 });
       for (let i = 0; i < 15; i++) await setDoc(doc(db, 'arenaExams/exam/attempts', `a${String(i).padStart(2, '0')}`), {
-        timingVersion: 1, score: 100, duration: 15 - i,
+        timingVersion: 1, rankingVersion: 2, score: 100, duration: 15 - i,
       });
-      await setDoc(doc(db, 'arenaExams/exam/attempts/z-tie'), { timingVersion: 1, score: 100, duration: 1 });
+      await setDoc(doc(db, 'arenaExams/exam/attempts/z-tie'), { timingVersion: 1, rankingVersion: 2, score: 100, duration: 1 });
       await setDoc(doc(db, 'arenaExams/exam/attempts/legacy'), { score: 100, duration: 0 });
     });
     const result = await getDocs(arenaLeaderboardQuery(testEnv.unauthenticatedContext().firestore() as unknown as Firestore, 'exam'));
@@ -70,20 +71,52 @@ describe('Firestore access policy', () => {
     await assertFails(getDoc(doc(otherUser, 'users', 'learner-a', 'history', 'session-1')));
   });
 
-  it('allows authenticated authors to create community content and anonymous users to read it', async () => {
+  it('denies profile enumeration and legacy private fields while retaining owner and safe UID lookup', async () => {
+    await testEnv.withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(), 'users/private'), { displayName: 'Private', email: 'private@example.invalid' });
+      await setDoc(doc(context.firestore(), 'users/public'), { displayName: 'Public', bio: 'Hello' });
+    });
+    const other = testEnv.authenticatedContext('other').firestore();
+    const owner = testEnv.authenticatedContext('private').firestore();
+    await assertFails(getDoc(doc(other, 'users/private')));
+    await assertFails(getDocs(collection(other, 'users')));
+    await assertSucceeds(getDoc(doc(owner, 'users/private')));
+    await assertSucceeds(getDoc(doc(other, 'users/public')));
+    await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'users/public')));
+    await assertFails(setDoc(doc(other, 'users/other'), { displayName: 'Other', email: 'no@example.invalid' }));
+    await assertSucceeds(updateDoc(doc(owner, 'users/private'), { email: deleteField(), bio: 'Repaired' }));
+    await assertSucceeds(getDoc(doc(other, 'users/private')));
+  });
+
+  it('denies root profile deletion/recreation and preserves server coin state and private descendants', async () => {
+    await testEnv.withSecurityRulesDisabled(async context => {
+      await setDoc(doc(context.firestore(), 'users/learner'), { displayName: 'Learner', sharkCoins: 100 });
+      await setDoc(doc(context.firestore(), 'users/learner/history/session'), { score: 80 });
+    });
+    const owner = testEnv.authenticatedContext('learner').firestore();
+    await assertFails(deleteDoc(doc(owner, 'users/learner')));
+    await assertFails(setDoc(doc(owner, 'users/learner'), { displayName: 'Reset' }));
+    await assertFails(updateDoc(doc(owner, 'users/learner'), { sharkCoins: deleteField() }));
+    await assertSucceeds(updateDoc(doc(owner, 'users/learner'), { bio: 'Valid edit' }));
+    expect((await getDoc(doc(owner, 'users/learner'))).get('sharkCoins')).toBe(100);
+    expect((await getDoc(doc(owner, 'users/learner/history/session'))).exists()).toBe(true);
+  });
+
+  it('requires the budgeted API for creation but preserves anonymous public reading', async () => {
     const author = testEnv.authenticatedContext('author').firestore();
-    await assertSucceeds(setDoc(doc(author, 'posts', 'post-1'), validPost()));
+    await assertFails(setDoc(doc(author, 'posts', 'post-1'), validPost()));
+    await testEnv.withSecurityRulesDisabled(context => setDoc(doc(context.firestore(), 'posts/post-1'), validPost()));
     await assertSucceeds(getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'posts', 'post-1')));
   });
 
-  it('allows a user to toggle only their own like and blocks protected client writes', async () => {
+  it('blocks direct reactions and protected client writes', async () => {
     await testEnv.withSecurityRulesDisabled(async context => {
       await setDoc(doc(context.firestore(), 'posts', 'post-1'), validPost());
       await setDoc(doc(context.firestore(), 'users', 'learner'), { sharkCoins: 10 });
       await setDoc(doc(context.firestore(), 'arenaExams', 'exam-1'), { authorId: 'author', totalAttempts: 0 });
     });
     const learner = testEnv.authenticatedContext('learner').firestore();
-    await assertSucceeds(updateDoc(doc(learner, 'posts', 'post-1'), { likedBy: ['learner'], likesCount: 1 }));
+    await assertFails(updateDoc(doc(learner, 'posts', 'post-1'), { likedBy: ['learner'], likesCount: 1 }));
     await assertFails(updateDoc(doc(learner, 'users', 'learner'), { sharkCoins: 999 }));
     await assertFails(setDoc(doc(learner, 'arenaExams', 'exam-1', 'attempts', 'attempt-1'), { userId: 'learner' }));
     await assertFails(setDoc(doc(learner, 'posts', 'post-1', 'comments', 'comment-1'), { authorId: 'learner', content: 'Hi' }));
@@ -96,29 +129,30 @@ describe('Firestore access policy', () => {
     const data = validPost();
     await assertFails(setDoc(post, { ...data, likesCount: 1, likedBy: ['victim'] }));
     await assertFails(setDoc(post, { ...data, commentsCount: 3 }));
-    await assertSucceeds(setDoc(post, data));
-    await assertSucceeds(updateDoc(post, { content: 'Updated content' }));
+    await assertFails(setDoc(post, data));
+    await testEnv.withSecurityRulesDisabled(context => setDoc(doc(context.firestore(), 'posts/author-post'), data));
+    await assertFails(updateDoc(post, { content: 'Updated content' }));
     await assertFails(updateDoc(post, { content: '' }));
     await assertFails(updateDoc(post, { title: 123 }));
     await assertFails(updateDoc(post, { authorId: 'victim' }));
     await assertFails(updateDoc(post, { commentsCount: 5 }));
     await assertFails(updateDoc(post, { likedBy: ['victim'], likesCount: 1 }));
     await assertFails(updateDoc(post, { likedBy: ['author', 'author'], likesCount: 2 }));
-    await assertSucceeds(updateDoc(post, { likedBy: ['author'], likesCount: 1 }));
+    await assertFails(updateDoc(post, { likedBy: ['author'], likesCount: 1 }));
   });
 
   it.each(Object.keys(validPost()))('rejects omission of required post field %s on create and update', async key => {
     const ref = doc(testEnv.authenticatedContext('author').firestore(), 'posts', 'post');
     const data: Record<string, unknown> = validPost(); delete data[key];
     await assertFails(setDoc(ref, data));
-    await assertSucceeds(setDoc(ref, validPost()));
+    await assertFails(setDoc(ref, validPost()));
     await assertFails(updateDoc(ref, { [key]: deleteField() }));
   });
 
   it('enforces text boundaries and rejects unknown or mistyped fields', async () => {
     const ref = doc(testEnv.authenticatedContext('author').firestore(), 'posts', 'post');
-    await assertSucceeds(setDoc(ref, { ...validPost(), title: 'x'.repeat(200), content: 'x'.repeat(20000), subject: 's'.repeat(100), authorName: 'a'.repeat(200) }));
-    await assertSucceeds(updateDoc(ref, { content: 'line one\nline two', updatedAt: serverTimestamp() }));
+    await assertFails(setDoc(ref, { ...validPost(), title: 'x'.repeat(200), content: 'x'.repeat(20000), subject: 's'.repeat(100), authorName: 'a'.repeat(200) }));
+    await assertFails(updateDoc(ref, { content: 'line one\nline two', updatedAt: serverTimestamp() }));
     for (const patch of [{ title: 'x'.repeat(201) }, { content: 'x'.repeat(20001) }, { subject: 's'.repeat(101) }, { content: ' \n\t ' }, { unknown: true }, { updatedAt: 'yesterday' }]) {
       await assertFails(updateDoc(ref, patch));
     }
@@ -139,8 +173,8 @@ describe('Firestore access policy', () => {
     const author = testEnv.authenticatedContext('author').firestore();
     const ref = doc(author, 'posts/post/comments/comment');
     await assertSucceeds(getDocs(collection(anonymous, 'posts/post/comments')));
-    await assertSucceeds(updateDoc(ref, { content: 'Edited', updatedAt: serverTimestamp() }));
-    await assertSucceeds(updateDoc(ref, { likedBy: ['author'], likesCount: 1 }));
+    await assertFails(updateDoc(ref, { content: 'Edited', updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(ref, { likedBy: ['author'], likesCount: 1 }));
     await assertFails(updateDoc(ref, { arbitrary: true }));
     await assertFails(updateDoc(ref, { postId: 'other' }));
     await assertFails(updateDoc(ref, { authorName: 'Forged' }));

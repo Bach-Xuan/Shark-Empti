@@ -1,6 +1,7 @@
 'use client';
 import { createPortal } from 'react-dom';
-import { LatexText } from './latex-text';
+import { useEffect } from 'react';
+import { MathText as LatexText } from './math-text';
 import type { DashboardStats } from '@/lib/stats-utils';
 import type { RoadmapChecks } from '@/lib/roadmap-storage';
 import type { TranslationSet } from '@/lib/translations';
@@ -54,6 +55,7 @@ export interface ProfilePrintReportProps {
   issued: string;
   t: TranslationSet;
   lang: Language;
+  onStatus?: (status: 'loading' | 'ready' | 'error') => void;
 }
 
 // Semantic, unconstrained document: no viewport containers, responsive charts,
@@ -88,5 +90,20 @@ export function ProfilePrintDocument({ stats, roadmapStatus, name, issued, t, la
 }
 
 export function ProfilePrintReport(props: ProfilePrintReportProps) {
+  const { stats, lang, onStatus } = props;
+  useEffect(() => {
+    let active = true;
+    onStatus?.('loading');
+    const fonts = document.fonts;
+    const declarations = new Set(Array.from(document.querySelectorAll('.profile-print-report .katex *'), element => {
+      const style = getComputedStyle(element);
+      return style.fontFamily ? `${style.fontStyle} ${style.fontWeight} 16px ${style.fontFamily}` : '';
+    }).filter(Boolean));
+    void Promise.all([fonts?.ready, ...Array.from(declarations, declaration => fonts?.load(declaration))]).then(
+      () => { if (active) onStatus?.('ready'); },
+      () => { if (active) onStatus?.('error'); },
+    );
+    return () => { active = false; onStatus?.('loading'); };
+  }, [stats, lang, onStatus]);
   return createPortal(<ProfilePrintDocument {...props} />, document.body);
 }

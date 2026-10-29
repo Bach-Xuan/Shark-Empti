@@ -4,7 +4,11 @@ import { showErrorToast,showUnexpectedErrorToast } from '@/lib/error-toast';
 import { createAppError,type AppError } from '@/lib/app-error';
 import { arenaDetailMessages,arenaResponseError,arenaSubscriptionError } from '@/lib/arena-detail';
 import { errorMessages,translatedError } from '@/lib/i18n/errors';
-import { readArenaExam,readArenaAttempt } from '@/lib/public-firestore-schema';
+import { readArenaExam,readArenaAttempt,readArenaPrompts } from '@/lib/public-firestore-schema';
+import { readHistoryItem } from '@/lib/history-schema';
+import { ReportContent } from '@/components/report-content';
+import { isDocumentId } from '@/lib/document-id';
+import { readDraft, writeDraft, removeDraft, parseWith, arenaSessionDraftSchema } from '@/lib/learning-drafts';
 import AiChatbot from '@/components/ai-chatbot';
 import { uiMessage } from '@/lib/i18n';
 import { quizLabel } from '@/lib/quiz-labels';
@@ -18,10 +22,10 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { useFirestore,useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
-import { isTrustedArenaExam } from '@/lib/arena-scoring';
 import { arenaLeaderboardQuery } from '@/lib/arena-leaderboard';
 import { translations,TranslationSet } from '@/lib/translations';
 import { ArenaAttempt,ArenaExam,QuizAnalysis,QuizHistoryItem } from '@/lib/types';
+import type { QuizQuestion } from '@/lib/learning-session';
 import { cn } from '@/lib/utils';
 import {
 doc,
@@ -63,6 +67,11 @@ function ArenaDetailSession({ examId }: { examId: string }) {
   const [leaderboard, setLeaderboard] = useState<ArenaAttempt[]>([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'details' | 'quiz' | 'result'>('details');
+  const [activeQuestions, setActiveQuestions] = useState<QuizQuestion[]>([]);
+  const [activeRequestId, setActiveRequestId] = useState<string | null>(null);
+  const [serverStartedAt, setServerStartedAt] = useState<number>();
+  const [resumable, setResumable] = useState(false);
+  const [draftAvailable, setDraftAvailable] = useState(true);
   const [lastResults, setLastResults] = useState<QuizHistoryItem | null>(null);
   const [earnedCoins, setEarnedCoins] = useState(0);
   const pendingSubmission = useRef<{ body: string; results: QuizHistoryItem } | null>(null);
@@ -84,7 +93,7 @@ function ArenaDetailSession({ examId }: { examId: string }) {
 
 
   useEffect(() => {
-    if (!examId || !db) {
+    if (!isDocumentId(examId) || !db) {
       setExamError(createAppError(!examId ? 'APP-INVALID-INPUT' : 'APP-CONFIG-MISSING', ''));
       setLoading(false);
       return;
@@ -111,7 +120,7 @@ function ArenaDetailSession({ examId }: { examId: string }) {
   }, [db, examId, examRetry]);
 
   useEffect(() => {
-    if (!examId || !db) return;
+    if (!isDocumentId(examId) || !db) return;
     let active = true;
     const q = arenaLeaderboardQuery(db, examId);
     const unsubLeaderboard = onSnapshot(q, (snapshot) => {
@@ -130,6 +139,11 @@ function ArenaDetailSession({ examId }: { examId: string }) {
   }, [db, examId, leaderboardRetry]);
 
   const t: TranslationSet = translations[lang];
+  useEffect(() => {
+    if (!user) return;
+    const saved = readDraft(user.uid, 'arena-session', parseWith(arenaSessionDraftSchema));
+    if (saved?.examId === examId) { pendingStart.current = saved.requestId; setResumable(true); }
+  }, [user, examId]);
   const copy = arenaDetailMessages[lang];
   const startAttempt = async () => {
     if (authLoading) return;
@@ -151,7 +165,7 @@ function ArenaDetailSession({ examId }: { examId: string }) {
       const body: unknown = await response.json().catch(() => null);
       if (!mounted.current || controller.signal.aborted) return;
       if (!response.ok) {
-        if (response.status === 409) pendingStart.current = null;
+        if (response.status === 409) { pendingStart.current = null; setResumable(false); removeDraft(user.uid, 'arena-session'); removeDraft(user.uid, 'arena-progress'); }
         showErrorToast(arenaResponseError(body, response.status), currentLanguage.current);
         return;
       }
@@ -159,7 +173,15 @@ function ArenaDetailSession({ examId }: { examId: string }) {
         showErrorToast(createAppError('APP-DATA-INVALID', ''), currentLanguage.current);
         return;
       }
+      const prompts = readArenaPrompts('questions' in body ? body.questions : null);
+      if (!prompts || prompts.length !== Number(exam.config.numQuestions) || !('startedAtMs' in body) || typeof body.startedAtMs !== 'number' || !Number.isSafeInteger(body.startedAtMs)) {
+        showErrorToast(createAppError('APP-DATA-INVALID', ''), currentLanguage.current);
+        return;
+      }
+      setActiveQuestions(prompts);
       activeAttempt.current = requestId;
+      setActiveRequestId(requestId); setServerStartedAt(body.startedAtMs); setResumable(false);
+      setDraftAvailable(writeDraft(user.uid, 'arena-session', { examId, requestId }));
       pendingStart.current = null;
       pendingSubmission.current = null;
       setLastResults(null);
@@ -210,10 +232,17 @@ function ArenaDetailSession({ examId }: { examId: string }) {
         return false;
       }
 
+      const canonical = readHistoryItem('arena-review', { ...pending.results,
+        quizResults: 'reviewResults' in submission ? submission.reviewResults : null,
+        totalTime: 'duration' in submission ? submission.duration : null });
+      if (!canonical || canonical.quizResults.length !== Number(exam.config.numQuestions)) {
+        showErrorToast(createAppError('APP-DATA-INVALID', ''), currentLanguage.current);
+        return false;
+      }
       setEarnedCoins(submission.coinsAwarded);
       if (submission.isFirstAttempt) toast({ title: t.firstAttemptBonus.toUpperCase() });
-
-      setLastResults(pending.results);
+      setLastResults(canonical);
+      removeDraft(user.uid, 'arena-session'); removeDraft(user.uid, 'arena-progress');
       setView('result');
       return true;
     } catch (error) {
@@ -231,7 +260,7 @@ function ArenaDetailSession({ examId }: { examId: string }) {
     {examError && <SubscriptionError error={examError} label={copy.exam} lang={lang} onRetry={() => setExamRetry(value => value + 1)} />}
     <Button onClick={() => router.push('/arena')}>{t.backToArena}</Button>
   </div>;
-  const isLegacyExam = !isTrustedArenaExam(exam.questions || []);
+  const isLegacyExam = exam.schemaVersion !== 2;
 
   return (
     <div className="min-h-screen flex flex-col bg-background transition-colors duration-500">
@@ -247,6 +276,9 @@ function ArenaDetailSession({ examId }: { examId: string }) {
       />
 
       <main className="flex-1 main-container pt-24 md:pt-36 space-y-10 pb-20">
+        <ReportContent target={{ kind: 'exam', id: examId }} lang={lang} />
+        {resumable && <p role="status">{lang === 'vi' ? 'Có lượt đang làm trong tab này. Bắt đầu sẽ tiếp tục đúng mã lượt và đồng hồ trước đó.' : 'An unfinished attempt is available in this tab. Start continues its original ID and server clock.'}</p>}
+        <p className="text-sm text-muted-foreground">{lang === 'vi' ? 'Arena là hoạt động luyện tập cộng đồng, không phải thi có giám sát. Chỉ lượt hoàn tất đầu tiên của người không phải tác giả mới được xếp hạng/nhận điểm tượng trưng. Lượt làm lại và đề cũ đã chuyển đổi không nhận thưởng.' : 'Arena is community practice, not a proctored assessment. Only a non-author’s first completion is ranked and earns symbolic points. Retakes and migrated legacy exams earn no rewards.'}</p>
         {examError && <SubscriptionError error={examError} label={copy.exam} lang={lang} onRetry={() => setExamRetry(value => value + 1)} />}
         {view === 'details' && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 md:gap-12 items-start">
@@ -260,7 +292,7 @@ function ArenaDetailSession({ examId }: { examId: string }) {
 
                 <div className="space-y-10 relative z-10">
                   <div className="space-y-4">
-                    <Badge className="bg-primary text-white font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-xl">
+                    <Badge className="bg-primary text-primary-foreground font-black uppercase tracking-[0.2em] px-4 py-1.5 rounded-xl">
                       {quizLabel('subject', exam.config.subject, t).toUpperCase()}
                     </Badge>
                     <h1 className="text-3xl md:text-6xl font-headline font-black text-foreground uppercase tracking-tight leading-tight">
@@ -279,7 +311,7 @@ function ArenaDetailSession({ examId }: { examId: string }) {
                     <Button
                       onClick={startAttempt}
                       disabled={isStarting || isLegacyExam || authLoading || !!examError}
-                      className="w-full md:w-auto h-16 md:h-24 px-12 md:px-20 rounded-[1.5rem] md:rounded-[3rem] btn-duo bg-primary text-white font-headline font-black text-xl md:text-3xl uppercase tracking-widest border-4 border-white/20 gap-4"
+                      className="w-full md:w-auto h-16 md:h-24 px-12 md:px-20 rounded-[1.5rem] md:rounded-[3rem] btn-duo bg-primary text-primary-foreground font-headline font-black text-xl md:text-3xl uppercase tracking-widest border-4 border-white/20 gap-4"
                     >
                       <PlayCircle className="w-8 h-8 md:w-12 md:h-12" /> {isLegacyExam ? uiMessage(lang, "arena.legacy_exam_unavailable") : !user ? uiMessage(lang, 'arena.sign_in_to_start') : t.takeExam}
                     </Button>
@@ -294,7 +326,7 @@ function ArenaDetailSession({ examId }: { examId: string }) {
 
               <Card className="card-duo p-8 md:p-12 space-y-8 bg-primary/5 border-primary/10">
                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-primary text-white flex items-center justify-center shadow-duo">
+                    <div className="w-12 h-12 rounded-xl bg-primary text-primary-foreground flex items-center justify-center shadow-duo">
                        <Coins className="w-7 h-7 animate-bounce-subtle" />
                     </div>
                     <div className="flex flex-col">
@@ -352,7 +384,7 @@ function ArenaDetailSession({ examId }: { examId: string }) {
                          </div>
                          <div className="col-span-6 flex items-center gap-2 md:gap-3 min-w-0">
                             <Avatar className="w-8 h-8 md:w-10 md:h-10 border-2 border-border shrink-0">
-                               <AvatarImage src={item.userPhoto} />
+                               <AvatarImage src={item.userPhoto} alt="" />
                                <AvatarFallback>{item.userName[0]}</AvatarFallback>
                             </Avatar>
                             <span className="font-black text-[10px] md:text-sm uppercase tracking-tight truncate">{item.userName}</span>
@@ -372,18 +404,20 @@ function ArenaDetailSession({ examId }: { examId: string }) {
             <p role="note">{copy.guru}</p>
             <QuizView
               t={t} lang={lang} config={exam.config}
-              initialQuestions={exam.questions}
+              initialQuestions={activeQuestions}
               onFinish={handleFinishQuiz}
               onAskGuru={() => toast({ description: copy.guru })}
               askGuruDisabledReason={copy.guru}
               numericShortAnswers
+              blindAnswers
+              draftOwner={user?.uid} draftId={activeRequestId} startedAtMs={serverStartedAt} draftAvailable={draftAvailable}
             />
           </div>
         )}
 
         {view === 'result' && lastResults && (
            <div className="space-y-12 animate-in zoom-in-95 duration-500">
-              <Card className="card-duo p-8 md:p-12 bg-primary text-white border-white/20 text-center space-y-4">
+              <Card className="card-duo p-8 md:p-12 bg-primary text-primary-foreground border-white/20 text-center space-y-4">
                  <div className="w-20 h-20 md:w-28 md:h-28 bg-white/20 rounded-full mx-auto flex items-center justify-center animate-bounce-subtle">
                     <Coins className="w-10 h-10 md:w-16 md:h-16" />
                  </div>

@@ -1,6 +1,5 @@
-import { expect, test } from '@playwright/test';
-import { createRequire } from 'node:module';
-const localRequire = createRequire(`${process.cwd()}/package.json`);
+import { expect, test } from './fixtures';
+import { accessibilityViolations } from './accessibility';
 
 test('responsive utilities and named keyboard controls work in both themes and languages', async ({ page }) => {
   test.setTimeout(180000);
@@ -15,9 +14,16 @@ test('responsive utilities and named keyboard controls work in both themes and l
       await expect(page.locator('html')).toHaveAttribute('lang', lang);
       const language = page.getByRole('button', { name: lang === 'en' ? 'Language' : 'Ngôn ngữ', exact: true });
       const toggle = page.getByRole('button', { name: lang === 'en' ? 'Toggle theme' : 'Đổi giao diện sáng tối', exact: true });
-      for (const width of [390, 640, 768, 1280]) {
+      for (const width of [320, 390, 640, 768, 1280]) {
         await page.setViewportSize({ width, height: 900 });
+        await expect.poll(() => page.evaluate(() => window.innerWidth)).toBe(width);
         await expect(language).toBeVisible(); await expect(toggle).toBeVisible();
+        for (const control of [language, toggle, ...await page.getByRole('main').getByRole('button').all()]) {
+          const bounds = await control.boundingBox();
+          expect(bounds).not.toBeNull();
+          expect(bounds!.x).toBeGreaterThanOrEqual(0);
+          expect(bounds!.x + bounds!.width).toBeLessThanOrEqual(width);
+        }
         // Exercise the actual emitted stylesheet, including all repaired typography tokens.
         const sizes = await page.evaluate(() => {
           const classes = ['text-[9px] md:text-sm', 'text-xs md:text-lg', 'text-xs md:text-base', 'text-[9px] md:text-xs', 'text-[8px] md:text-[10px]', 'hidden sm:inline'];
@@ -37,11 +43,7 @@ test('responsive utilities and named keyboard controls work in both themes and l
       await page.keyboard.press('Escape'); await expect(language).toBeFocused();
       await page.keyboard.press('Tab'); await expect(toggle).toBeFocused();
       await page.keyboard.press('Shift+Tab'); await expect(language).toBeFocused();
-      await page.addScriptTag({ path: localRequire.resolve('axe-core/axe.min.js') });
-      const violations = await page.evaluate(async () => {
-        const axe = (window as unknown as { axe: { run: (options: unknown) => Promise<{ violations: Array<{ id: string }> }> } }).axe;
-        return (await axe.run({ runOnly: { type: 'rule', values: ['button-name', 'link-name', 'nested-interactive', 'aria-valid-attr', 'aria-valid-attr-value'] } })).violations;
-      });
+      const violations = await accessibilityViolations(page, ['button-name', 'link-name', 'nested-interactive', 'aria-valid-attr', 'aria-valid-attr-value', 'color-contrast', 'image-alt', 'label', 'landmark-one-main', 'page-has-heading-one']);
       expect(violations).toEqual([]);
     }
   }

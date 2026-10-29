@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useLanguageState,useThemeState } from '@/components/app-preferences';
 import { PageControls } from '@/components/page-controls';
 import { usePagedCollection } from '@/hooks/use-paged-collection';
+import { useAiRequestScope } from '@/hooks/use-ai-request-scope';
 import { formatStoredDate } from '@/lib/date-format';
 import { readArenaExam, arenaConfigSchema } from '@/lib/public-firestore-schema';
 import { uiMessage } from '@/lib/i18n';
@@ -31,7 +32,7 @@ import { translations,TranslationSet } from '@/lib/translations';
 import { ArenaExam,QuizConfig } from '@/lib/types';
 import {
 collection,
-orderBy,
+orderBy, where,
 query
 } from 'firebase/firestore';
 import {
@@ -50,6 +51,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 
 export default function ArenaPage() {
+  const aiRequest = useAiRequestScope();
   const { user } = useUser();
   const db = useFirestore();
   const { data: profile } = useDoc(user ? `users/${user.uid}` : null);
@@ -86,7 +88,7 @@ export default function ArenaPage() {
   };
 
 
-  const source = usePageMemo(() => db ? query(collection(db, 'arenaExams'), orderBy('createdAt', 'desc')) : null, [db]);
+  const source = usePageMemo(() => db ? query(collection(db, 'arenaExams'), where('schemaVersion', '==', 2), orderBy('createdAt', 'desc')) : null, [db]);
   const page = usePagedCollection<ArenaExam>(source, readArenaExam);
   const { items: exams, loading } = page;
 
@@ -113,7 +115,7 @@ export default function ArenaPage() {
         numQuestions: Number(validated.numQuestions),
         language: lang as 'en' | 'vi',
         arenaMode: true,
-      });
+      }, { signal: aiRequest.start() });
       if (!current()) return;
 
       if (!result.ok) {
@@ -182,16 +184,16 @@ export default function ArenaPage() {
             <h1 className="text-4xl md:text-8xl font-headline font-black text-primary uppercase tracking-tighter flex items-center gap-4 md:gap-8">
               <Trophy className="w-10 h-10 md:w-20 md:h-20" /> {t.arena}
             </h1>
-            <p className="text-[10px] md:text-sm font-black text-muted-foreground uppercase tracking-[0.2em] opacity-60">
+            <p className="text-[10px] md:text-sm font-black text-muted-foreground uppercase tracking-[0.2em] ">
               {uiMessage(lang, "arena.challenge_the_community_earn_shark_coins")}
             </p>
           </div>
 
           <div className="flex items-center gap-4">
-            <Card className="card-duo px-4 md:px-8 py-2 md:py-4 flex items-center gap-3 md:gap-4 bg-primary text-white border-white/20">
+            <Card className="card-duo px-4 md:px-8 py-2 md:py-4 flex items-center gap-3 md:gap-4 bg-primary text-primary-foreground border-white/20">
               <Coins className="w-5 h-5 md:w-8 md:h-8 animate-bounce-subtle" />
               <div className="flex flex-col">
-                <span className="text-[8px] md:text-xs font-black uppercase tracking-widest opacity-80">{t.sharkCoin}</span>
+                <span className="text-[8px] md:text-xs font-black uppercase tracking-widest">{t.sharkCoin}</span>
                 <span className="text-lg md:text-3xl font-black">{profile?.sharkCoins || 0}</span>
               </div>
             </Card>
@@ -206,10 +208,10 @@ export default function ArenaPage() {
 
         <Tabs defaultValue="exams" className="w-full">
           <TabsList className="h-14 md:h-20 p-2 bg-muted/30 border-4 border-border rounded-full w-full max-w-md mx-auto mb-12">
-            <TabsTrigger value="exams" className="flex-1 rounded-full h-full font-black uppercase text-[10px] md:text-sm tracking-widest data-[state=active]:bg-primary data-[state=active]:text-white transition-all gap-2">
+            <TabsTrigger value="exams" className="flex-1 rounded-full h-full font-black uppercase text-[10px] md:text-sm tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all gap-2">
               <Layers className="w-4 h-4 md:w-5 md:h-5" /> {t.arenaExams}
             </TabsTrigger>
-            <TabsTrigger value="rewards" className="flex-1 rounded-full h-full font-black uppercase text-[10px] md:text-sm tracking-widest data-[state=active]:bg-primary data-[state=active]:text-white transition-all gap-2">
+            <TabsTrigger value="rewards" className="flex-1 rounded-full h-full font-black uppercase text-[10px] md:text-sm tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all gap-2">
               <Gift className="w-4 h-4 md:w-5 md:h-5" /> {t.rewards}
             </TabsTrigger>
           </TabsList>
@@ -219,8 +221,8 @@ export default function ArenaPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {[1, 2, 3, 4].map(i => <Card key={i} className="card-duo h-48 md:h-64 bg-muted/20 animate-pulse border-dashed" />)}
               </div>
-            ) : exams.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-24 text-center space-y-6 opacity-50">
+            ) : page.error ? null : exams.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-24 text-center space-y-6">
                 <Search className="w-20 h-20 text-muted-foreground" />
                 <p className="font-black uppercase tracking-widest text-lg max-w-md">{t.noArenaExams}</p>
               </div>
@@ -260,7 +262,7 @@ export default function ArenaPage() {
                       <div className="flex items-center justify-between pt-6 border-t-2 border-border/30">
                         <div className="flex items-center gap-2">
                           <Avatar className="w-8 h-8 rounded-lg border-2 border-border">
-                            <AvatarImage src={exam.authorPhoto} />
+                            <AvatarImage src={exam.authorPhoto} alt="" />
                             <AvatarFallback>{exam.authorName[0]}</AvatarFallback>
                           </Avatar>
                           <span className="text-[9px] font-black text-primary uppercase tracking-widest truncate max-w-[100px]">{exam.authorName}</span>

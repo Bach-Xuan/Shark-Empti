@@ -8,6 +8,9 @@ import { getAiOperationDefinition } from './operation-registry';
 import type { AiGenerationState,AiOperation,AiProtocolResponse } from './protocol';
 import type { NormalizedAiFailure } from './openrouter';
 import type { RetryDecision } from './error-classifier';
+import { recordAiEvent } from './telemetry';
+import { prepareRequestBudget } from '@/lib/request-budget';
+import { AI_IO_LIMITS } from './config/limits';
 
 type AttemptOrdinal = 0 | 1 | 2;
 type AttemptRecord = { attempt: AttemptOrdinal; outcome: string; durationMs: number; completedAt: Timestamp };
@@ -51,7 +54,9 @@ export async function createGeneration(id: string, uid: string, operation: AiOpe
       return response(id, current);
     }
     const now = Timestamp.now();
+    const commitAdmission = await prepareRequestBudget(transaction, uid, 'ai-create', Buffer.byteLength(JSON.stringify(input)), now.toMillis());
     const record: GenerationRecord = { ownerUid: uid, operation, inputFingerprint, validatedInput: input, status: 'ready', nextAttempt: 0, attempts: [], createdAt: now, updatedAt: now, expiresAt: Timestamp.fromMillis(now.toMillis() + RETENTION_MS) };
+    commitAdmission();
     transaction.create(ref, record);
     return response(id, record);
   });
@@ -60,17 +65,34 @@ export async function createGeneration(id: string, uid: string, operation: AiOpe
 export async function getGeneration(id: string, uid: string): Promise<AiProtocolResponse> {
   const db = getAdminDb();
   const ref = db.collection(COLLECTION).doc(id);
-  return db.runTransaction(async transaction => {
+  const settled = await db.runTransaction(async transaction => {
     const snapshot = await transaction.get(ref);
     if (!snapshot.exists || snapshot.get('ownerUid') !== uid) throw new ApiError('APP-NOT-FOUND', 404, 'Generation was not found.');
     const record = snapshot.data() as GenerationRecord;
-    if (record.status === 'cancel_requested' && (!record.inFlight || record.inFlight.leaseExpiresAt.toMillis() <= Date.now())) {
-      const terminalError = record.terminalError ?? createAppError('AI-CANCELLED', 'The AI request was cancelled.');
-      transaction.update(ref, { status: 'cancelled', terminalError, updatedAt: Timestamp.now(), inFlight: FieldValue.delete(), validatedInput: FieldValue.delete() });
-      return { generationId: id, state: 'cancelled', error: terminalError };
+    const now = Timestamp.now();
+    const expired = record.inFlight && record.inFlight.leaseExpiresAt.toMillis() <= now.toMillis();
+    if ((record.status === 'cancel_requested' && (!record.inFlight || expired)) || (record.status === 'running' && expired)) {
+      await releaseQuota(transaction, uid, id);
+      const nextAttempt = record.inFlight ? record.inFlight.attempt + 1 : record.nextAttempt;
+      const cancelled = record.status === 'cancel_requested';
+      const terminal = cancelled || nextAttempt >= 3;
+      const state = cancelled ? 'cancelled' as const : terminal ? 'failed' as const : 'retryable' as const;
+      const error = createAppError(cancelled ? 'AI-CANCELLED' : terminal ? 'AI-FALLBACK-EXHAUSTED' : 'AI-ATTEMPT-EXPIRED', cancelled ? 'The AI request was cancelled.' : 'The AI request could not be completed.');
+      const attempts = record.inFlight ? [...record.attempts, {
+        attempt: record.inFlight.attempt, outcome: 'lease_expired',
+        durationMs: Math.max(0, now.toMillis() - record.inFlight.startedAt.toMillis()), completedAt: now,
+      }] : record.attempts;
+      transaction.update(ref, {
+        status: state, terminalError: error, nextAttempt, attempts, updatedAt: now,
+        inFlight: FieldValue.delete(), retryNotBefore: FieldValue.delete(),
+        ...(terminal ? { validatedInput: FieldValue.delete(), result: FieldValue.delete() } : {}),
+      });
+      return { value: { generationId: id, state, error } satisfies AiProtocolResponse, recovered: record.operation };
     }
-    return response(id, record);
+    return { value: response(id, record), recovered: undefined };
   });
+  if (settled.recovered) recordAiEvent({ generationId: id, operation: settled.recovered, stage: 'lease_recovered', state: settled.value.state });
+  return settled.value;
 }
 
 type QuotaRecord = { windowStartMs?: number; used?: number; active?: Array<{ generationId: string; expiresAtMs: number }> };
@@ -105,6 +127,7 @@ export async function claimGeneration(id: string, uid: string): Promise<{ kind: 
     const recoveredAttempt = record.status === 'running' && record.inFlight ? record.inFlight.attempt + 1 : record.nextAttempt;
     if (recoveredAttempt >= 3) {
       const terminalError = createAppError('AI-FALLBACK-EXHAUSTED', 'The AI service could not complete this request.');
+      await releaseQuota(transaction, uid, id);
       transaction.update(ref, { status: 'failed', terminalError, nextAttempt: 3, updatedAt: now, inFlight: FieldValue.delete(), validatedInput: FieldValue.delete() });
       return { kind: 'response', value: { generationId: id, state: 'failed', error: terminalError } };
     }
@@ -136,7 +159,7 @@ export async function finalizeGeneration(id: string, uid: string, leaseId: strin
     const snapshot = await transaction.get(ref);
     if (!snapshot.exists || snapshot.get('ownerUid') !== uid) throw new ApiError('APP-NOT-FOUND', 404, 'Generation was not found.');
     const record = snapshot.data() as GenerationRecord;
-    if (record.inFlight?.leaseId !== leaseId) return response(id, record);
+    if (record.inFlight?.leaseId !== leaseId) throw new ApiError('AI-LEASE-CONFLICT', 409, 'The attempt lease has changed. Refresh its authoritative status.');
     const now = Timestamp.now();
     await releaseQuota(transaction, uid, id);
     const attempts = [...record.attempts, { attempt, outcome: 'data' in outcome ? 'succeeded' : outcome.failure.code, durationMs, completedAt: now }];
@@ -146,7 +169,18 @@ export async function finalizeGeneration(id: string, uid: string, leaseId: strin
       return { generationId: id, state: 'cancelled', error: terminalError };
     }
     if ('data' in outcome) {
-      transaction.update(ref, { status: 'succeeded', result: outcome.data, attempts, updatedAt: now, inFlight: FieldValue.delete(), validatedInput: FieldValue.delete() });
+      let wireData: unknown;
+      try {
+        const serialized = JSON.stringify(outcome.data);
+        if (typeof serialized !== 'string' || Buffer.byteLength(serialized, 'utf8') > AI_IO_LIMITS.storedResultBytes) throw new Error('Unpersistable result');
+        wireData = JSON.parse(serialized);
+      } catch {
+        const terminalError = createAppError('AI-PERSISTENCE-INVALID', 'The AI result could not be saved.');
+        attempts[attempts.length - 1].outcome = terminalError.code;
+        transaction.update(ref, { status: 'failed', terminalError, attempts, updatedAt: now, inFlight: FieldValue.delete(), result: FieldValue.delete(), validatedInput: FieldValue.delete() });
+        return { generationId: id, state: 'failed', error: terminalError };
+      }
+      transaction.update(ref, { status: 'succeeded', result: wireData, attempts, updatedAt: now, inFlight: FieldValue.delete(), validatedInput: FieldValue.delete() });
       return { generationId: id, state: 'succeeded', data: outcome.data };
     }
     const error = safeError(outcome.failure);

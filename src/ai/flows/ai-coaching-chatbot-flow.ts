@@ -50,7 +50,7 @@ export type AiCoachingChatbotOutput = z.infer<typeof AiCoachingChatbotOutputSche
 const SYSTEM_PROMPT = `${SHARK_GURU_ROLE}
 
 PRIMARY TASKS:
-- Use detailed analysis logic for errors: Misinterpretation (asked X chose Y), Concept Error (theory failure), Reasoning Error (logic gap), and Careless Mistake (fast/small deviation).
+- Treat error categories as tentative, not diagnoses. Use observable answer/work evidence; speed alone never establishes carelessness. Say evidence is insufficient rather than guessing a cause.
 - Provide advice based on 6 core skills: Concept Mastery, Application, Problem Decomposition, Logical Reasoning, Error Awareness, and Instruction Following.
 - Highlights (Điểm nổi bật): Stable patterns of 5+ correct answers, >=80% accuracy.
 - Areas for Improvement (Điểm cần cải thiện): Systematic error patterns, repeated main errors.

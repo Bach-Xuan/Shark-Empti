@@ -10,6 +10,9 @@ Read **Status** and **Current implementation** or **Resolution and evidence** fo
 
 Evidence applies to the revision, environment and scope in which it was collected. Local tests, Emulator checks, browser fixtures and deployed acceptance are distinct layers; **Resolved** closes the stated finding within its documented boundary. Finding-specific limitations remain below. The [release procedure](CONFIGURATION.md#release-procedure) connects the outstanding checks to staging and canary work.
 
+
+**Pause checkpoint — 29 October 2026:** WebKit remediation is paused at the user's request. Evidence-based reconciliation closes independently verified local defects: 52 findings are resolved and 20 remain unresolved. A failed global browser gate does not reopen unrelated corrected controls; missing finding-specific acceptance is not waived. Build/cache/test/coverage outputs were cleaned after dated conclusions were captured. Direct deletion of remaining `reports/` and `.tools/` analysis/installer leftovers was blocked; these ignored files are not application inputs. Named artifact paths describe reproducible outputs, not a permanent archive.
+
 ## 🧭 Finding-Code Legend
 
 | Code | Full Name | Scope |
@@ -26,14 +29,26 @@ Evidence applies to the revision, environment and scope in which it was collecte
 
 | ID | Finding | Status | Last Updated |
 |---|---|---|---|
-| M01 | Multi-Model AI Fallback Can Exceed a Single Transport Lifetime and Obscure Terminal Failures | Implemented locally; staging and canary verification pending | 20 September 2026 |
-| F01 | Missing Server-Side Authentication and Quota Enforcement for AI Actions | Local and Emulator verification passed; staging quota calibration pending | 20 September 2026 |
+| M01 | Multi-Model AI Fallback Can Exceed a Single Transport Lifetime and Obscure Terminal Failures | Local recovery regressions pass; staging and canary acceptance pending | 29 October 2026 |
+| F01 | Missing Server-Side Authentication and Quota Enforcement for AI Actions | Creation/traffic admission verified locally; staging calibration pending | 29 October 2026 |
 | F02 | Inadequate Validation of Persisted and Legacy Firestore Data | Local verification passed; deployed Rules verification pending | 20 September 2026 |
 | D07 | Post Deletion Leaves Publicly Readable Orphaned Comments | Local verification passed; deployed Rules verification pending | 20 September 2026 |
-| P04 | Idempotency Receipts Have No Defined Retention Bound | Implemented; production TTL/index activation blocked by IAM | 15 September 2026 |
-| V01 | Incomplete WebKit Validation | Partial; WebKit development passed, production matrix pending | 15 September 2026 |
+| D19 | AI Generation Finalization Failures Lose Stage Classification and Correlated Telemetry | Checkpoints and safe persistence classification implemented; staged acceptance pending | 29 October 2026 |
+| D20 | Indexability and Discoverability Policy Is Undefined Across Public and Authenticated Routes | Production-mode local metadata checks pass; deployed crawler/origin acceptance pending | 29 October 2026 |
+| D23 | Authenticated Profile Reads Expose Private Email Data | Owner/get/list boundaries verified locally; deployed Rules acceptance pending | 29 October 2026 |
+| D24 | Public Arena Answers and Repeat Rewards Undermine Competition Integrity | Private-key/eligibility regressions pass; full browser and migration deployment pending | 29 October 2026 |
+| D25 | Profile Deletion Removes Protected Coin State but Retains Descendants | Direct root-state deletion blocked and tested locally; deployed Rules/lifecycle acceptance pending | 29 October 2026 |
+| D27 | Recovered AI Feedback Is Not Persisted to Learning History | Stable-ID recovery persistence verified in unit tests; final browser handoff pending | 29 October 2026 |
+| D29 | Subscription Failures Produce Blank or Misleading Empty States | Safe error/retry states implemented; initial WebKit subscription stall unresolved | 29 October 2026 |
+| S05 | User-Facing Service Information and Account-Data Controls Are Missing | Bounded learning export/private review requests implemented; real operator and fulfilment remain pending | 29 October 2026 |
+| S06 | Community Operations Lack Moderation and Abuse Budgets | Budgeted writes/reporting/reversible moderation verified locally; operational/deployment acceptance pending | 29 October 2026 |
+| P04 | Idempotency Receipts Have No Defined Retention Bound | Retention implemented; deployed TTL/index activation still missing | 29 October 2026 |
+| P05 | Route-Level Client JavaScript Is Excessive | Initial-script budgets pass; controlled post-upgrade comparison pending | 29 October 2026 |
+| V01 | Incomplete WebKit Validation | Unresolved; remediation paused and full production matrix not green | 29 October 2026 |
 | V02 | Unverified Minimum Browser Versions and Physical-Camera Behaviour | Partial; historical physical-camera result is not reproducible from the current checkout; target matrix pending | 19 September 2026 |
-| V03 | Unverified Remote CI, Production Runtime, and Firestore Index State | Partial; hosted CI failure observed, deployment verification pending | 15 September 2026 |
+| V03 | Unverified Remote CI, Production Runtime, and Firestore Index State | Partial; browser release gate fails and deployed metadata has verified gaps | 29 October 2026 |
+| V07 | Educational and Focus Scores Lack Product Validation Evidence | Uncertainty labels and conservative provenance added; labelled product validation remains pending | 29 October 2026 |
+| V08 | Backup, Restore and Service-Incident Recovery Are Unverified | Native local export/import drill passed; production backup, ownership and recovery objectives unverified | 29 October 2026 |
 
 ## ✅ Resolved Findings
 
@@ -42,7 +57,7 @@ Evidence applies to the revision, environment and scope in which it was collecte
 | F03 | Non-Durable History Persistence Caused by `undefined` Values and Unawaited Writes | Resolved | 19 September 2026 |
 | F04 | Prototype-Key Collisions in Topic Aggregation | Resolved | 3 September 2026 |
 | F05 | Incorrect Denominators in Per-Skill Aggregate Scores | Resolved | 3 September 2026 |
-| F06 | Insufficient Semantic Validation of AI Inputs and Outputs | Resolved | 3 September 2026 |
+| F06 | Insufficient Semantic Validation of AI Inputs and Outputs | Resolved | 20 September 2026 |
 | F07 | Duplicate Forum Submission and Premature Draft Disposal | Resolved | 3 September 2026 |
 | F08 | Duplicate AI Feedback Generation for a Single Arena Attempt | Resolved | 3 September 2026 |
 | F09 | Inadequate Authentication Guarding and Retry Behaviour in Arena | Resolved | 3 September 2026 |
@@ -64,10 +79,20 @@ Evidence applies to the revision, environment and scope in which it was collecte
 | D12 | Incomplete Keyboard Semantics and Accessible Naming | Resolved | 19 September 2026 |
 | D13 | OpenRouter Health Check Does Not Authenticate the Supplied Key | Resolved | 19 September 2026 |
 | D14 | Authentication Restoration Can Discard an Early Forum Draft | Resolved | 19 September 2026 |
-| D15 | Client-Controlled Duration Compromises Arena Leaderboard Integrity | Resolved | 19 September 2026 |
-| D16 | Arena Leaderboard Applies Its Result Limit Before the Duration Tie-Break | Resolved | 19 September 2026 |
-| D17 | English Bonus Copy Misrepresents the Arena Reward Rule | Resolved | 19 September 2026 |
+| D15 | Client-Controlled Duration Compromises Arena Leaderboard Integrity | Resolved | 29 October 2026 |
+| D16 | Arena Leaderboard Applies Its Result Limit Before the Duration Tie-Break | Resolved | 29 October 2026 |
+| D17 | English Bonus Copy Misrepresents the Arena Reward Rule | Resolved | 29 October 2026 |
 | D18 | Activity Tracking Can Lose Concurrent Day Updates | Resolved | 19 September 2026 |
+| D21 | Custom Not-Found Experience Is Functionally Present but Incomplete | Resolved | 29 October 2026 |
+| D22 | User Avatar Images Lack Alternative Text | Resolved | 29 October 2026 |
+| D26 | Quiz Duration Limits Disagree Between Setup and Runtime | Resolved | 29 October 2026 |
+| D28 | Form Naming, Contrast and Page Semantics Remain Incomplete | Resolved | 29 October 2026 |
+| D30 | Authentication Can Complete Before Profile Initialization | Resolved | 29 October 2026 |
+| D31 | Unfinished Learning Sessions Have No Leave Protection or Recovery | Resolved | 29 October 2026 |
+| D32 | Locked Dependencies Trigger Blocking Security Advisories | Resolved | 29 October 2026 |
+| D33 | Practice Short Answers Use Unqualified Exact-Text Grading | Resolved | 29 October 2026 |
+| D34 | Authentication Controls and Chat Panels Fail Small-Viewport Layout | Resolved | 29 October 2026 |
+| D35 | Production Browser Checks Do Not Verify Demo Build Configuration | Resolved | 29 October 2026 |
 | N01 | Inconsistent Naming and File-Name Conventions | Resolved | 13 September 2026 |
 | N02 | Domain Types and Schemas Do Not Consistently Represent Their Lifecycle Stage | Resolved | 13 September 2026 |
 | N03 | Readability Debt and Potentially Unused Modules | Resolved | 13 September 2026 |
@@ -78,35 +103,39 @@ Evidence applies to the revision, environment and scope in which it was collecte
 | P01 | Unbounded Queries and Client-Side List Processing | Resolved | 13 September 2026 |
 | P02 | Recurrent Timer Updates and Repeated KaTeX Rendering | Resolved | 13 September 2026 |
 | P03 | Duplicate Conversation Context in AI Requests | Resolved | 13 September 2026 |
-| V04 | Dependency-Risk Assessment Is Not Current | Resolved | 20 September 2026 |
-| V05 | Inadequate Comparative Baselines and Incomplete Coverage Evidence | Resolved | 20 September 2026 |
+| V04 | Dependency-Risk Assessment Is Not Current | Resolved | 29 October 2026 |
+| V05 | Inadequate Comparative Baselines and Incomplete Coverage Evidence | Resolved | 29 October 2026 |
 | V06 | Production Builds Depend on Live Google Fonts Availability | Resolved | 13 September 2026 |
 
 ## 🔎 Detailed Findings
 
 ### 🤖 M01 - Multi-Model AI Fallback Can Exceed a Single Transport Lifetime and Obscure Terminal Failures
 
-**Status:** Implemented locally; staging and canary verification pending.
+**Status:** Local recovery regressions pass; staging and canary acceptance pending.
 
 **Original mechanism:** Before the implementation, all seven public AI flows executed `generateStructured` within a Server Action. The adapter performed sequential model fallback inside one invocation, and timeout rollover could produce the five-attempt sequence Inkling → Nemotron → Inkling → Gemma → Nemotron. Process-global model preference and visitor-triggered warm-up could also change the initial model for unrelated requests.
 
-**Current local implementation evidence:** The seven operations now use a server-only operation registry and one shared authenticated client protocol. A generation ledger transactionally claims at most three server-ordered attempts, and each attempt route calls the single-attempt OpenRouter adapter no more than once. The protocol provides idempotent creation, status recovery, explicit cancellation, short-lived validated input/result retention, per-user concurrency and rolling weighted quotas, a global ceiling, bounded request parsing, normalized retry classification, and content-free correlation telemetry. The process-global model preference, public warm-up flow, and `AiModelWarmup` bootstrap were removed. Firestore Rules explicitly deny browser access to `_aiGenerations` and `_aiQuota`, with TTL field overrides configured for both collections. Local lint, TypeScript, 32 unit/component test files with 88 tests, and a production build passed in the recorded validation. That historical run encountered a host loopback-selector failure before Emulator assertions; the 20 September run described in F01 subsequently passed all 45 Rules/integration tests.
+**Current local implementation evidence:** All seven operations use a server-only registry and shared authenticated client protocol. The transactional ledger permits at most three server-ordered attempts, each making at most one OpenRouter call. The adapter combines a 20-second deadline with the request signal and normalizes provider, transport, empty-content, JSON and schema failures before accepting data. Idempotent creation, status lookup, cancellation endpoints, bounded input parsing, attempt quotas and content-free completion telemetry are present, with recovery limitations below. Process-global model preference and visitor warm-up were removed. Browser access to `_aiGenerations` and `_aiQuota` is denied, and TTL policies are declared. The 29 October static, unit/integration and build results are recorded in V03; they do not close the confirmed recovery defects.
 
 **Remaining evidence boundary:** The repository does not prove the deployed Function maximum duration, Fluid Compute state, proxy behaviour, staging region, TTL activation, response-loss behaviour across real instances, or production cost/latency thresholds. The production feature flag therefore requires explicit enablement, and the finding is not classified as resolved until staging fault injection and production-canary criteria are satisfied. No `maxDuration` value has been invented from an unverified deployment assumption.
 
-**Scope boundary:** The finding is specifically concerned with the lifetime, retry topology, cancellation semantics, recovery behaviour, and process-level state of AI transport. The loss of structured diagnostic context is a consequence of that mechanism, not the complete definition of the problem. Correcting the transport does not remove the independent requirements for server-side authentication, authorization, request-size limits, rate limits, quota enforcement, semantic validation, or protection of sensitive data.
+**29 October recovery remediation:** Quota rejections no longer become polling loops; creation retries retain one UUID, request/recovery deadlines are bounded and feature-owned cancellation propagates through all wrappers. Expired leases settle transactionally, release concurrency reservations and terminate within three ordinals; stale finalizers cannot overwrite a new lease. Provider response bodies are size/time bounded, malformed envelopes/content/schema failures remain distinct, and invalid/oversized persisted output terminates atomically without leaking quota. The combined 368-test unit/component and 64-test Emulator suites pass locally; deployed fault injection and canary acceptance remain required.
+
+**Scope boundary:** The finding is specifically concerned with the lifetime, retry topology, cancellation semantics, recovery behaviour, and process-level state of AI transport. The supplied concerns about malformed/truncated output and per-attempt aborts therefore overlap M01 and the semantic-output boundary in F06; current source does not support treating them as newly discovered generic-500 defects. The remaining persistence and checkpoint-observability gap is independently recorded as D19. Correcting the transport does not remove the independent requirements for server-side authentication, authorization, request-size limits, rate limits, quota enforcement, semantic validation, or protection of sensitive data.
 
 **Closure criteria:** Deterministic coverage must establish the attempt ceiling, cancellation and timeout handling, response-loss recovery, duplicate in-flight rejection, retry classification, quota/authentication rejection, state isolation, secret redaction and preservation of all seven operation contracts. Staging evidence must correlate a non-sensitive generation identifier across browser and Function events, show no more than one provider call per invocation, and confirm that response loss recovers authoritative state before any further attempt. Closure also requires verified deployed duration/proxy behavior, calibrated quotas and TTL activation, followed by controlled production-canary acceptance.
 
 ### 🔥 F01 - Missing Server-Side Authentication and Quota Enforcement for AI Actions
 
-**Status:** Local and Emulator verification passed; staging quota calibration pending.
+**Status:** Creation/traffic admission verified locally; staging calibration pending.
 
 **Historical description:** The former exported AI Server Actions validated request shape but did not authenticate callers or enforce user quotas, body limits or rate limits. A prior probe invoked an action anonymously over HTTP; this did not establish credential exposure.
 
 **Implementation:** All AI creation, status, attempt and cancellation routes authenticate Firebase ID tokens. Creation authenticates before reading a byte-limited stream and validating operation input. Provider calls require an owner-bound transactional lease plus weighted user/global quota reservation. The browser cannot select a model or attempt ordinal. Stream parsing now cancels immediately when the actual byte limit is exceeded, including requests without Content-Length.
 
-**Verification evidence:** Four Auth/Firestore Emulator test cases in `tests/integration/ai-security.test.ts` cover absent, malformed and tampered credentials across all four routes; oversized envelope/operation input; valid-owner execution and cross-owner rejection; concurrent replay; per-user concurrency; user/global exhaustion; atomic cross-user global reservation and window reset. A server-auth regression separately simulates Firebase Admin's expired-token rejection and verifies the safe invalid-or-expired contract. Rejected requests never reach the mocked provider. Unit tests cover streaming cancellation and split UTF-8. The complete Rules/integration suite passes 45 tests.
+**Verification evidence:** The 64-test Rules/integration suite covers credentials across all AI routes, owner isolation, bounded input, transactional creation/storage admission, replay, traffic/provider quotas, concurrency and quota-release recovery. Expired-token and streaming body tests cover safe errors, byte accounting, a 10-second body-read deadline and aborts, including stalled/cancellation-resistant streams. Rejected requests do not reach the provider. These local fixtures do not establish deployed cost/burst calibration.
+
+**29 October admission remediation:** Creation reserves user/global count and byte credits atomically with its record; identical replay consumes no additional storage credit. Every AI endpoint has a separate authenticated traffic bucket, including status/cancellation. These refill buckets are distinct from first-reservation-anchored provider quotas. Admission/concurrency regressions pass in the combined suite; provisional capacities still need staging calibration. Non-AI contribution abuse remains S06 scope.
 
 **Remaining acceptance:** Staging must establish sustained-burst behavior across deployed instances and calibrate the 30/300 weighted budgets. The user confirmed these local changes have not reached Preview. `https://shark-empti.vercel.app` is a project reference, not acceptance evidence for this revision. F01 remains open until deployed verification is available.
 
@@ -156,7 +185,7 @@ Evidence applies to the revision, environment and scope in which it was collecte
 
 **Description and context:** Earlier flow contracts did not consistently enforce question counts, question types, option cardinality and uniqueness, answer membership, or metric ranges.
 
-**Resolution evidence:** Shared Zod schemas now constrain integer counts to 1–50, require the requested output count, validate question-specific option rules, and bound feedback metrics to 0–100. The test suite covers seven flow variants, invalid input and output cases, numeric Arena short answers, and language-specific exceptions.
+**Resolution evidence:** The OpenRouter adapter requires a valid response envelope, non-empty message content and parseable JSON before applying the operation's Zod schema. Shared Zod schemas then constrain integer counts to 1–50, require the requested output count, validate question-specific option rules, and bound feedback metrics to 0–100. Empty, malformed-JSON and schema-invalid provider results remain distinct internal failure kinds and do not cross the flow boundary as successful data. The test suite covers the adapter's invalid schema path, seven flow variants, invalid input and output cases, numeric Arena short answers, and language-specific exceptions.
 
 **Scope and evidentiary boundary:** Validation is performed at the server-side flow boundary after parsing the model response, including relationships that cannot be expressed solely by a provider-facing JSON Schema. Invalid inputs and outputs receive controlled application errors rather than silent coercion. Closure concerns the documented semantic contract; it does not guarantee factual correctness, pedagogical quality, or provider availability.
 
@@ -176,7 +205,7 @@ Evidence applies to the revision, environment and scope in which it was collecte
 
 **Description and context:** `QuizView` produced an analysis that `ResultView` previously regenerated, introducing unnecessary cost and potentially inconsistent feedback within one attempt.
 
-**Resolution evidence:** Arena retains and passes the existing analysis to the result view. A component-level regression verifies one feedback call rather than two.
+**Resolution evidence:** The V2 Arena flow defers feedback until after canonical server grading; its result view requests that analysis once. The current lifecycle regression verifies no provider grading during blind answering and one feedback call after submit. This preserves the single-analysis contract while avoiding public answer keys and timed pre-submit AI work.
 
 **Scope and evidentiary boundary:** The correction establishes single ownership of the analysis generated during quiz completion and prevents the result view from initiating a redundant request when that analysis is available. The test exercises the real view boundary while mocking external AI transport. It does not establish that upstream feedback generation itself is reliable or semantically correct.
 
@@ -356,7 +385,7 @@ Evidence applies to the revision, environment and scope in which it was collecte
 
 **Original defect:** Flashcard flipping, branding and some card navigation depended on pointer-only containers; several icon-only controls lacked explicit action names.
 
-**Implemented correction:** Flashcards and expandable history headers are native buttons. Flashcards expose the pressed state, describe the visible card face and hide the inactive face from assistive technology. Branding and Forum/Arena titles are native links. Chat, language/theme, help, note, copy, topic-action and overflow controls have accessible names; like actions also expose their pressed state.
+**Implemented correction:** Flashcards and expandable history headers are native buttons. Flashcards expose the pressed state, describe the visible card face and hide the inactive face from assistive technology. Branding and Forum/Arena titles are native links. The identified chat, language/theme, help, note, copy, topic-action and overflow controls have accessible names; like actions also expose their pressed state. Additional form/chat and visual-accessibility defects found in the broader review are tracked in D28.
 
 **Evidence and boundary:** Component tests exercise flashcard Enter/Space activation and Tab/Shift+Tab traversal. Browser tests check language-menu keyboard activation, Escape focus return, named controls and focused axe rules for names, nesting and ARIA validity in both locales/themes. These checks close the identified interaction defects; they are not a comprehensive screen-reader or WCAG certification.
 
@@ -388,7 +417,7 @@ Evidence applies to the revision, environment and scope in which it was collecte
 
 **Implemented correction:** An authenticated start API records a private UID/exam-bound session and question fingerprint. The client waits for acknowledgement before showing the quiz; start retries retain the original clock. Submission requires that session, ignores client duration, derives elapsed seconds from server start/receipt times and commits the consumed session with the attempt/reward/receipt transaction. Sessions expire logically after 24 hours, with a declared TTL policy for storage cleanup. Only new `timingVersion: 1` attempts enter the timed leaderboard.
 
-**Evidence and boundary:** Emulator tests cover zero, negative, fractional, extremely large and missing client durations; absent/mismatched/expired sessions; concurrent starts and submissions; and replay after receipt deletion. Component tests cover response loss, duplicate starts, retakes and late responses after account changes. The interval includes network and pre-submission feedback latency; public exam content still permits pre-reading. Production TTL activation and release of the matching client/start API remain deployment responsibilities.
+**Evidence and boundary:** Emulator tests cover untrusted client durations, absent/mismatched/expired sessions, concurrent/replayed starts/submissions and deleted-receipt replay; component tests cover response loss and stale account completions. V2 metadata no longer exposes prompts/keys before start, submission precedes canonical review, and ranked timing is anchored to the first eligible start across UUIDs (D24). Server elapsed time still includes transport delay; author collusion/sharing is not proctoring. Production Rules/index/TTL release remains separate acceptance.
 
 ### 🧩 D16 - Arena Leaderboard Applies Its Result Limit Before the Duration Tie-Break
 
@@ -396,7 +425,7 @@ Evidence applies to the revision, environment and scope in which it was collecte
 
 **Original defect:** The database selected ten attempts before the client applied duration tie-breaking, excluding faster qualifying attempts at the score cutoff.
 
-**Implemented correction:** The shared leaderboard query filters verified timing, orders by score descending, duration ascending and document ID ascending, and only then limits to ten. Client-side reordering is removed. `firestore.indexes.json` declares the exact composite index.
+**Implemented correction:** The shared leaderboard query filters verified timing and V2 ranking eligibility, orders by score descending, duration ascending and document ID ascending, and only then limits to ten. V2 entries are immutable per eligible participant, so retakes cannot occupy extra slots. Client-side reordering is removed; the exact composite index is declared.
 
 **Evidence and boundary:** A Rules/Emulator test queries the production query builder against more than ten tied scores, including a duration tie and a legacy zero-time record, and verifies the exact winning IDs. The index must be provisioned and ready before production release; Emulator success does not establish its remote deployment state. Legacy records remain stored but are not retroactively assigned trusted timing.
 
@@ -406,9 +435,9 @@ Evidence applies to the revision, environment and scope in which it was collecte
 
 **Original defect:** English copy implied a per-user first-attempt bonus although the server awards the first successful submission globally for each exam.
 
-**Implemented correction:** Both locales explicitly describe the first participant to complete that exam. The existing global reward rule is preserved.
+**Implemented correction:** Both locales describe the first eligible participant to complete an exam globally. Under D24's V2 policy, only a non-author's first eligible completion ranks/earns coins; author, retake and migrated practice-only completions do not receive rewards.
 
-**Evidence:** An Emulator test submits the first global attempt, another user's first attempt and a retake. It verifies bonus flags `[true, false, false]` and equal-score coin awards `[150, 100, 100]`.
+**Evidence:** Emulator cases verify bonus flags `[true, false, false]` and equal-score coin awards `[150, 100, 0]` for the first eligible global completion, another user's eligible completion and a retake. The zero retake reward is deliberate V2 policy, not a reopening of the original copy defect.
 
 ### 🧩 D18 - Activity Tracking Can Lose Concurrent Day Updates
 
@@ -421,6 +450,144 @@ Evidence applies to the revision, environment and scope in which it was collecte
 **Implemented correction:** `recordActiveDay` writes only the current date and `updatedAt`, with an explicit `mergeFields` leaf mask. Account-tagged snapshots and revoked callbacks prevent old-account activity from entering a new session.
 
 **Evidence:** Emulator tests retain distinct dates written by two stale clients in both orders and reconcile an offline queued date after another device writes. Hook tests verify one-date payloads, account switching, ignored stale callbacks and no guest writes. Existing Rules continue to enforce owner-only access.
+
+### 🧩 D19 - AI Generation Finalization Failures Lose Stage Classification and Correlated Telemetry
+
+**Status:** Checkpoints and safe persistence classification implemented; staged acceptance pending.
+
+**Finding and applicability:** Transactional ownership/lease checks were already present; the original gap was failure attribution after successful provider work, not a demonstrated non-atomic finalization. The pipeline now emits content-free checkpoints for creation, claim, provider receipt, parsing, validation, persistence and expired-lease recovery. Known storage failures receive a safe persistence error; unexpected errors retain the generic boundary plus the last failed stage. Stale leases are explicit conflicts and successful output is normalized for Firestore serialization.
+
+**Local evidence:** Combined unit/API regressions cover claim/finalize gRPC failures, stale leases, correlated checkpoints, redaction and invalid/oversized successful output. The latter atomically marks failure and releases quota; replay does not call the provider again. Body-read/provider-size deadlines are independently bounded. The 368/64 suites pass locally; deployed logging, cancellation/commit faults and retained telemetry still require staged acceptance.
+
+**Required correction and evidence:** Introduce a content-free stage taxonomy tied to the hashed generation correlation identifier; record entry and outcome checkpoints around claim, provider dispatch/receipt, parse/validation, finalization and recovery. Convert expected persistence and state conflicts into safe structured application errors while preserving an unexpected-error boundary and secret/content redaction. Deterministic fault injection must cover Firestore read/write/commit failures, stale leases, cancellation during finalization, quota-release failure, duplicate requests, and successful provider output followed by failed persistence. Staging evidence must demonstrate that every terminal or recovered request has an attributable last checkpoint without logging prompts, outputs, credentials or raw provider bodies.
+
+### 🧩 D20 - Indexability and Discoverability Policy Is Undefined Across Public and Authenticated Routes
+
+**Status:** Production-mode local metadata checks pass; deployed crawler/origin acceptance pending.
+
+**Current implementation:** Home/about now render useful bilingual public HTML, descriptions, canonical/social metadata and truthful SoftwareApplication JSON-LD. Only those stable routes enter the sitemap (empty in demo/preview). Forum/Arena remain public-read as requested, but UGC and authenticated/policy/moderation routes are noindex/nofollow, not sitemap entries. Robots permits page crawling to discover noindex and disallows APIs; it does not specifically block AI bots. Optional llms.txt describes public pages, not private data or access control. SITE_URL still needs the verified deployment origin.
+
+**Evidence and remaining acceptance:** Production-mode local HTTP smoke verifies meaningful SSR body content, descriptions/canonical/social image/JSON-LD, noindex policy, robots/sitemap/llms.txt and 404 behavior. This corrects the baseline source/metadata gaps, but not the unverified deployment origin or actual crawler acceptance; the finding remains open.
+
+### 🧩 D21 - Custom Not-Found Experience Is Functionally Present but Incomplete
+
+**Status:** Resolved.
+
+**Current implementation:** The existing custom 404 now includes bilingual explanation, home/about recovery links and a main landmark. Ordinary unknown/public-information routes no longer initialize Firebase, notifications or Focus Shield solely for the error page. The supplied blanket claim that no custom page existed was never applicable.
+
+**Resolution and evidence:** Local production checks verify ordinary/nested HTTP 404s, noindex and provider isolation; Chromium keyboard tests cover bilingual home/about recovery. This closes the identified recovery-page defects in the repository. Broader engine/deployed acceptance remains V01/V02/V03, not a claim of completed production rollout.
+
+### 🧩 D22 - User Avatar Images Lack Alternative Text
+
+**Status:** Resolved.
+
+**Current implementation:** All nine user-avatar sites explicitly use an empty alternative because adjacent identity text or the enclosing named control already conveys the identity. The shared AvatarImage type requires an alt prop, preventing accidental omissions at new call sites. No unsupported claim about missing general content-image alternatives is made.
+
+**Resolution and evidence:** All nine call sites satisfy the required-alt type contract; representative Navigation, Forum list/detail and Profile states pass recorded Chromium accessibility checks, including real decorative images next to readable identities. This closes the missing-avatar-alternative defect, not a general assistive-technology certification (D28/V02).
+
+### 🧩 D23 - Authenticated Profile Reads Expose Private Email Data
+
+**Status:** Owner/get/list boundaries verified locally; deployed Rules acceptance pending.
+
+**Current implementation and evidence:** Email remains in Auth, not new public profiles. Account bootstrap removes legacy email without overwriting biography or server-owned coins. Rules deny collection enumeration; another authenticated user can only get a known-UID record containing the explicit public-field whitelist. Legacy records with email/unknown private fields remain owner-only until repaired. Guest private reads remain denied. Local Rules tests verify owner/other/guest/list and repair behavior; UI reader stripping is not treated as access control.
+
+**Remaining acceptance:** Deploy and verify those Rules against the intended project. Dormant legacy profiles are deliberately fail-closed rather than silently bulk-modified.
+
+### 🧩 D24 - Public Arena Answers and Repeat Rewards Undermine Competition Integrity
+
+**Status:** Private-key/eligibility regressions pass; full browser and migration deployment pending.
+
+**Current implementation:** Arena is explicitly community practice, not a proctored competition; coins are symbolic/non-redeemable. V2 public documents contain metadata only. Private keys stay server-side, prompts arrive after a server-clock start, and canonical review arrives only after accepted submission. Only a non-author's first eligible completion can rank/earn points; retakes/authors and migrated legacy exams cannot. One participant occupies one V2 leaderboard slot. A private first-start marker prevents distinct start UUIDs from resetting ranked timing; configured timer expiry plus transport grace removes reward eligibility.
+
+**Evidence and remaining acceptance:** Local API tests verify private start payloads, concurrent/replayed submissions, one pioneer bonus, retake exclusion and migration to practice-only with private backups. Final tests cover the added first-clock anchoring/author policy and complete browser flow. Previously public answers cannot be made secret retroactively: inventory/migration, V2 indexes and Rules must be coordinated before deployment. Sharing released answers or multiple real accounts remains outside any proctoring claim; D15/D16 timing/order guarantees are preserved within the new policy.
+
+### 🧩 D25 - Profile Deletion Removes Protected Coin State but Retains Descendants
+
+**Status:** Direct root-state deletion blocked and tested locally; deployed Rules/lifecycle acceptance pending.
+
+**Current implementation and evidence:** Rules deny direct root-profile deletion/recreation over protected coin state, and public-field edits cannot remove/update coins. Local Rules tests verify the blocked delete/recreate bypass while owner-only descendants remain intact. This closes the narrow client lifecycle bypass in source; it is not an account-erasure implementation.
+
+**Remaining acceptance:** Verify deployed Rules. Complete export/deletion/request lifecycle and retention/operator responsibilities remain S05; do not imply that deleting a profile alone erases Auth, descendants, authored content or server records.
+
+### 🧩 D26 - Quiz Duration Limits Disagree Between Setup and Runtime
+
+**Status:** Resolved.
+
+**Current implementation:** Setup, ordinary runtime and stored Arena adapters share QUIZ_LIMITS (50 questions, optional 1–999 minutes), preserving the already offered/stored duration range. Numeric validation precedes academic/provider work. Raw fractional/out-of-range input is rejected with field feedback rather than silently becoming another integer. Unit boundaries cover the shared contract.
+
+**Resolution and evidence:** Shared-contract regressions cover empty/integer/fractional/out-of-range limits. Production Chromium cases accept a 999-minute draft through refresh and reject 1000 before AI work. Setup/runtime now use the same contract; no legacy data was rewritten. Full engine/release acceptance remains separate, not an uncorrected duration mismatch.
+
+### 🧩 D27 - Recovered AI Feedback Is Not Persisted to Learning History
+
+**Status:** Stable-ID recovery persistence verified in unit tests; final browser handoff pending.
+
+**Current implementation and evidence:** Recovered non-Arena feedback is merged into the same history document, including bilingual topic names, before ResultView presents it as durable. Save failure retains a retry, while generation/save-ID fences reject stale-session completion. Tests verify same-record updates, rejected writes and reset fencing. Failed-save drafts additionally retain already generated feedback rather than requiring another paid analysis after restore.
+
+**Remaining acceptance:** Local history/refresh cases verify ordinary durable saves; faulted recovery merge, stable IDs and stale/reset fencing are unit-tested. Dedicated cross-browser Dashboard/report handoff after a failed feedback save remains pending. Arena review is intentionally ephemeral, not a private history save.
+
+### 🧩 D28 - Form Naming, Contrast and Page Semantics Remain Incomplete
+
+**Status:** Resolved.
+
+**Current implementation:** Setup controls/radio/pressed state and chat input/send/log are named; primary page headings and navigation landmarks are explicit. Subject badges and foreground pairs use shared light/dark tokens; affected low-opacity text was removed. Reduced-motion and keyboard focus styles are present. Full axe checks pass for the recorded desktop/mobile Chromium states in both locales/themes, not a complete accessibility certification.
+
+**Verification boundary:** The identified naming, contrast and semantic failures are corrected and covered by full axe scans of the recorded desktop/mobile Chromium forms, expanded landscape chat and community states in both locales/themes. This is not WCAG certification. Remaining-engine/manual zoom/assistive-technology acceptance stays V01/V02; the unsettled subscription remains D29.
+
+### 🧩 D29 - Subscription Failures Produce Blank or Misleading Empty States
+
+**Status:** Safe error/retry states implemented; initial WebKit subscription stall unresolved.
+
+**Current implementation:** Paged readers expose persistent safe errors, malformed-record counts and retry; Profile/history/comments consume them. Detail readers distinguish missing/invalid/error states rather than redirecting or returning an unexplained blank body, and failed continuation clears unsafe cursors/data. These error callbacks do not yet solve a listener that never settles: the initial WebKit Forum subscription can remain in loading before the comment field appears (V01).
+
+**Remaining acceptance:** Exercise denied/missing/invalid records, failed continuation and successful resubscription in the final browser/Rules matrix. A valid empty feed must remain distinguishable from a failed read.
+
+### 🧩 D30 - Authentication Can Complete Before Profile Initialization
+
+**Status:** Resolved.
+
+**Current implementation and evidence:** FirebaseProvider owns bootstrap after sign-in and restored sessions. Authenticated children wait for an idempotent repair; failure preserves Auth and exposes retry. Missing public fields are repaired without overwriting biography/coins, and stale account completions are fenced. The sign-in hook no longer independently races profile creation/redirect. Component tests cover delayed/rejected bootstrap and account switching.
+
+**Resolution and evidence:** Delayed/rejected/retried bootstrap and stale account completion are component-tested; real Emulator popup, restored-session, private-data isolation and account-switch flows pass recorded production Chromium runs. Children do not proceed before owner profile readiness. General browser release acceptance remains V01/V03; no unresolved profile-initialization race is being hidden by that boundary.
+
+### 🧩 D31 - Unfinished Learning Sessions Have No Leave Protection or Recovery
+
+**Status:** Resolved.
+
+**Current implementation:** Account-scoped, validated same-tab drafts cover Quiz, Practice, Flashcards and Arena with a 24-hour inactivity expiry and 1 MB per-record cap. Questions/progress and stable save IDs resume; failed Quiz saves retain generated feedback. Flashcard resume does not rearchive/regenerate. Auth changes clear other-owner data, explicit discard/completion clears active drafts, and storage failure warns visibly. Home navigation can preserve an unfinished session rather than resetting it. Browser/internal-link guards prompt before abandoning active work. Arena restores its server UUID and never trusts a local key/clock for rewards.
+
+**Resolution and evidence:** Unit cases cover owner isolation, corrupt/expired/quota storage, stable save IDs, question position and failed-save retry. Recorded production Chromium cases recover Quiz, Practice, Flashcards and Arena without duplicate generation/archive; Arena reuses its start UUID. This closes the absence of leave/recovery protection within the stated best-effort, same-tab 1 MB/24-hour contract. It does not promise cross-device durability or certify untested physical browsers (V01/V02).
+
+### 🧩 D32 - Locked Dependencies Trigger Blocking Security Advisories
+
+**Status:** Resolved.
+
+**Current assessment and remediation:** The baseline registry run matched 95 advisory records (34 high/four critical). Compatible groups now use Next/eslint-config-next 16.4.3, Zod 4.6.7, firebase-admin 14.5.0 and Vitest/coverage 4.1.12, plus permitted transitive updates. Exact-parent overrides patch Firestore-owned grpc-js and development-only get-uri/basic-ftp; local load/FTP-contract regressions pass. The fresh policy run matched eight moderate and zero high/critical records across 1,454 instances. These are advisory matches, not independently demonstrated exploits.
+
+**Resolution and evidence:** Clean `npm ci --ignore-scripts`, the blocking-advisory policy, build and unit/integration gates pass on the updated lock; the full installed dependency tree has no invalid/missing/extraneous packages. This closes the identified blocking ranges, not a zero-vulnerability claim: eight moderate advisories remain visible, not approved exceptions. Reassess parent-scoped overrides when dependencies change. The pre-existing browser/release failure remains V01/V03.
+
+### 🧩 D33 - Practice Short Answers Use Unqualified Exact-Text Grading
+
+**Status:** Resolved.
+
+**Current implementation:** Practice choice/exact answers are deterministic; scalar numeric variants use the shared absolute tolerance. Free text uses bounded contextual short-answer evaluation. Low-confidence/unavailable grading preserves the answer for edit/retry rather than saving an incorrect result. Per-attempt cancellation/epoch fences suppress stale grading; duplicate actions stay locked. Ordinary Quiz also refuses low-confidence grading. The 0.8 confidence gate is provisional, not calibrated product-validation evidence.
+
+**Resolution and evidence:** Local regressions cover equivalent/incorrect English/Vietnamese answers, numeric formats, uncertain/unavailable provider results and account/unmount fencing. Free text is no longer unconditionally exact-text graded or falsely marked wrong when grading is uncertain. This closes the functional grading/provenance defect; calibrated semantic accuracy and the provisional threshold remain V07.
+
+### 🧩 D34 - Authentication Controls and Chat Panels Fail Small-Viewport Layout
+
+**Status:** Resolved.
+
+**Current implementation:** The 320-pixel reproduction exposed a nowrap authentication switch that enlarged the layout viewport. Branding/actions now have bounded flex widths and the switch wraps; tests assert the actual viewport and every header/main button boundary at 320/390/640/768/1280 widths in both locales/themes. Expanded landscape chat has bounded dynamic height, a keyboard-scrollable named log and reachable minimize controls.
+
+**Resolution and evidence:** Recorded Chromium cases verify actual narrow viewport geometry and visible/clickable controls across both locales/themes, plus the 844×390 expanded-chat reproduction, long content and keyboard scrolling/minimize access. This closes those identified CSS/layout failures. Actual OS virtual keyboards, physical-device zoom and remaining-engine acceptance remain V01/V02, not a claimed device certification.
+
+### 🧩 D35 - Production Browser Checks Do Not Verify Demo Build Configuration
+
+**Status:** Resolved.
+
+**Evidence and impact:** Production E2E and browser-performance runners supply demo Firebase values when starting Next, but `NEXT_PUBLIC_*` values in client JavaScript originate from the build. Neither runner verifies that an existing optimized artifact was built for the demo project and Emulator mode before launching a browser. A locally prepared production-configured build can therefore retain non-demo client destinations despite server-side Emulator variables. CI supplies demo values at build time, and the 29 October audit explicitly prepared its demo build; the finding concerns missing enforcement for other local/artifact inputs, not evidence that those recorded runs accessed production.
+
+**Resolution and evidence:** Build IDs verify all seven build-time demo values and fingerprint source/assets/lock/configuration. Production browser runners reject missing, non-demo, stale and linked inputs and require loopback Emulators. E2E permits only configured local ports and public GAPI GET bootstrap scripts, denying production Auth/Firestore/provider endpoints; benchmarks retain native caching with verified demo inputs and a disabled provider. Negative guards and real demo-build/HTTP checks pass. This closes accidental-misconfiguration enforcement, not malicious-artifact attestation or the independent V01 browser defect.
 
 ### 🧹 N01 - Inconsistent Naming and File-Name Conventions
 
@@ -506,6 +673,22 @@ Evidence applies to the revision, environment and scope in which it was collecte
 
 **Original verification criteria:** Mutations that require coordination should return an explicit `Promise<Result>`, apply pending exclusion where necessary, and retain safe typed diagnostics. Delayed and rejected promises, provider failures, boundary reset, and localized recovery UI require testing.
 
+### 🏗️ S05 - User-Facing Service Information and Account-Data Controls Are Missing
+
+**Status:** Bounded learning export/private review requests implemented; real operator and fulfilment remain pending.
+
+**Current implementation:** Public bilingual about/privacy/terms/community drafts explain data/AI/camera boundaries, public UGC, unvalidated estimates, browser drafts and symbolic coins. Profile downloads supported private learning datasets in bounded, explicitly scoped JSON parts with continuation/completion and selected Auth identity, never credentials. Private, rate-limited complete-export/deletion-review requests are idempotent and owner-status scoped; they do not execute deletion or grant community moderators account-data access. Per the user's decision, SITE_INFO visibly uses unconfigured example.invalid placeholders, not a working service contact or approved legal identity.
+
+**Evidence and remaining acceptance:** Local owner-only export tests cover tagged values, paging, request caps/replay and no deletion; Chromium browser cases verify downloads and private review queues in both locales. Replace dummy identity/contact information, assign the actual operator/audience, approve retention and staff fulfilment across Auth, descendants, public attribution and backups. A queued request is not fulfilled erasure or a complete account export; no legal compliance or response SLA is claimed.
+
+### 🏗️ S06 - Community Operations Lack Moderation and Abuse Budgets
+
+**Status:** Budgeted writes/reporting/reversible moderation verified locally; operational/deployment acceptance pending.
+
+**Current implementation and evidence:** Forum creation/edit/likes use authenticated, bounded Admin APIs; direct SDK writes are denied. Transactional per-user/global count/byte budgets cover contributions and Arena create/start/submit, while receipt retries remain idempotent. Reporting, private moderator queues and attributable reversible hide/restore are implemented. Decisions require current server-assigned moderator claims, not UI flags. Local tests verify spam caps, concurrent desired likes, unauthorized/revoked roles, replay, archive recovery and tombstone protection.
+
+**Remaining acceptance:** Deploy matching Rules/indexes/APIs, verify the final browser paths and calibrate limits. No moderator is granted by default and no staffed response SLA or school/minor readiness is implied. Hidden/backlogged reports and privacy/account requests still require a real operational owner.
+
 ### ⚡ P01 - Unbounded Queries and Client-Side List Processing
 
 **Status:** Resolved.
@@ -544,7 +727,7 @@ Evidence applies to the revision, environment and scope in which it was collecte
 
 ### ⚡ P04 - Idempotency Receipts Have No Defined Retention Bound
 
-**Status:** Implemented; production TTL/index activation blocked by IAM.
+**Status:** Retention implemented; deployed TTL/index activation still missing.
 
 **Historical finding:** Request receipts previously lacked a defined expiry, permitting unbounded retention.
 
@@ -552,19 +735,29 @@ Evidence applies to the revision, environment and scope in which it was collecte
 
 **Recorded historical evidence:** The production metadata inspection found TTL disabled and the configured posts compound index missing. Receipt inventory returned zero documents. A configuration application attempt was rejected with HTTP 403 `PERMISSION_DENIED` at index creation, before TTL configuration was attempted; no production configuration change succeeded. The apply script cited in the original evidence is not present in this checkout. `scripts/inspect-firestore.mjs` is currently read-only. Local integration tests passed 7/7 in that recorded validation.
 
-**Remaining acceptance:** Use an appropriately authorized Google identity to apply the configuration and verify completed index/TTL operations. Verify actual expiry cleanup and retry behavior around deletion. Local machine access does not grant Google IAM permissions.
+**Remaining acceptance:** The read-only inspection at `2026-10-29T15:11:46.600Z` found no composite indexes in the four declared collection groups and all five declared TTL policies unset. This does not concern automatic single-field indexes. No new configuration write or IAM test was attempted; the 403 above is historical, not a verified current permission assessment. Authorized, coordinated activation and subsequent deployed verification remain required.
+
+### ⚡ P05 - Route-Level Client JavaScript Is Excessive
+
+**Status:** Initial-script budgets pass; controlled post-upgrade comparison pending.
+
+**Baseline and implementation:** The earlier 29 October production Forum shell referenced 644,079 gzip bytes of initial JavaScript against a 612,352-byte budget. That is a route-level performance finding, independent of SEO. Plain text now bypasses lazy KaTeX JS/CSS, the public home defers the authenticated learning module and print-only eager math lives in a deferred report module. Public information/ordinary 404s avoid application providers. Print readiness preserves synchronous math output and font preparation rather than accepting a raw-TeX fallback as an optimization.
+
+**Remaining acceptance:** Production HTTP smoke now passes all six unchanged script budgets: initial gzip bytes are 385,142 (home), 443,743 (login/register), 510,151 (Forum), 508,924 (Arena) and 508,830 (Profile). Forum is 20.8% below its recorded 644,079-byte baseline. These route-transfer measurements are not isolated timing/heap gains across changed dependencies. The controlled post-upgrade cold/warm comparison was prepared but not completed before the pause; it remains pending, along with full browser acceptance.
 
 ### 🧪 V01 - Incomplete WebKit Validation
 
-**Status:** Partial; WebKit development passed, production matrix pending.
+**Status:** Unresolved; remediation paused and full production matrix not green.
 
 **Historical finding:** Earlier WebKit attempts were limited by host application control and stalled Firestore subscriptions. The host launch restriction no longer prevented the recorded run.
 
-**Current-source reconciliation:** `src/firebase/index.ts` currently connects to the Auth and Firestore emulators but does not set a Firestore long-polling option. The earlier claim that long polling is forced is therefore not supported by this checkout. The toast viewport change and failed-comment E2E handling remain separate UI corrections.
+**Current-source reconciliation:** The final checkout keeps the original Firestore transport; no forced long polling, disabled CORS or weakened Rules was retained. Routing arrangements, wrapper/native controls and a fresh Emulator were investigated without establishing a root cause. One native control passed, but repetition stalled again; an isolated pass is not acceptance. The final Emulator-only long-polling experiment was interrupted and removed rather than retained as an unverified fix.
 
 **Recorded historical evidence:** Before the recorded corrections, production E2E passed 26/28 cases, with two WebKit failures. After those corrections, WebKit development E2E passed 7/7 and the production build passed. Firestore Rules and access controls were not weakened.
 
-**Remaining acceptance:** Run the complete 28-case production E2E matrix on the corrected build. Development E2E and a successful build do not substitute for that result, and current Playwright WebKit does not establish exact Safari-version support.
+**29 October evidence:** The expanded 56-case production matrix passed 32, failed one and skipped 23 after fail-fast. Desktop/mobile Chromium completed; WebKit stalled waiting for the Forum comment field before Arena submission. Repeated combined and control cases also stalled, so the earlier 31/32 result is superseded and scenario-specific routing blame is unproven. This is reproducible local evidence, not proof of a deployed Safari defect. Remediation was paused at the user's request.
+
+**Remaining acceptance:** Diagnose the failed Forum scenario and obtain a complete repeatable production matrix. Development success or an isolated passing rerun does not erase the full-run failure, and current Playwright WebKit does not establish exact Safari-version support.
 
 ### 🧪 V02 - Unverified Minimum Browser Versions and Physical-Camera Behaviour
 
@@ -578,13 +771,15 @@ Evidence applies to the revision, environment and scope in which it was collecte
 
 ### 🧪 V03 - Unverified Remote CI, Production Runtime, and Firestore Index State
 
-**Status:** Partial; hosted CI failure observed, deployment verification pending.
+**Status:** Partial; browser release gate fails and deployed metadata has verified gaps.
 
 **Recorded external evidence:** The previously inspected hosted run `34766457053` for revision `cc97e79` passed installation, static checks, coverage, integration and build, then failed four development WebKit cases; production E2E and later validation steps were skipped. Six deployed public routes returned HTTP 200, and the deployment status indicated success. These observations predate the user's restriction on GitHub operations; no new remote verification is implied.
 
-**Local implementation and evidence:** The repository declares posts/Arena compound indexes and TTL policies for receipts, AI generations, AI quotas and Arena sessions in `firestore.indexes.json`, and includes production HTTP smoke and full production E2E commands. The read-only metadata script inspects posts/Arena indexes and all four TTL policies. The corrected local production build passed; the complete corrected production E2E matrix remains unverified. A historical direct Firestore metadata read found the configured posts index missing and receipt TTL disabled; the subsequent configuration attempt failed with IAM 403.
+**Local implementation and evidence:** The read-only metadata inspector now derives every declared index group and expiry field from configuration. Its `2026-10-29T15:11:46.600Z` read found `_communityReports`, `arenaExams`, `posts` and `attempts` composite-index inventories empty, and all five TTL policies unset. Private Admin and explicit Web project configuration matched without exposing values. No remote mutation/current IAM-write check was performed. Local production HTTP probes find no public source maps; server/build maps remain local artifacts, not demonstrated public exposure.
 
-**Remaining acceptance:** Obtain a successful complete hosted run only when the user explicitly requests GitHub activity, validate the corrected optimized runtime and deployment settings, and confirm deployed Rules, index readiness and TTL activation. Public-route HTTP responses do not establish authenticated workflows, live AI inference or production configuration correctness.
+**Remaining acceptance:** Obtain a successful complete hosted run only when the user explicitly requests GitHub activity, validate the corrected optimized runtime and deployment settings, and confirm deployed Rules, index readiness and TTL activation. Confirm source-map upload, retention and access policy in the actual deployment/observability configuration without making server artifacts public. Public-route HTTP responses and sampled 404 probes do not establish authenticated workflows, live AI inference, complete source-map policy or production configuration correctness.
+
+**29 October local release evidence:** The pause review passes lint (zero warnings), TypeScript, maintenance contracts and 368 unit/component tests, including both opt-in Chromium print cases, with no skips. The latest completed Rules/API run passes 64; production build/HTTP smoke passes and all six script budgets are within unchanged limits. Registry assessment has zero high/critical and eight moderate matches. Browser acceptance still fails at V01 (32 passed/one failed/23 skipped); no new hosted CI, deployed Rules or live-provider acceptance is implied.
 
 ### 🧪 V04 - Dependency-Risk Assessment Is Not Current
 
@@ -592,9 +787,9 @@ Evidence applies to the revision, environment and scope in which it was collecte
 
 **Historical context:** A past registry assessment reported four moderate findings, but its claimed policy was absent from the checkout and the workflow did not enforce a current audit.
 
-**Resolution and evidence:** The registry runner records advisory identities, affected installed paths, measurement time and lockfile SHA-256. `config/dependency-audit-policy.json` blocks high/critical findings; registry errors fail validation. The checked-in workflow runs the audit after installation. Four regressions verify moderate reporting, high/critical failure and registry failure. On 20 September 2026, 1,429 package instances produced six moderate findings and no high/critical findings: OpenTelemetry core, csv-parse, two qs advisories, stream-json and uuid.
+**Resolution and evidence:** The runner records advisory IDs, installed paths, time and lock SHA-256; high/critical or registry errors fail policy, while low/moderate remain visible. Four regressions and the checked-in workflow enforce that assessment. Historical 20 September data had six moderate matches; the initial 29 October run had 95 (34 high/four critical). After remediation, the `2026-10-29T15:17:32.707Z` run across 1,454 instances has eight moderate and zero high/critical. D32 remains open for complete release acceptance.
 
-**Boundary:** Closure concerns a current, reproducible assessment and explicit policy. The six moderate advisories remain reported and are not approved exceptions or fixed vulnerabilities. No exception mechanism or `--write-report` mode is claimed. Hosted execution remains V03 scope; advisory counts must be refreshed as dependencies or registry data change.
+**Boundary:** Closure concerns the reproducible assessment and explicit policy, not absence of vulnerable dependencies. Reported advisories are not approved exceptions or proof of exploitability. No exception mechanism or `--write-report` mode is claimed. Hosted execution remains V03 scope; counts must be refreshed as dependencies or registry data change.
 
 ### 🧪 V05 - Inadequate Comparative Baselines and Incomplete Coverage Evidence
 
@@ -604,11 +799,11 @@ Evidence applies to the revision, environment and scope in which it was collecte
 
 **Resolution:** Checked-in browser, historical-comparison and query-comparison scripts now supplement synthetic and bundle reports. On 20 September 2026, historical source `e6e19af` (107 source/config files verified against that revision) and current source both ran with Node 24.19.0 and an identical SHA-256 of the installed dependency lock. This normalizes dependencies rather than reproducing the historical lockfile installation. Sequential measurements used the same Chromium, machine, 1280×800 viewport, guest state, empty demo database and five cold/warm pairs per route.
 
-**Measured comparison:** Browser cold-load medians, baseline → current, were 402.3 → 204.8 ms for `/login`, 599.5 → 486.3 ms for `/forum`, and 401.9 → 425.1 ms for `/arena`. Warm medians were 124.6 → 80.8, 183.6 → 130.2 and 169.2 → 127.2 ms respectively. Reports preserve raw load/resource/heap/DOM samples and Forum input-to-frame p50/p95. These mixed route outcomes do not support a universal speedup claim. A real Emulator comparison returned 100/1,000/10,000 documents versus 50 at every scale, with five alternating query pairs per scale.
+**Historical measured comparison (20 September, not the post-upgrade build):** Cold-load medians, baseline → current at that time, were 402.3 → 204.8 ms (`/login`), 599.5 → 486.3 (`/forum`) and 401.9 → 425.1 (`/arena`); warm medians were 124.6 → 80.8, 183.6 → 130.2 and 169.2 → 127.2 ms. Recorded samples included heap/DOM/resources and Forum interaction p50/p95. A separate local query comparison returned 100/1,000/10,000 documents versus 50 at each scale. These historical mixed outcomes do not establish a current universal speedup.
 
-**Coverage evidence:** Unit/component validation passed 300 tests across 53 files, with two opt-in print cases skipped in one additional file. V8 whole-source coverage measured 2,077/3,306 lines and 1,405/2,737 branches. Changed biography logic covered 18/18 branches; the body parser and document subscription each covered 13/18. The 45-test Rules/integration run separately covered 156/201 lines and 98/166 branches within its explicit AI/server denominator, including 60/116 ledger branches. Reports are under `coverage/unit/` and `coverage/integration/`; overlapping counters must not be summed. Lint, typecheck and the optimized build passed.
+**Current local coverage evidence:** The 368-test unit/component run (61 files, no skips) covers 2,656/4,265 source lines (62.27%) and 1,866/3,761 branches (49.61%). The separate 64-test Rules/API run covers 232/265 lines (87.54%) and 151/216 branches (69.90%) within its explicit AI/server denominator. Overlapping counters must not be summed, and unexecuted source is not implied covered. Lint, typecheck and the recorded optimized build pass.
 
-**Evidence boundary:** Repeatable tooling, a controlled historical source comparison and explicit coverage denominators close this validation gap. Five samples per condition are exploratory and cover guest routes/local demo queries. They do not establish statistical significance, production billing, authenticated learning latency, physical-camera performance or live AI reliability. Raw artifacts are `reports/browser-performance-{baseline,current}.json`, `reports/performance-comparison.json` and `reports/query-comparison.json`. Reproduction prerequisites are in [CONFIGURATION.md](CONFIGURATION.md).
+**Evidence boundary:** Repeatable tooling, a dated controlled comparison and explicit denominators close this tooling gap, not P05's current performance acceptance. Five guest-route samples are exploratory, not evidence of production billing, authenticated latency, real-camera or live-AI reliability. The post-upgrade controlled comparison remains unfinished. Output names `reports/browser-performance-{baseline,current}.json`, `reports/performance-comparison.json` and `reports/query-comparison.json` are reproducible artifacts, not retained files; see [CONFIGURATION.md](CONFIGURATION.md).
 
 ### 🧪 V06 - Production Builds Depend on Live Google Fonts Availability
 
@@ -619,3 +814,19 @@ Evidence applies to the revision, environment and scope in which it was collecte
 **Historical description and context:** The root layout imports Inter and Space Grotesk through `next/font/google`, which downloads font assets during the production build. A clean `next build` performed during this review failed solely because the environment could not reach `fonts.googleapis.com`. The repository does not contain local copies or another offline build path for these fonts.
 
 **Original verification criteria:** Decide whether network access to Google Fonts is an explicit build prerequisite or whether the fonts should be self-hosted through `next/font/local`. A clean build should then be tested both in the intended CI environment and in a network-restricted environment consistent with the chosen policy. This finding concerns deterministic build availability and does not assert a defect in the application's runtime font rendering.
+
+### 🧪 V07 - Educational and Focus Scores Lack Product Validation Evidence
+
+**Status:** Uncertainty labels and conservative provenance added; labelled product validation remains pending.
+
+**Current implementation and limits:** Result/Dashboard/public information label AI/cognitive outputs as unvalidated estimates. Wrong-answer speed no longer assigns a cognitive cause; missing/unknown stored categories remain Unclassified rather than silently becoming Concept Error, and prompts warn against timing-only diagnoses. Low-confidence text grading stays retryable. No labelled bilingual evaluation/calibration set or reviewed rubric exists for six cognitive scores, semantic grading or camera thresholds/person detection; lifecycle tests do not establish those accuracies.
+
+**Remaining acceptance:** Evaluate representative topics and supported camera conditions against reviewed labels, document disagreements and calibrate confidence/thresholds. Align displayed category provenance without treating model interpretations as diagnoses. Hardware/attention/person-detection validity and educational accuracy cannot be closed by synthetic passing tests or new disclaimer copy alone.
+
+### 🧪 V08 - Backup, Restore and Service-Incident Recovery Are Unverified
+
+**Status:** Native local export/import drill passed; production backup, ownership and recovery objectives unverified.
+
+**Current evidence:** The 29 October native Auth/Firestore Emulator export/import drill restored sign-in/claims, history/timestamps, private Arena keys/sessions/receipts and wallet state. A consumed submission replay did not pay again; private/owner/orphan Rules still held, hidden content restored and interrupted Forum deletion resumed. The generated synthetic snapshot was removed after successful verification. The configuration guide now includes the reproducible command and incident/isolation/reconciliation procedure.
+
+**Remaining acceptance:** Assign real incident/privacy ownership and contact, agree production recovery-point/time objectives and backup retention, verify an actual backup schedule/least-privilege restore target, then perform a reviewed isolated production-data restore and cutover/canary drill. The repository does not establish that deployed backups/IAM/indexes are configured. TTL/receipts are not business backups, and local synthetic restoration is not production recovery certification.

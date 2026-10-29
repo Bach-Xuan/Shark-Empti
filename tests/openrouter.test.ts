@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { requestStructuredOnce } from '@/ai/openrouter';
 import { classifyAiFailure } from '@/ai/error-classifier';
+import { AI_IO_LIMITS } from '@/ai/config/limits';
+import { readProviderBody } from '@/ai/provider-body';
 import { afterEach,beforeEach,describe,expect,it,vi } from 'vitest';
 import { z } from 'zod';
 vi.mock('server-only', () => ({}));
@@ -52,5 +54,46 @@ describe('single-attempt OpenRouter adapter', () => {
     const fetchMock = vi.fn(); vi.stubGlobal('fetch', fetchMock);
     await expect(run()).resolves.toEqual({ ok: false, failure: { kind: 'configuration', code: 'AI-CONFIG-MISSING' } });
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it.each([
+    ['{', 'invalid_json'],
+    [JSON.stringify({ choices: 'wrong shape' }), 'invalid_schema'],
+    [JSON.stringify({ choices: [{ message: { content: '   ' } }] }), 'empty'],
+  ])('classifies malformed envelope/content %s without leaking its body', async (text, kind) => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(text)));
+    await expect(run()).resolves.toEqual({ ok: false, failure: { kind, code: 'AI-INVALID-RESPONSE' } });
+  });
+  it('bounds decoded provider bytes and cancels an oversized streamed response', async () => {
+    const cancel = vi.fn(() => new Promise<void>(() => {}));
+    const stream = new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array(AI_IO_LIMITS.providerBodyBytes + 1)); }, cancel });
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(stream)));
+    await expect(run()).resolves.toEqual({ ok: false, failure: { kind: 'response_too_large', code: 'AI-INVALID-RESPONSE' } });
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+  it('rejects schema-valid output that exceeds the persisted UTF-8 byte budget', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ choices: [{ message: { content: JSON.stringify({ answer: 'é'.repeat(AI_IO_LIMITS.storedResultBytes / 2) }) } }] })));
+    await expect(run()).resolves.toEqual({ ok: false, failure: { kind: 'response_too_large', code: 'AI-INVALID-RESPONSE' } });
+  });
+  it('cancels a body stalled after headers when its signal aborts', async () => {
+    const controller = new AbortController();
+    const cancel = vi.fn();
+    const waiting = readProviderBody(new Response(new ReadableStream({ cancel })), controller.signal);
+    const failure = expect(waiting).rejects.toBeInstanceOf(DOMException);
+    controller.abort();
+    await failure;
+    expect(cancel).toHaveBeenCalledOnce();
+  });
+  it('normalizes unsupported serialization from a future output transform', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({ choices: [{ message: { content: '{"answer":"1"}' } }] })));
+    const transformed = z.object({ answer: z.string().transform(value => BigInt(value)) });
+    await expect(requestStructuredOnce({ operation: 'academic-validation', modelOrdinal: 0, system: 'Teach clearly.', prompt: 'Question', schema: transformed, signal: new AbortController().signal })).resolves.toEqual({ ok: false, failure: { kind: 'invalid_schema', code: 'AI-INVALID-RESPONSE' } });
+  });
+  it('respects Retry-After dates and terminates oversized delays instead of creating invalid timestamps', async () => {
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response({}, 429, { 'retry-after': new Date(Date.now() + 10_000).toUTCString() })));
+    const result = await run();
+    expect(result).toMatchObject({ ok: false, failure: { retryAfterMs: 10_000 } });
+    expect(classifyAiFailure({ kind: 'provider', code: 'AI-PROVIDER-429', httpStatus: 429, retryAfterMs: 1e100 })).toEqual({ decision: 'terminal' });
+    expect(classifyAiFailure({ kind: 'provider', code: 'AI-PROVIDER-429', httpStatus: 429, retryAfterMs: NaN })).toEqual({ decision: 'terminal' });
   });
 });

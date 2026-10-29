@@ -25,6 +25,7 @@ vi.mock('@/components/ui/dropdown-menu', () => ({
   DropdownMenuContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
   DropdownMenuItem: ({ children, onSelect }: { children: ReactNode; onSelect: (event: { preventDefault: () => void }) => void }) => <button onClick={event => onSelect(event)}>{children}</button>,
 }));
+vi.mock('@/lib/forum-client', () => ({ mutateForum: (_user: unknown, postId: string, body: unknown) => mocks.write(postId, body), deleteForumPost: vi.fn(), communityRequest: vi.fn() }));
 vi.mock('firebase/firestore', () => ({
   collection: (_db: unknown, ...p: string[]) => p.join('/'), doc: (_db: unknown, ...p: string[]) => ({ path: p.join('/') }), query: (source: string) => source,
   orderBy: vi.fn(), where: vi.fn(), serverTimestamp: () => 1, updateDoc: mocks.write,

@@ -86,7 +86,7 @@ export default function FeatureHelp({ title, items, helpTitle, storageKey }: Fea
               className="flex gap-4 p-4 rounded-2xl border-2 border-border/50 bg-muted/5 hover:bg-muted/10 transition-colors group animate-in slide-in-from-left-4 duration-500"
               style={{ animationDelay: `${idx * 100}ms` }}
             >
-              <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-primary text-white flex items-center justify-center font-black text-[10px] md:text-xs shrink-0 shadow-duo group-hover:scale-110 transition-transform">
+              <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-black text-[10px] md:text-xs shrink-0 shadow-duo group-hover:scale-110 transition-transform">
                 {idx + 1}
               </div>
               <p className="text-[11px] md:text-sm font-bold text-foreground leading-relaxed flex-1">
@@ -99,7 +99,7 @@ export default function FeatureHelp({ title, items, helpTitle, storageKey }: Fea
         <div className="mt-8 flex justify-end">
           <Button
             onClick={() => setIsOpen(false)}
-            className="btn-duo h-12 md:h-14 px-8 md:px-12 rounded-xl md:rounded-2xl bg-primary text-white font-black uppercase text-xs md:text-sm tracking-widest border-2 md:border-[3px] border-white/20"
+            className="btn-duo h-12 md:h-14 px-8 md:px-12 rounded-xl md:rounded-2xl bg-primary text-primary-foreground font-black uppercase text-xs md:text-sm tracking-widest border-2 md:border-[3px] border-white/20"
           >
             <ArrowRight className="mr-2 w-4 h-4 md:w-5 md:h-5" /> <UiText id="gotIt" />
           </Button>

@@ -1,14 +1,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import crypto from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { chromium } from '@playwright/test';
+import { readPerformanceBuild } from './lib/performance-build.mjs';
+import { requireDemoBuild, requireLocalEmulators } from './lib/demo-build.mjs';
 
 const root = path.resolve(process.env.PERFORMANCE_ROOT || '.');
 const label = process.env.PERFORMANCE_LABEL || 'current';
 if (!/^[a-zA-Z0-9_-]+$/.test(label)) throw new Error('Invalid performance label');
-if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) throw new Error('Run inside the demo Auth/Firestore Emulators');
+requireLocalEmulators();
+requireDemoBuild(root);
+const build = readPerformanceBuild(root);
 const port = 9104, origin = `http://127.0.0.1:${port}`;
 const server = spawn(process.execPath, [path.resolve('node_modules/next/dist/bin/next'), 'start', '-p', String(port), '-H', '127.0.0.1'], {
   cwd: root, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
@@ -59,9 +62,7 @@ try {
     }
     rows.push({ route, samples });
   }
-  const installedLock = path.resolve('node_modules/.package-lock.json');
-  if (!fs.existsSync(installedLock)) throw new Error('Installed dependency lock is unavailable; run npm ci before measuring');
-  const report = { measuredAt: new Date().toISOString(), label, root, buildId: fs.readFileSync(path.join(root, '.next/BUILD_ID'), 'utf8').trim(), node: process.version, browser: browser.version(), platform: process.platform, cpu: os.cpus()[0]?.model, cpuCount: os.cpus().length, installedDependencyLockSha256: crypto.createHash('sha256').update(fs.readFileSync(installedLock)).digest('hex'), conditions: 'Production server, guest session, empty demo data, Chromium 1280x800, 5 fresh contexts with cold then warm navigation, 1s settling, same installed dependency graph. Forum input-to-two-animation-frame timing includes automation overhead. No live AI or production billing claims.', rows };
+  const report = { measuredAt: new Date().toISOString(), label, ...build, node: process.version, browser: browser.version(), platform: process.platform, cpu: os.cpus()[0]?.model, cpuCount: os.cpus().length, conditions: 'Production server, guest session, empty demo data, Chromium 1280x800, 5 fresh contexts with cold then warm navigation, 1s settling, same installed dependency graph. Forum input-to-two-animation-frame timing includes automation overhead. No live AI or production billing claims.', rows };
   fs.mkdirSync('reports', { recursive: true });
   fs.writeFileSync(`reports/browser-performance-${label}.json`, JSON.stringify(report, null, 2));
   console.log(`Browser performance recorded for ${label}: ${rows.length} routes, 30 navigations.`);

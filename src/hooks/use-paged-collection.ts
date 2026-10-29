@@ -14,7 +14,14 @@ export function usePagedCollection<T>(source: Query<DocumentData> | null, read: 
  const cursor = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
  const [items, setItems] = useState<T[]>([]);
  const [loading, setLoading] = useState(true), [hasMore, setHasMore] = useState(false);
- const report = useCallback((cause: unknown) => errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'paged-collection', operation: 'list' }, cause)), []);
+ const [error, setError] = useState<FirestorePermissionError | null>(null);
+ const [retryEpoch, setRetryEpoch] = useState(0);
+ const [invalidRecords, setInvalidRecords] = useState(0);
+ const report = useCallback((cause: unknown) => {
+  const problem = new FirestorePermissionError({ path: 'paged-collection', operation: 'list' }, cause);
+  errorEmitter.emit('permission-error', problem);
+  return problem;
+ }, []);
  const decode = useCallback((docs: QueryDocumentSnapshot<DocumentData>[]) => docs.flatMap(doc => {
   try {
    const item = reader.current(doc.id, doc.data());
@@ -25,16 +32,18 @@ export function usePagedCollection<T>(source: Query<DocumentData> | null, read: 
  useEffect(() => {
   const lifecycle = epoch;
   const generation = ++lifecycle.current;
-  busy.current = false; cursor.current = null; seenIds.current.clear(); setItems([]); setHasMore(false); setLoading(!!source);
+  busy.current = false; cursor.current = null; seenIds.current.clear(); setItems([]); setHasMore(false); setLoading(!!source); setError(null); setInvalidRecords(0);
   if (!source) return;
   const unsubscribe = onSnapshot(query(source, limit(PAGE_SIZE)), snapshot => {
    if (generation !== epoch.current) return;
    cursor.current = snapshot.docs.at(-1) ?? null;
    seenIds.current = new Set(snapshot.docs.map(doc => doc.id));
-   setItems(decode(snapshot.docs)); setHasMore(snapshot.size === PAGE_SIZE); setLoading(false);
-  }, cause => { if (generation === epoch.current) { report(cause); setItems([]); setHasMore(false); cursor.current = null; setLoading(false); } });
+   const items = decode(snapshot.docs);
+   setItems(items); setInvalidRecords(snapshot.docs.length - items.length); setError(null); setHasMore(snapshot.size === PAGE_SIZE); setLoading(false);
+  }, cause => { if (generation === epoch.current) { setError(report(cause)); setItems([]); setHasMore(false); cursor.current = null; setLoading(false); } });
   return () => { lifecycle.current++; unsubscribe(); };
- }, [source, decode, report]);
+ }, [source, decode, report, retryEpoch]);
+ const retry = useCallback(() => setRetryEpoch(value => value + 1), []);
  const loadMore = useCallback(async () => {
   if (!source || !cursor.current || busy.current || !hasMore) return;
   const generation = epoch.current, anchor = cursor.current;
@@ -47,10 +56,11 @@ export function usePagedCollection<T>(source: Query<DocumentData> | null, read: 
    const unseen = snapshot.docs.filter(doc => !seenIds.current.has(doc.id));
    unseen.forEach(doc => seenIds.current.add(doc.id));
    const additions = decode(unseen);
+   setInvalidRecords(previous => previous + unseen.length - additions.length);
    setItems(previous => [...previous, ...additions]);
    setHasMore(snapshot.size === PAGE_SIZE);
-  } catch (cause) { if (generation === epoch.current) report(cause); }
+  } catch (cause) { if (generation === epoch.current) { setError(report(cause)); setItems([]); cursor.current = null; setHasMore(false); } }
   finally { if (generation === epoch.current) { busy.current = false; setLoading(false); } }
  }, [source, hasMore, decode, report]);
- return { items, loading, hasMore, loadMore };
+ return { items, loading, hasMore, loadMore, error, retry, invalidRecords };
 }

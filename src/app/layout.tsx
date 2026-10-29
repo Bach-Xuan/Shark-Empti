@@ -1,16 +1,19 @@
 
 import { AppPreferencesProvider } from '@/components/app-preferences';
-import { ErrorBoundary } from '@/components/error-boundary';
-import FocusTrackerWidget from '@/components/focus-tracker-widget';
-import { Toaster } from '@/components/ui/toaster';
-import { FirebaseClientProvider } from '@/firebase';
+import { RouteProviders } from '@/components/route-providers';
+import { siteOrigin, indexPublicPages } from '@/lib/site-metadata';
 import type { Metadata } from 'next';
 import './globals.css';
 
 
 export const metadata: Metadata = {
-  title: 'Shark Empti',
-  description: 'AI-powered cognitive learning and quiz tracker with a Duolingo-inspired interface.',
+  metadataBase: siteOrigin(),
+  title: { default: 'Shark Empti', template: '%s | Shark Empti' },
+  description: 'AI-assisted quizzes, practice, flashcards and personal learning records. AI feedback is study support, not a verified assessment.',
+  alternates: { canonical: '/' },
+  robots: { index: indexPublicPages(), follow: true },
+  openGraph: { type: 'website', siteName: 'Shark Empti', title: 'Shark Empti', description: 'Quizzes, practice and personal learning support.', url: '/' },
+  twitter: { card: 'summary_large_image' },
 };
 
 export default function RootLayout({
@@ -21,11 +24,7 @@ export default function RootLayout({
   return (
     <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning>
       <body className="font-body antialiased bg-background text-foreground">
-        <AppPreferencesProvider><FirebaseClientProvider>
-          {children}
-          <Toaster />
-          <ErrorBoundary><FocusTrackerWidget /></ErrorBoundary>
-        </FirebaseClientProvider></AppPreferencesProvider>
+        <AppPreferencesProvider><RouteProviders>{children}</RouteProviders></AppPreferencesProvider>
       </body>
     </html>
   );

@@ -133,13 +133,13 @@ export default function QuickNotes({ t, lang, isSticky, notes: externalNotes, on
 
           {localNotes.includes('$') && (
             <div className="p-6 md:p-8 bg-muted/10 rounded-3xl border-2 border-dashed border-border/50 animate-in fade-in duration-300">
-              <span className="text-[8px] md:text-[9px] font-black uppercase text-primary/50 block mb-2 md:mb-4">{t.latexPreview}</span>
+              <span className="text-[8px] md:text-[9px] font-black uppercase text-primary block mb-2 md:mb-4">{t.latexPreview}</span>
               <div className="text-sm md:text-lg font-bold leading-relaxed"><LatexText text={localNotes} /></div>
             </div>
           )}
 
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-4">
-            <p className="text-[8px] md:text-[9px] font-black text-muted-foreground/60 uppercase tracking-widest flex items-center gap-1.5 md:gap-2">
+            <p className="text-[8px] md:text-[9px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5 md:gap-2">
               <Sigma className="w-2.5 h-2.5 md:w-3 md:h-3" /> {t.latexHelp}
             </p>
             <div className="flex gap-4 justify-end">
@@ -156,7 +156,7 @@ export default function QuickNotes({ t, lang, isSticky, notes: externalNotes, on
               <Button
                 onClick={handleSave}
                 disabled={isSaving}
-                className="rounded-xl font-black uppercase tracking-widest text-xs btn-duo bg-primary text-white border-2 border-white/20 h-12 px-8 flex items-center gap-2"
+                className="rounded-xl font-black uppercase tracking-widest text-xs btn-duo bg-primary text-primary-foreground border-2 border-white/20 h-12 px-8 flex items-center gap-2"
               >
                 <Save className="w-4 h-4" /> {t.save}
               </Button>

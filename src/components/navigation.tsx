@@ -121,7 +121,7 @@ export default function Navigation({ view, setView, lang, changeLang, theme, onT
   };
 
   return (
-    <nav className={cn(
+    <nav aria-label={uiMessage(lang, 'navigation.main')} className={cn(
       "fixed top-0 left-0 right-0 z-[100] w-full glass-morphism px-3 md:px-6 py-2.5 md:py-4 flex items-center justify-between select-none transition-all duration-500 border-b-[3px] md:border-b-[5px] border-border/30 overflow-hidden transform bg-background/80 backdrop-blur-xl",
       isVisible ? "translate-y-0" : "-translate-y-full"
     )}>
@@ -133,7 +133,7 @@ export default function Navigation({ view, setView, lang, changeLang, theme, onT
         <div className="flex flex-col">
           <div className="flex items-baseline gap-1 md:gap-2">
             <span className="font-headline font-black text-xs md:text-2xl leading-none text-primary tracking-tight uppercase group-hover:tracking-normal transition-all duration-500">SHARK EMPTI</span>
-            <span className="hidden sm:inline text-[7px] md:text-[10px] font-black text-muted-foreground/50 tracking-widest uppercase ml-0.5 opacity-60">v1.15.1</span>
+            <span className="hidden sm:inline text-[7px] md:text-[10px] font-black text-muted-foreground tracking-widest uppercase ml-0.5 ">v1.15.1</span>
           </div>
           <span className="hidden md:block text-[9px] font-black text-muted-foreground uppercase tracking-[0.15em] leading-tight whitespace-normal break-words max-w-[120px] md:max-w-none">
             {t.appTagline}
@@ -200,7 +200,7 @@ export default function Navigation({ view, setView, lang, changeLang, theme, onT
           ) : user ? (
             <div className="relative">
               <Avatar className="w-9 h-9 md:w-12 md:h-12 rounded-xl md:rounded-2xl border-2 md:border-[4px] border-primary/20 shadow-duo group-hover:border-primary transition-all duration-300">
-                <AvatarImage src={user.photoURL || ''} />
+                <AvatarImage src={user.photoURL || ''} alt="" />
                 <AvatarFallback className="bg-primary/10 text-primary font-black text-[9px] md:text-sm">
                   {user.email?.[0].toUpperCase()}
                 </AvatarFallback>

@@ -1,66 +1,11 @@
 'use client';
+import dynamic from 'next/dynamic';
+import { memo, Suspense } from 'react';
 
-import katex from 'katex';
-import 'katex/dist/katex.min.css';
-import React,{ useMemo } from 'react';
+// Plain discussion/chat does not need the KaTeX parser or its stylesheet.
+const MathText = dynamic(() => import('./math-text').then(module => module.MathText));
 
-interface LatexTextProps {
-  text: string;
-}
-
-/**
- * A component that parses text and renders LaTeX expressions using KaTeX.
- * Supports inline ($...$) and block ($$...$$) math.
- */
-export const LatexText = React.memo(function LatexText({ text }: LatexTextProps) {
-  const parts = useMemo(() => {
-    if (!text) return [];
-    // Split by $$...$$ (block) or $...$ (inline)
-    return text.split(/(\$\$[\s\S]+?\$\$|\$[^\$]+?\$)/g);
-  }, [text]);
-
-  return (
-    <span className="leading-relaxed">
-      {parts.map((part, index) => {
-        if (part.startsWith('$$') && part.endsWith('$$')) {
-          const content = part.slice(2, -2);
-          try {
-            return (
-              <span
-                key={index}
-                className="block my-4 overflow-x-auto text-center"
-                dangerouslySetInnerHTML={{
-                  __html: katex.renderToString(content, {
-                    displayMode: true,
-                    throwOnError: false,
-                  }),
-                }}
-              />
-            );
-          } catch (e) {
-            return <span key={index}>{part}</span>;
-          }
-        } else if (part.startsWith('$') && part.endsWith('$')) {
-          const content = part.slice(1, -1);
-          try {
-            return (
-              <span
-                key={index}
-                className="inline-block px-1"
-                dangerouslySetInnerHTML={{
-                  __html: katex.renderToString(content, {
-                    displayMode: false,
-                    throwOnError: false,
-                  }),
-                }}
-              />
-            );
-          } catch (e) {
-            return <span key={index}>{part}</span>;
-          }
-        }
-        return <span key={index}>{part}</span>;
-      })}
-    </span>
-  );
+export const LatexText = memo(function LatexText({ text }: { text: string }) {
+  if (!text || !/(\$\$[\s\S]+?\$\$|\$[^$]+?\$)/.test(text)) return <span className="leading-relaxed">{text}</span>;
+  return <Suspense fallback={<span>{text}</span>}><MathText text={text} /></Suspense>;
 });

@@ -3,7 +3,13 @@
 import { messages,uiMessage } from '@/lib/i18n';
 import type { DashboardStats } from '@/lib/stats-utils';
 
-import { generatePractice,validateAcademicTopic } from '@/ai/client-flows';
+import { generatePractice,validateAcademicTopic,shortAnswerAnalysis } from '@/ai/client-flows';
+import { useAiRequestScope } from '@/hooks/use-ai-request-scope';
+import { useLearningDraft, useLearningLeaveGuard } from '@/hooks/use-learning-draft';
+import { practiceDraftSchema, parseWith, removeDraft } from '@/lib/learning-drafts';
+import { DraftNotice } from '@/components/draft-notice';
+import { learningNotices } from '@/lib/i18n/learning-notices';
+import { answersMatch, parseNumericAnswer } from '@/lib/arena-scoring';
 import { LatexText } from '@/components/latex-text';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -37,6 +43,7 @@ import React,{ useEffect,useMemo,useRef,useState } from 'react';
 export default function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initialConcept, onAskGuru }: { t: TranslationSet, lang: Language, weakPoints: DashboardStats['processedGroupedInsights'], totalAttempts: number, totalErrors: number, initialConcept?: string, onAskGuru: (msg: string) => void }) {
   const { user } = useUser();
   const db = useFirestore();
+  const aiRequest = useAiRequestScope();
   const { toast } = useToast();
 
   const topicsWithMistakes = useMemo(() =>
@@ -57,6 +64,16 @@ export default function PracticeMode({ t, lang, weakPoints, totalAttempts, total
   const mounted = useRef(false);
   const advancing = useRef(false);
   const sessionId = useRef<string | null>(null);
+  const [draftSessionId, setDraftSessionId] = useState<string | null>(null);
+  const evaluationEpoch = useRef(0), evaluating = useRef(false);
+  const [isEvaluating, setIsEvaluating] = useState(false);
+  const [evaluationError, setEvaluationError] = useState<string | null>(null);
+  const confirmLeave = useLearningLeaveGuard(questions.length > 0 && !isFinishing, lang);
+  const draftValue = useMemo(() => questions.length && !isFinishing && draftSessionId ? ({ id: draftSessionId, concept, questions, index: currentIndex, answers, feedback: currentFeedback, input: shortAnswer }) : null, [questions, isFinishing, concept, currentIndex, answers, currentFeedback, shortAnswer, draftSessionId]);
+  const draft = useLearningDraft(user?.uid, 'practice', draftValue, parseWith(practiceDraftSchema), value => {
+    sessionId.current = value.id; setDraftSessionId(value.id); setConcept(value.concept); setQuestions(value.questions);
+    setCurrentIndex(value.index); setAnswers(value.answers); setCurrentFeedback(value.feedback); setShortAnswer(value.input);
+  });
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
 
   useEffect(() => {
@@ -78,7 +95,7 @@ export default function PracticeMode({ t, lang, weakPoints, totalAttempts, total
       const validation = await validateAcademicTopic({
         topic: concept,
         language: lang as 'en' | 'vi'
-      });
+      }, { signal: aiRequest.start() });
 
       if (!mounted.current) return;
       if (!validation.ok) {
@@ -99,13 +116,14 @@ export default function PracticeMode({ t, lang, weakPoints, totalAttempts, total
       setIsValidating(false);
       setIsGenerating(true);
 
-      const result = await generatePractice({ concept, numQuestions, language: lang as 'en' | 'vi' });
+      const result = await generatePractice({ concept, numQuestions, language: lang as 'en' | 'vi' }, { signal: aiRequest.start() });
       if (!mounted.current) return;
       if (!result.ok) {
         showErrorToast(result.error, lang);
         return;
       }
       sessionId.current = crypto.randomUUID();
+      setDraftSessionId(sessionId.current);
       setQuestions(result.data.questions);
       setCurrentIndex(0);
       setAnswers([]);
@@ -121,7 +139,9 @@ export default function PracticeMode({ t, lang, weakPoints, totalAttempts, total
   };
 
   const handleRetry = () => {
+    aiRequest.cancel(); evaluationEpoch.current++; evaluating.current = false; setIsEvaluating(false); setEvaluationError(null);
     sessionId.current = crypto.randomUUID();
+    setDraftSessionId(sessionId.current);
     setCurrentIndex(0);
     setAnswers([]);
     setCurrentFeedback(null);
@@ -129,13 +149,32 @@ export default function PracticeMode({ t, lang, weakPoints, totalAttempts, total
     setShortAnswer("");
   };
 
-  const handleAnswer = (ans: string) => {
-    if (currentFeedback) return;
+  const handleAnswer = async (ans: string) => {
+    if (currentFeedback || evaluating.current || !ans.trim()) return;
+    evaluating.current = true;
+    const version = evaluationEpoch.current;
+    setIsEvaluating(true); setEvaluationError(null);
     advancing.current = false;
     const q = questions[currentIndex];
-    const isCorrect = ans.toLowerCase().trim() === q.correct.toLowerCase().trim();
-    const feedback = { ...q, userAnswer: ans, isCorrect };
-    setCurrentFeedback(feedback);
+    try {
+      let isCorrect = ans.toLowerCase().trim() === q.correct.toLowerCase().trim();
+      if (q.type === 'Short Answer' && !isCorrect) {
+        if (parseNumericAnswer(q.correct) !== null && parseNumericAnswer(ans) !== null) isCorrect = answersMatch(q, ans);
+        else {
+          const result = await shortAnswerAnalysis({ questionText: q.question, correctAnswer: q.correct, userAnswer: ans, language: lang }, { signal: aiRequest.start() });
+          if (!mounted.current || version !== evaluationEpoch.current) return;
+          if (!result.ok) { showErrorToast(result.error, lang); throw new Error('Evaluation unavailable'); }
+          if (!Number.isFinite(result.data.confidence) || result.data.confidence < 0.8) throw new Error('Uncertain evaluation');
+          isCorrect = result.data.isCorrect;
+        }
+      }
+      if (mounted.current && version === evaluationEpoch.current) setCurrentFeedback({ ...q, userAnswer: ans, isCorrect });
+    } catch {
+      if (mounted.current && version === evaluationEpoch.current) {
+        evaluating.current = false;
+        setEvaluationError(learningNotices[lang].uncertain);
+      }
+    } finally { if (mounted.current && version === evaluationEpoch.current) setIsEvaluating(false); }
   };
 
   const handleNext = async () => {
@@ -155,7 +194,7 @@ export default function PracticeMode({ t, lang, weakPoints, totalAttempts, total
       }
       if (!mounted.current) return false;
     }
-    setAnswers(updated); setCurrentFeedback(null); setShortAnswer('');
+    setAnswers(updated); setCurrentFeedback(null); setShortAnswer(''); evaluating.current = false;
     if (last) setIsFinishing(true); else setCurrentIndex(currentIndex + 1);
     return true;
   };
@@ -168,6 +207,9 @@ export default function PracticeMode({ t, lang, weakPoints, totalAttempts, total
   };
 
   const handleBackToPlayground = () => {
+    if (!confirmLeave()) return;
+    if (user) removeDraft(user.uid, 'practice');
+    aiRequest.cancel(); evaluationEpoch.current++; evaluating.current = false; setIsEvaluating(false); setEvaluationError(null);
     setQuestions([]);
     setAnswers([]);
     setCurrentIndex(0);
@@ -217,7 +259,7 @@ export default function PracticeMode({ t, lang, weakPoints, totalAttempts, total
             <div className="w-20 h-20 md:w-40 md:h-40 rounded-full bg-secondary mx-auto flex items-center justify-center shadow-duo border-4 border-white/20">
               <Trophy className="w-10 h-10 md:w-20 md:h-20 text-primary fill-current animate-bounce-subtle" />
             </div>
-            <div className="absolute -top-2 -right-2 md:-top-3 md:-right-3 bg-primary text-white rounded-lg md:rounded-2xl px-3 md:px-6 py-1 md:py-3 text-sm md:text-3xl font-black shadow-xl border-2 md:border-4 border-white/20 animate-in zoom-in-50 delay-300">
+            <div className="absolute -top-2 -right-2 md:-top-3 md:-right-3 bg-primary text-primary-foreground rounded-lg md:rounded-2xl px-3 md:px-6 py-1 md:py-3 text-sm md:text-3xl font-black shadow-xl border-2 md:border-4 border-white/20 animate-in zoom-in-50 delay-300">
               {score}%
             </div>
           </div>
@@ -233,7 +275,7 @@ export default function PracticeMode({ t, lang, weakPoints, totalAttempts, total
             <Button variant="outline" onClick={handleRetry} className="btn-duo h-12 md:h-20 rounded-xl md:rounded-[2rem] px-6 md:px-10 font-black uppercase text-[9px] md:text-lg tracking-widest bg-card">
               <RotateCcw className="mr-1.5 md:mr-3 w-4 h-4 md:w-6 md:h-6" /> {t.retryPractice}
             </Button>
-            <Button onClick={handleBackToPlayground} className="btn-duo h-12 md:h-20 rounded-xl md:rounded-[2rem] px-6 md:px-12 bg-primary text-white font-black uppercase text-[9px] md:text-lg tracking-widest border-2 md:border-4 border-white/20">
+            <Button onClick={handleBackToPlayground} className="btn-duo h-12 md:h-20 rounded-xl md:rounded-[2rem] px-6 md:px-12 bg-primary text-primary-foreground font-black uppercase text-[9px] md:text-lg tracking-widest border-2 md:border-4 border-white/20">
               {t.backToPlayground} <ArrowRight className="ml-1.5 md:ml-3 w-4 h-4 md:w-6 md:h-6" />
             </Button>
           </div>
@@ -246,6 +288,7 @@ export default function PracticeMode({ t, lang, weakPoints, totalAttempts, total
     const q = questions[currentIndex];
     return (
       <div className="w-full max-w-5xl space-y-6 md:space-y-12 animate-in slide-in-from-bottom-8 duration-500 px-4">
+        <DraftNotice {...draft} lang={lang} />
         <div className="space-y-3 md:space-y-4">
           <div className="flex justify-between items-end text-[8px] md:text-sm font-black text-muted-foreground uppercase tracking-[0.2em] px-1">
             <span className="bg-muted px-2.5 py-1 md:px-4 md:py-1.5 rounded-full border-2">{t.practice}: {currentIndex + 1} / {questions.length}</span>
@@ -272,7 +315,7 @@ export default function PracticeMode({ t, lang, weakPoints, totalAttempts, total
                   <Button
                     key={i}
                     variant="outline"
-                    disabled={!!currentFeedback}
+                    disabled={!!currentFeedback || isEvaluating}
                     onClick={() => handleAnswer(opt)}
                     className={cn(
                       "h-auto min-h-[60px] md:min-h-[90px] py-3.5 md:py-6 px-5 md:px-10 rounded-xl md:rounded-[2rem] border-[3px] font-black text-[11px] md:text-xl whitespace-normal break-words leading-tight btn-duo bg-card transition-all text-left justify-start",
@@ -290,13 +333,13 @@ export default function PracticeMode({ t, lang, weakPoints, totalAttempts, total
                 <Input
                   value={shortAnswer}
                   onChange={(e) => setShortAnswer(e.target.value)}
-                  disabled={!!currentFeedback}
+                  disabled={!!currentFeedback || isEvaluating}
                   placeholder={t.typeYourAnswer}
                   className="h-14 md:h-24 rounded-xl md:rounded-[2rem] border-[3px] border-border font-black text-sm md:text-4xl text-center bg-muted/10 shadow-inner px-6 md:px-8 focus:ring-4 md:ring-8 focus:ring-primary/10 transition-all focus:border-primary"
                   onKeyDown={(e) => e.key === 'Enter' && handleAnswer(shortAnswer)}
                 />
                 {!currentFeedback && (
-                  <Button onClick={() => handleAnswer(shortAnswer)} disabled={!shortAnswer.trim()} className="w-full h-12 md:h-20 rounded-xl md:rounded-[2rem] btn-duo bg-primary text-white border-[3px] md:border-[4px] border-white/20 font-black text-base md:text-3xl uppercase tracking-[0.1em]">
+                  <Button onClick={() => void handleAnswer(shortAnswer)} disabled={!shortAnswer.trim() || isEvaluating} className="w-full h-12 md:h-20 rounded-xl md:rounded-[2rem] btn-duo bg-primary text-primary-foreground border-[3px] md:border-[4px] border-white/20 font-black text-base md:text-3xl uppercase tracking-[0.1em]">
                     {t.submitAnswer}
                   </Button>
                 )}
@@ -304,6 +347,8 @@ export default function PracticeMode({ t, lang, weakPoints, totalAttempts, total
             )}
           </div>
 
+          {isEvaluating && <p role="status">{lang === 'vi' ? 'Đang đánh giá câu trả lời…' : 'Evaluating your answer…'}</p>}
+          {evaluationError && <p role="alert" className="rounded-xl border p-4">{evaluationError}</p>}
           {currentFeedback && (
             <div className={cn(
               "mt-8 md:mt-16 p-6 md:p-12 rounded-xl md:rounded-[3rem] border-[3px] md:border-[5px] animate-in slide-in-from-top-6 duration-500 space-y-6 md:space-y-10 shadow-2xl relative",
@@ -369,21 +414,22 @@ export default function PracticeMode({ t, lang, weakPoints, totalAttempts, total
 
       <div className="space-y-8 md:space-y-10">
         <div className="space-y-4 group">
-          <Label className="text-[9px] md:text-xs font-black uppercase text-muted-foreground tracking-[0.2em] px-1 flex items-center gap-2 group-hover:text-primary transition-colors">
+          <Label id="practice-topic-label" className="text-[9px] md:text-xs font-black uppercase text-muted-foreground tracking-[0.2em] px-1 flex items-center gap-2 group-hover:text-primary transition-colors">
             <Target className="w-3.5 h-3.5 md:w-4 md:h-4 transition-transform group-hover:-translate-y-0.5" /> {t.selectTarget}
           </Label>
 
           {!isPracticeDisabled && topicsWithMistakes.length > 0 ? (
-            <div className="flex flex-wrap gap-2 md:gap-3">
+            <div role="group" aria-labelledby="practice-topic-label" className="flex flex-wrap gap-2 md:gap-3">
               {topicsWithMistakes.map((wp, i) => (
                 <Button
                   key={i}
                   variant={concept === wp.topic ? "default" : "outline"}
                   onClick={() => setConcept(wp.topic)}
+                  aria-pressed={concept === wp.topic}
                   className={cn(
                     "h-10 md:h-16 rounded-lg md:rounded-[1.5rem] text-[9px] md:text-sm font-black uppercase tracking-widest border-[2px] md:border-[3px] px-4 md:px-10 btn-duo shadow-none transition-all",
                     concept === wp.topic
-                      ? "bg-primary text-white border-primary/20 translate-y-[-4px] shadow-duo"
+                      ? "bg-primary text-primary-foreground border-primary/20 translate-y-[-4px] shadow-duo"
                       : "bg-card border-border hover:border-primary/40 hover:bg-primary/5"
                   )}
                 >
@@ -404,12 +450,13 @@ export default function PracticeMode({ t, lang, weakPoints, totalAttempts, total
         </div>
 
         <div className="space-y-4 group">
-          <Label className="text-[9px] md:text-xs font-black uppercase text-muted-foreground tracking-[0.2em] px-1 flex items-center gap-2 group-hover:text-primary transition-colors">
+          <Label htmlFor="practice-count" className="text-[9px] md:text-xs font-black uppercase text-muted-foreground tracking-[0.2em] px-1 flex items-center gap-2 group-hover:text-primary transition-colors">
              <Zap className="w-3.5 h-3.5 md:w-4 md:h-4" /> {t.numQuestions} (1-50)
           </Label>
           <div className="flex items-center gap-3 md:gap-6">
             <Input
               type="number"
+              id="practice-count"
               value={numQuestions}
               onChange={handleNumChange}
               onBlur={handleNumBlur}
@@ -424,7 +471,7 @@ export default function PracticeMode({ t, lang, weakPoints, totalAttempts, total
         <Button
           onClick={startSession}
           disabled={!concept.trim() || isGenerating || isValidating || isPracticeDisabled}
-          className="w-full h-14 md:h-24 rounded-xl md:rounded-[2.5rem] btn-duo bg-primary text-white border-[3px] md:border-[5px] border-white/20 font-black text-base md:text-3xl uppercase tracking-[0.1em] shadow-duo group active:translate-y-2"
+          className="w-full h-14 md:h-24 rounded-xl md:rounded-[2.5rem] btn-duo bg-primary text-primary-foreground border-[3px] md:border-[5px] border-white/20 font-black text-base md:text-3xl uppercase tracking-[0.1em] shadow-duo group active:translate-y-2"
         >
           {isValidating ? (
             <div className="flex items-center gap-2 md:gap-3">

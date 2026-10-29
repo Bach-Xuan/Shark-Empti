@@ -39,6 +39,7 @@ it.skipIf(!browserName).each(['en', 'vi'] as const)('prints long %s reports in b
   }));
   const stats = calculateDashboardStats(sessions, translations[lang], lang)!;
   const markup = renderToStaticMarkup(<ProfilePrintDocument stats={stats} roadmapStatus={{}} name="Print verification" issued="19/09/2026" t={translations[lang]} lang={lang} />);
+  expect(markup).toContain('class="katex"'); // A lazy fallback must not print raw TeX.
   const page = await browser.newPage({ viewport: { width: 794, height: 1123 } });
   try {
     for (const theme of ['light', 'dark']) {

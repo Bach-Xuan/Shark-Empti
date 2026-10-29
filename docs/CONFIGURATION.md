@@ -241,9 +241,13 @@ Missing Admin credentials do not mean the Firebase Web config is invalid; they m
 
 ### 5.2. Arena Timing and Ranking Deployment
 
-Deploy the `attempts` composite index declared in `firestore.indexes.json` before releasing the new leaderboard query: `timingVersion ASC`, `score DESC`, `duration ASC`, and document ID `ASC`. Confirm that the index is ready on the target project; Emulator query success does not prove production index readiness. The UI reports query failures and offers retry.
+Deploy the `attempts` composite index declared in `firestore.indexes.json` before releasing the V2 leaderboard query: `timingVersion ASC`, `rankingVersion ASC`, `score DESC`, `duration ASC`, document ID `ASC`. Also deploy the V2 Arena feed (`schemaVersion`, `createdAt`) and moderation queue (`status`, `createdAt`) indexes. Emulator query success does not prove production readiness; the UI reports query failures and offers retry.
 
-Arena starts create private `_arenaSessions` documents with a 24-hour logical lifetime and `expiresAt` TTL declaration. Activate the TTL policy in the target project to bound abandoned-session storage; expiry is enforced by API code even when TTL cleanup is delayed. Browser reads/writes are denied. Release the start API and matching client together: submissions require the UUID returned by the start request. Older attempts remain stored but are excluded from the new ranking because their elapsed time cannot be verified retroactively. No production index/TTL activation is implied by these local changes.
+Arena starts create private `_arenaSessions` with a 24-hour logical lifetime and declared expiresAt TTL. Activate TTL to bound abandoned storage; API expiry works independently. Keys, first-start eligibility, legacy backups and moderation archives are private, without automatic TTL while needed for exam/recovery policy. Release matching Rules, APIs and client together. Only V2 metadata is publicly readable; previously exposed legacy exams must first be inventoried and converted to non-rewarded practice, never relabelled as a fresh competition. Existing attempts are not retroactively ranked.
+
+`npm run migrate:arena -- --project=demo-shark-empti` inventories without writes when both loopback Emulators/GCLOUD_PROJECT are configured. `--apply` performs per-document atomic backup/key/metadata conversion. A real project requires exact matching FIREBASE_ADMIN_PROJECT_ID, a reviewed backup/index/Rules plan and the explicit `--confirm-legacy-practice-only` flag as well as `--apply`. This session has not authorized or executed production migration. Inspect blocked/conflicting records manually; never copy a demo marker or force a legacy key into a rewarded public document. No production index/TTL activation is implied.
+
+Set the verified public origin through `SITE_URL`. Home/about are sitemap-indexable; UGC stays public-read but noindex. Robots must allow crawling those pages for the noindex directive to be observed. Replace the visibly unconfigured SITE_INFO operator/support placeholders before release. Assign no moderator automatically: a trusted operator must grant the Admin Auth `moderator: true` claim after review. Every decision rechecks current server claims, and private reports/archives/actions remain browser-denied. Configure actual coverage/retention and calibrate REQUEST_BUDGETS rather than assuming a response SLA or production capacity.
 
 ## 6. 🧪 Emulator and Test Execution
 
@@ -265,7 +269,7 @@ npm run test:integration
 npm run test:e2e
 ```
 
-`test:rules` and `test:integration` use `firebase emulators:exec --project demo-shark-empti`; the CLI supplies emulator host variables. E2E supplies browser demo Firebase configuration and a fake OpenRouter key in `playwright.config.ts`. Source guards reject `OPENROUTER_TEST_URL` in production, off localhost or outside a demo Emulator context.
+`test:rules` and `test:integration` use `firebase emulators:exec --project demo-shark-empti`; the CLI supplies emulator host variables. E2E supplies demo Firebase configuration and a fake OpenRouter key in `playwright.config.ts`. Run `npm run build:demo` before production E2E/browser measurements. Next's build ID records whether the exact demo public configuration was present during compilation and includes a fingerprint of source, public assets, dependency metadata and build configuration. Runners reject missing, unverified, non-demo or stale builds before launching a browser. Runtime variables cannot turn a production artifact into a demo artifact. Emulator hosts must match the configured local ports; E2E browser requests to external hosts are blocked. Native browser caching is retained in performance measurements, whose provider is disabled and whose client build is verified demo-only. Source guards additionally reject non-local AI fixture URLs; production permits that fixture only with explicit isolated-test flags and the `test-only` key.
 
 If Windows/JDK reports UnixDomainSockets or loopback errors caused by a TEMP path, use a dedicated ASCII-only directory for that test shell:
 
@@ -301,15 +305,18 @@ There is no `vercel.json` in this repository; dashboard/project defaults are the
 
 ## 9. ✅ Release Checklist
 
+Use a dedicated local demo-verification shell for this checklist, not a deployment shell. The demo-build helper supplies explicit public test values; production assets must be built separately with the intended production configuration.
+
 ```powershell
 npm ci
 npm run audit:dependencies
+npm run check:maintenance
 npm run lint
 npm run typecheck
 npm test
 npm run test:integration
 npm run report:performance
-npm run build
+npm run build:demo
 npx --no-install playwright install chromium webkit firefox
 npm run test:e2e
 $env:E2E_PRODUCTION='true'
@@ -318,7 +325,7 @@ Remove-Item Env:E2E_PRODUCTION
 npm run test:production
 ```
 
-The first E2E run uses the development server; the second uses the optimized build. CI also records the bundle inventory and synthetic performance baseline. Browser installation requires the relevant host libraries. Consult [the audit report](AUDIT_REPORT.md) for dated results and outstanding browser acceptance evidence.
+The first E2E run uses the development server; the second requires the verified optimized demo artifact. The checked-in CI environment supplies demo values for its ordinary build and receives the same verification ID automatically. A production `.env` build is not an interchangeable test artifact. Any build-input change invalidates a previous demo build. Historical comparison roots also need the `verificationBuildId` hook, built in their own tree with the same demo environment; never copy a build ID or artifact from another checkout. CI records the bundle inventory and synthetic performance baseline. Browser installation requires the relevant host libraries. Consult [the audit report](AUDIT_REPORT.md) for dated results and outstanding browser acceptance evidence.
 
 The commands above establish local evidence. Before release, complete the environment-specific checks below and review each open finding's acceptance criteria in [AUDIT_REPORT.md](AUDIT_REPORT.md).
 
@@ -330,9 +337,9 @@ The commands above establish local evidence. Before release, complete the enviro
 | Browser and device support | Corrected production E2E matrix, documented minimum browser targets and physical-camera checks |
 | User-visible scope | Confirm labels describe loaded-record search/statistics/reports; initial pages contain at most 50 records |
 
-The AI feature flag remains disabled outside approved staging/canary scopes. Production builds use local system fonts and require no Google Fonts download.
+Keep production AI creation disabled outside approved staging/canary scopes; development is enabled by default unless explicitly disabled. Production builds use local system fonts and require no Google Fonts download.
 
-The public-data changes require coordinated deployment of server routes, client assets and Firestore Rules: Arena creation now uses `POST /api/arena`, and post deletion uses `DELETE /api/forum/{postId}`. Old browser create/delete paths are denied by the new Rules. `_forumDeletions` records deliberately have no TTL; they retain owner recovery and post-ID reuse protection. No production deployment or legacy data sweep is implied by local verification.
+The public-data changes require coordinated deployment of server routes, client assets and Firestore Rules: Arena creation uses `POST /api/arena` with private answer keys/eligibility, and Forum create/edit/like/comment/delete operations use the authenticated Admin APIs. All direct browser community writes are denied by the new Rules. Deploy the V2 feed/leaderboard/report indexes and run the separately confirmed legacy Arena migration before accepting production traffic. `_forumDeletions` deliberately has no TTL; it retains owner recovery and post-ID reuse protection. No production deployment or legacy data sweep is implied by local verification.
 
 Optional print-layout verification runs independently of the Firebase emulators:
 
@@ -352,15 +359,15 @@ The selected browser must be installed. The test renders the actual print compon
 
 ### 9.2. 🧾 Receipt and AI-Ledger Retention and Index Operations
 
-New receipts carry `expiresAt` seven days after creation and remain replayable until asynchronous deletion. AI generation and quota records also carry short-lived expiry fields; Arena timing sessions have a 24-hour logical lifetime. The [technical documentation](TECHNICAL_DOCUMENTATION.md) distinguishes retention from application-enforced expiry.
+New receipts carry `expiresAt` seven days after creation and remain replayable until asynchronous deletion. AI generation/quota and request-budget records carry short-lived expiry fields; Arena timing sessions have a 24-hour logical lifetime. The [technical documentation](TECHNICAL_DOCUMENTATION.md) distinguishes retention from application-enforced expiry.
 
-`firestore.indexes.json` declares the desired posts/Arena indexes and TTL settings for `_requestReceipts`, `_aiGenerations`, `_aiQuota` and `_arenaSessions`. Inspect deployed state from the repository root:
+`firestore.indexes.json` declares the desired posts/Arena/report indexes and five TTL settings: `_requestReceipts`, `_aiGenerations`, `_aiQuota`, `_arenaSessions` and `_requestBudgets`. Inspect deployed state from the repository root:
 
 ```powershell
 node scripts/inspect-firestore.mjs
 ```
 
-The script loads the Admin identity from `.env`, reads indexes and all four TTL policies, and writes `reports/firestore-metadata.json`. It does not change remote configuration. This checkout has no package command or source file that applies indexes or TTL policies; use a separately authorized infrastructure workflow, then repeat the inspection to verify readiness.
+The script loads the Admin identity from `.env`, reads indexes and every expiry TTL declared in `firestore.indexes.json`, and writes `reports/firestore-metadata.json`. It does not change remote configuration. This checkout has no package command or source file that applies indexes or TTL policies; use a separately authorized infrastructure workflow, then repeat the inspection to verify readiness.
 
 For legacy data, `node --conditions=react-server --env-file=.env --import tsx scripts/receipt-retention.ts` inventories missing expiry values; adding `--apply` backfills them without directly deleting receipts. Its `alreadyExpired` counter concerns missing-expiry records whose calculated expiry is past, not every expired document. Deployment attempts and IAM outcomes are tracked in [the audit report](AUDIT_REPORT.md), rather than repeated in this operational guide.
 
@@ -369,7 +376,7 @@ For legacy data, `node --conditions=react-server --env-file=.env --import tsx sc
 - `npm run report:performance` measures synthetic processing and serialized-data cardinality for 100, 1,000, and 10,000 history records. It is not a browser, Firestore-billing, heap, or interaction benchmark.
 - `npm run report:browser` requires a production build configured for demo Firebase and installed Playwright Chromium. It starts local Emulators and measures five cold/warm pairs for `/login`, `/forum` and `/arena`, including heap, DOM, resource bytes and Forum input-to-frame timing. Output is `reports/browser-performance-current.json`; the fixture covers guest routes with empty demo data.
 - `npm run report:queries` creates an isolated `_performanceComparison` fixture in the local demo Emulator, compares unrestricted and `limit(50)` queries at 100/1,000/10,000 records, writes `reports/query-comparison.json`, and removes its fixture. Returned documents and serialized JSON sizes are not production billing or wire-byte measurements.
-- For historical comparison, supply an independently prepared source checkout through `PERFORMANCE_BASELINE_ROOT`. Build both trees with the same Node, installed dependency graph, demo build variables and build command; then run `npm run report:comparison`. The runner controls Chromium, viewport, guest state and cache sequence, checks runtime metadata, and writes raw samples plus `reports/performance-comparison.json`. Record the source revision and normalized dependency differences. Five samples per condition support exploratory comparisons, including regressions.
+- For historical comparison, supply an independently prepared source checkout through `PERFORMANCE_BASELINE_ROOT`. Build both trees with the same Node, installed dependency graph, demo build variables and build command; then run `npm run report:comparison`. Each tree must expose its own installed `node_modules/.package-lock.json`; missing or differing hashes stop the comparison before browser work. The runner controls Chromium, viewport, guest state and cache sequence, checks runtime metadata, and writes raw samples plus `reports/performance-comparison.json`. Record the source revision and normalized dependency differences. Five samples per condition support exploratory comparisons, including regressions.
 - `npm run test:coverage` writes whole-source unit/component coverage to `coverage/unit/`. Adding `--coverage` to the Vitest command inside an Emulator integration run writes the AI routes, ledger, body parser and server API coverage to `coverage/integration/`. These overlapping denominators must not be added together.
 - Physical-camera verification still requires device access and separate tooling; browser performance does not reproduce the historical camera result.
 
@@ -382,8 +389,47 @@ Current verification scripts print or write their evidence when explicitly run. 
 This procedure organizes the existing acceptance requirements. It does not record a completed deployment or supply unmeasured cost, latency or traffic thresholds.
 
 1. **Identify the release candidate.** Record the source revision, lockfile hash, target environment and configuration changes. Run the local checklist and retain the relevant reports with their dates and environment details.
-2. **Prepare staging infrastructure.** Confirm the target Firebase project, authorized domains, server credentials, Function duration and region. Coordinate client assets, server routes and Rules; verify indexes and all four TTL policies through Section 9.2. Preserve Forum tombstones.
+2. **Prepare staging infrastructure.** Confirm the target Firebase project, authorized domains, server credentials, Function duration and region. Coordinate client assets, server routes and Rules; verify every declared index/TTL policy through Section 9.2. Preserve Forum tombstones, Arena keys/eligibility and moderation archives.
 3. **Validate staging behavior.** Enable AI creation only within the approved staging scope. Exercise response loss, duplicate/concurrent claims, cancellation, quota rejection and all seven AI operations. Correlate requests using non-sensitive generation identifiers and verify the one-provider-call-per-invocation boundary. Run the corrected production browser matrix and record device checks separately.
 4. **Define canary acceptance before exposure.** Assign a release owner and specify the allowed scope, observation period, cost/latency/error thresholds and stop conditions. Calibrate the current 30/300 weighted quota budgets using staging evidence. M01 and F01 remain open until their deployed acceptance requirements are met.
 5. **Run and assess the canary.** Enable creation in the approved production scope, retain content-free telemetry and compare observations with the agreed criteria. If criteria fail, disable new production generation creation through the feature flag and deploy the updated configuration. The flag controls creation; it must not be treated as cancellation of in-flight generations or reversal of persisted mutations.
 6. **Record the decision.** Attach dated evidence to the relevant audit findings before broader release. Record unresolved failures and recovery work. Coordinate any client/server/Rules rollback as a separate release change, since older clients may use paths that current Rules deny.
+
+<a id="maintenance-and-generated-artifacts"></a>
+
+### 9.5. Maintenance and Generated Artifacts
+
+Run `npm run check:maintenance` after changing imports, package metadata, documented commands or output paths. It checks direct package declarations and their locked resolutions, local Markdown file targets (not heading anchors), documented npm scripts, TypeScript/ESLint inputs and Git ignore boundaries. The maintenance test also runs it as part of the ordinary unit suite. It does not replace dependency security assessment, runtime tests or a clean installation.
+
+| Location | Ownership and cleanup |
+|---|---|
+| `.next/` | Generated Next build/dev output. `npm run clean` removes the whole tree; rebuild before production checks. |
+| `.next/cache/`, `.next/dev/`, `.tools/tmp/` | Regenerable caches and scratch data. `npm run clean:cache` removes eligible old trees. |
+| `coverage/`, `test-results/`, `playwright-report/`, `blob-report/`, `tmp/pdfs/`, root Emulator debug logs | Disposable verification output. `npm run clean:artifacts` removes eligible old runs. |
+| `reports/` | Generated measurements/diagnostics, retained by fixed-scope commands by default. Record useful dated conclusions in the audit, then explicitly remove completed investigation outputs when requested; do not accumulate duplicate archives. |
+| `.tools/` outside `tmp/` | Keep installed JDK/browser/npm runtimes still in use. Explicitly identified analysis checkouts, one-off package probes and installer archives may be removed after path/link checks; age alone is insufficient. |
+| `node_modules/`, `.env`, source, docs and lockfile | Outside artifact cleanup. `npm ci` remains the explicit dependency-reinstallation operation. |
+
+Artifact/cache cleanup defaults to seven days and preserves an entire tree if any file or directory within it is newer. Stop relevant servers/test processes first and preview the selection:
+
+```powershell
+npm run clean:artifacts -- --dry-run
+npm run clean:cache -- --dry-run
+
+# Apply the same retention policy after reviewing the selected paths.
+npm run clean:artifacts
+npm run clean:cache
+
+# Optional retention override; zero selects all ages in that scope.
+npm run clean:artifacts -- --older-than-days=14 --dry-run
+```
+
+Cleanup accepts only fixed project-relative scopes, validates the complete plan before removal, refuses tracked content and linked artifact roots, and never follows nested links. The build-clean command intentionally has no age threshold. Output/scratch roots are ignored by Git and excluded from normal TypeScript inputs; Next-generated route types remain explicit compiler inputs. Preserve useful dated conclusions in the audit before disposing raw diagnostics; named report paths describe regenerable outputs, not a permanent archive. Stop processes before removing their build/temp trees, and never traverse an analysis checkout's dependency junction into the working installation.
+
+### 9.6. Backup, Restore and Incidents
+
+`npm run test:restore` starts isolated loopback Auth/Firestore Emulators twice: seed synthetic records and native export, then native import/verification. It checks restored sign-in, history/timestamps, private Rules, canonical Arena replay without another reward, reversible moderation and interrupted Forum deletion. A successful drill removes its generated synthetic snapshot; failure retains the exact temporary directory for diagnosis. Run only with the configured ports free and JDK 21. The 29 October local drill passed. This is not proof of a production backup, deployed IAM/index readiness or an accepted production RPO/RTO.
+
+Before production acceptance, assign an incident/privacy operator and real contact, agree recovery objectives and data/backup retention, and verify an actual backup schedule and restore target with least-privilege access. Protect Auth/claims and all durable/private control records listed in the data map, not just public collections. Do not treat TTL/receipts as business backups.
+
+For an incident, preserve a read-only diagnosis and keep risky writes/AI disabled while selecting a verified recovery point. Restore first into an isolated target, verify Rules/indexes/TTL, account identities, keys, wallet/idempotency and deletion/moderation state, then rehearse rollback/canary before cutover. Old active AI reservations require reconciliation; never blindly replay provider work or lower protections to make a test pass. Dependency/provider outages should retain safe errors and retries, not reset wallets or mint reward eligibility. Real contacts, objectives and a production drill remain deliberately unapproved rather than filled with invented values.

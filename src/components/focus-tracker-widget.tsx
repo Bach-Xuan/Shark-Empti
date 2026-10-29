@@ -1,4 +1,5 @@
 "use client";
+import { learningNotices } from '@/lib/i18n/learning-notices';
 import { useLanguageState } from '@/components/app-preferences';
 import { UiText } from "@/components/ui-text";
 import { uiMessage } from '@/lib/i18n';
@@ -105,19 +106,20 @@ export default function FocusTrackerWidget() {
         : "bottom-24 right-4 md:bottom-32 md:right-6 items-end"
     )}>
       {isOpen && !isMinimized && (
-        <Card className="card-duo w-[300px] md:w-[350px] overflow-hidden animate-in slide-in-from-bottom-8 duration-500 pointer-events-auto border-[3px] shadow-2xl bg-card mb-2">
-          <div className="bg-primary p-4 flex items-center justify-between text-white border-b-4 border-black/10">
+        <Card className="card-duo w-[300px] md:w-[350px] max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-14rem)] overflow-y-auto animate-in slide-in-from-bottom-8 duration-500 pointer-events-auto border-[3px] shadow-2xl bg-card mb-2">
+          <div className="bg-primary p-4 flex items-center justify-between text-primary-foreground border-b-4 border-black/10">
             <div className="flex items-center gap-2">
               <Zap className="w-5 h-5 fill-current animate-pulse" />
               <span className="font-headline font-black uppercase text-sm tracking-widest">{t.focusShield}</span>
             </div>
             <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" aria-label={uiMessage(lang, 'focus.minimize')} onClick={() => setIsMinimized(true)} className="h-8 w-8 rounded-lg hover:bg-white/20 text-white"><Minus className="w-5 h-5" /></Button>
-              <Button variant="ghost" size="icon" aria-label={uiMessage(lang, "focus.stop_camera_and_close")} onClick={() => { setIsOpen(false); stopTracking(); }} className="h-8 w-8 rounded-lg hover:bg-white/20 text-white"><X className="w-5 h-5" /></Button>
+              <Button variant="ghost" size="icon" aria-label={uiMessage(lang, 'focus.minimize')} onClick={() => setIsMinimized(true)} className="h-8 w-8 rounded-lg hover:bg-white/20 text-primary-foreground"><Minus className="w-5 h-5" /></Button>
+              <Button variant="ghost" size="icon" aria-label={uiMessage(lang, "focus.stop_camera_and_close")} onClick={() => { setIsOpen(false); stopTracking(); }} className="h-8 w-8 rounded-lg hover:bg-white/20 text-primary-foreground"><X className="w-5 h-5" /></Button>
             </div>
           </div>
 
           <div className="p-5 space-y-6">
+            <p role="note" className="text-xs text-muted-foreground">{learningNotices[lang].camera}</p>
             <div className={cn("relative aspect-video bg-muted rounded-2xl border-4 border-border overflow-hidden transition-all duration-500", !showPreview && "h-0 opacity-0 mb-[-1.5rem]")}>
               <video
                 ref={videoRef}

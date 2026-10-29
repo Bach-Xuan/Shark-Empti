@@ -29,7 +29,8 @@ beforeEach(async () => {
   const response = await fetch(`http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/demo-shark-empti/databases/(default)/documents`, { method: 'DELETE' });
   expect(response.ok).toBe(true);
   const db = getAdminDb();
-  await db.doc('arenaExams/exam').set({ title: 'Exam', config: { subject: 'math', grade: '12', topic: 'Math', type: 'Mixed', difficulty: 'Mixed', numQuestions: '1' }, questions: [question], totalAttempts: 0, authorId: uid });
+  await db.doc('arenaExams/exam').set({ schemaVersion: 2, questionCount: 1, title: 'Exam', config: { subject: 'math', grade: '12', topic: 'Math', type: 'Mixed', difficulty: 'Mixed', numQuestions: '1' }, totalAttempts: 0, authorId: 'other-author' });
+  await db.doc('_arenaAnswerKeys/exam').set({ schemaVersion: 2, authorId: 'other-author', questions: [question] });
   await db.doc('posts/post').set({ title: 'Post', content: 'Body', subject: 'math', commentsCount: 0, likesCount: 0, likedBy: [], authorId: uid });
 });
 it('commits one Arena attempt and one reward for concurrent retries', async () => {
@@ -96,12 +97,13 @@ it('awards the global pioneer bonus once, including another user and a retake', 
     bonuses.push(await response.json());
   }
   expect(bonuses.map(r => r.isFirstAttempt)).toEqual([true, false, false]);
-  expect(bonuses.map(r => r.coinsAwarded)).toEqual([150, 100, 100]);
+  expect(bonuses.map(r => r.coinsAwarded)).toEqual([150, 100, 0]);
+  expect((await getAdminDb().collection('arenaExams/exam/attempts').get()).size).toBe(2);
 });
 it('rejects invalid tokens, null payloads and legacy free-text exams', async () => {
   expect((await submit(request({}, undefined, 'invalid'), params)).status).toBe(401);
   expect((await submit(request(null), params)).status).toBe(400);
-  await getAdminDb().doc('arenaExams/exam').update({ questions: [{ ...question, correct: 'four' }] });
+  await getAdminDb().doc('_arenaAnswerKeys/exam').update({ questions: [{ ...question, correct: 'four' }] });
   expect((await submit(request({ answers: ['four'], requestId: crypto.randomUUID() }), params)).status).toBe(409);
 });
 it('creates a comment once and decrements the counter on authorized delete', async () => {

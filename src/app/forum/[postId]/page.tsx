@@ -6,9 +6,11 @@ import { UiText } from "@/components/ui-text";
 import { usePagedCollection } from '@/hooks/use-paged-collection';
 import { formatForumDate } from '@/lib/date-format';
 import { readForumPost, readForumComment } from '@/lib/public-firestore-schema';
-import { deleteForumPost } from '@/lib/forum-client';
+import { deleteForumPost, mutateForum } from '@/lib/forum-client';
+import { ReportContent } from '@/components/report-content';
+import { isDocumentId } from '@/lib/document-id';
 import { uiMessage } from '@/lib/i18n';
-import { subjectOptions } from '@/lib/subjects';
+import { subjectBadgeClassName, subjectOptions } from '@/lib/subjects';
 import { useMemo } from 'react';
 
 import ActivityCalendar from '@/components/activity-calendar';
@@ -59,16 +61,11 @@ import { translations,TranslationSet } from '@/lib/translations';
 import { ForumComment,ForumPost } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import {
-arrayRemove,
-arrayUnion,
 collection,
 doc,
-increment,
 onSnapshot,
 orderBy,
 query,
-serverTimestamp,
-updateDoc
 } from 'firebase/firestore';
 import {
 ArrowLeft,
@@ -88,6 +85,7 @@ import { useEffect,useRef,useState } from 'react';
 
 import { LatexQuickToolbar } from '@/components/latex-toolbar';
 import { useMutation } from '@/hooks/use-mutation';
+import { DataNotice } from '@/components/data-notice';
 
 export default function PostDetailPage() {
   const { user } = useUser();
@@ -103,6 +101,9 @@ export default function PostDetailPage() {
   const [post, setPost] = useState<ForumPost | null>(null);
 
   const [loading, setLoading] = useState(true);
+  const [postError, setPostError] = useState<FirestorePermissionError | null>(null);
+  const [postInvalid, setPostInvalid] = useState(false);
+  const [postRetry, setPostRetry] = useState(0);
   const [newComment, setNewComment] = useState("");
   const commentRequest = useRef<{ content: string; id: string } | null>(null);
   const postingComment = useRef(false);
@@ -121,8 +122,10 @@ export default function PostDetailPage() {
 
   useEffect(() => {
     setPost(null);
+    setPostError(null);
+    setPostInvalid(false);
     setLoading(Boolean(postId && db));
-    if (!postId || !db) return;
+    if (!isDocumentId(postId) || !db) { setLoading(false); setPostInvalid(!isDocumentId(postId)); return; }
     let active = true;
     const postRef = doc(db, 'posts', postId);
     const unsubPost = onSnapshot(postRef,
@@ -130,24 +133,26 @@ export default function PostDetailPage() {
         if (!active) return;
         const parsed = docSnap.exists() ? readForumPost(docSnap.id, docSnap.data()) : null;
         setPost(parsed);
+        setPostInvalid(docSnap.exists() && !parsed);
         if (parsed) {
           setLoading(false);
         } else {
-          toast({ variant: "destructive", title: uiMessage(lang, "forum.post_not_found") });
-          router.push('/forum');
+          setPostInvalid(docSnap.exists());
         }
         setLoading(false);
       },
       async cause => {
         if (!active) return;
         setPost(null);
-        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'get' }, cause));
+        const error = new FirestorePermissionError({ path: postRef.path, operation: 'get' }, cause);
+        setPostError(error);
+        errorEmitter.emit('permission-error', error);
         setLoading(false);
       }
     );
 
     return () => { active = false; unsubPost(); };
-  }, [db, postId, router, toast, lang]);
+  }, [db, postId, postRetry]);
   const commentSource = useMemo(() => db && post?.id === postId ? query(collection(db, 'posts', postId, 'comments'), orderBy('createdAt', 'asc')) : null, [db, postId, post?.id]);
   const commentPage = usePagedCollection<ForumComment>(commentSource, readForumComment);
   const comments = commentPage.items;
@@ -159,18 +164,6 @@ export default function PostDetailPage() {
   const getSubjectLabel = (id: string) => {
     const s = subjectsList.find(sub => sub.id === id);
     return s ? s.label : t.other;
-  };
-
-  const getSubjectColor = (id: string) => {
-    switch (id) {
-      case 'math': return 'bg-blue-500/10 text-blue-600 border-blue-500/20';
-      case 'physics': return 'bg-purple-500/10 text-purple-600 border-purple-500/20';
-      case 'chemistry': return 'bg-green-500/10 text-green-600 border-green-500/20';
-      case 'biology': return 'bg-teal-500/10 text-teal-600 border-teal-500/20';
-      case 'literature': return 'bg-orange-500/10 text-orange-600 border-orange-500/20';
-      case 'english': return 'bg-indigo-500/10 text-indigo-600 border-indigo-500/20';
-      default: return 'bg-muted/50 text-muted-foreground border-border';
-    }
   };
 
   const handleAddComment = async () => {
@@ -209,10 +202,9 @@ export default function PostDetailPage() {
       title: tempTitle,
       content: tempContent,
       subject: tempSubject,
-      updatedAt: serverTimestamp()
     };
 
-    const result = await mutation.run(() => updateDoc(postRef, updateData), cause => {
+    const result = await mutation.run(() => mutateForum(user, post.id, { action: 'edit-post', ...updateData }), cause => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'update', requestResourceData: updateData }, cause));
     });
     if (result.ok) { setEditingPost(null);
@@ -240,9 +232,9 @@ export default function PostDetailPage() {
   const handleUpdateComment = async () => {
     if (!user || !db || !editingComment) return;
     const commRef = doc(db, 'posts', postId, 'comments', editingComment.id);
-    const updateData = { content: tempContent, updatedAt: serverTimestamp() };
+    const updateData = { content: tempContent };
 
-    const result = await mutation.run(() => updateDoc(commRef, updateData), cause => {
+    const result = await mutation.run(() => mutateForum(user, postId, { action: 'edit-comment', commentId: editingComment.id, ...updateData }), cause => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({ path: commRef.path, operation: 'update', requestResourceData: updateData }, cause));
     });
     if (result.ok) { setEditingComment(null);
@@ -275,10 +267,7 @@ export default function PostDetailPage() {
     }
     const postRef = doc(db, 'posts', post.id);
     const hasLiked = post.likedBy?.includes(user.uid);
-    updateDoc(postRef, {
-      likedBy: hasLiked ? arrayRemove(user.uid) : arrayUnion(user.uid),
-      likesCount: increment(hasLiked ? -1 : 1)
-    }).catch(async cause => {
+    mutateForum(user, post.id, { action: 'like', liked: !hasLiked }).catch(async cause => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'update', requestResourceData: { likedBy: user.uid } }, cause));
     });
   };
@@ -290,10 +279,7 @@ export default function PostDetailPage() {
     }
     const commRef = doc(db, 'posts', postId, 'comments', comment.id);
     const hasLiked = comment.likedBy?.includes(user.uid);
-    updateDoc(commRef, {
-      likedBy: hasLiked ? arrayRemove(user.uid) : arrayUnion(user.uid),
-      likesCount: increment(hasLiked ? -1 : 1)
-    }).catch(async cause => {
+    mutateForum(user, postId, { action: 'like', commentId: comment.id, liked: !hasLiked }).catch(async cause => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({ path: commRef.path, operation: 'update', requestResourceData: { likedBy: user.uid } }, cause));
     });
   };
@@ -320,7 +306,7 @@ export default function PostDetailPage() {
 
 
   if (loading) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="w-12 h-12 animate-spin text-primary" /></div>;
-  if (!post) return null;
+  if (!post) return <main className="min-h-screen grid place-content-center p-4"><DataNotice lang={lang} error={postError} invalid={postInvalid} onRetry={() => setPostRetry(value => value + 1)} back="/forum" /></main>;
 
   return (
     <div className="min-h-screen flex flex-col bg-background transition-colors duration-500">
@@ -356,13 +342,13 @@ export default function PostDetailPage() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 border-b-[4px] md:border-b-[5px] border-border/30 pb-6 md:pb-8">
             <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
               <Avatar className="w-12 h-12 md:w-20 md:h-20 rounded-[1.2rem] md:rounded-[2rem] border-2 md:border-4 border-primary/20 shadow-duo shrink-0">
-                <AvatarImage src={post.authorPhoto} />
+                <AvatarImage src={post.authorPhoto} alt="" />
                 <AvatarFallback className="bg-primary/10 text-primary font-black text-lg md:text-2xl">{post.authorName[0]}</AvatarFallback>
               </Avatar>
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-sm md:text-lg font-black text-primary uppercase tracking-wider truncate">{post.authorName}</span>
-                  <Badge variant="outline" className={cn("font-black uppercase text-[7px] md:text-[9px] tracking-widest border-2", getSubjectColor(post.subject))}>
+                  <Badge variant="outline" className={cn("font-black uppercase text-[7px] md:text-[9px] tracking-widest border-2", subjectBadgeClassName(post.subject))}>
                     {getSubjectLabel(post.subject)}
                   </Badge>
                 </div>
@@ -421,6 +407,7 @@ export default function PostDetailPage() {
             </h1>
             <div className="text-sm md:text-xl font-bold text-muted-foreground leading-relaxed whitespace-pre-wrap break-words">
               <LatexText text={post.content} />
+              <ReportContent target={{ kind: 'post', id: post.id }} lang={lang} />
             </div>
           </div>
         </Card>
@@ -429,10 +416,10 @@ export default function PostDetailPage() {
           <div className="flex items-center gap-3 md:gap-4 border-b-[4px] md:border-b-[5px] border-border/30 pb-3 md:pb-4"><MessageSquare className="w-6 h-6 md:w-8 md:h-8 text-primary" /><h3 className="text-lg md:text-3xl font-headline font-black text-foreground uppercase tracking-tight">{t.comments} ({comments.length})</h3></div>
 
           <div className="space-y-4 md:space-y-6">
-            {comments.length === 0 ? <div className="py-8 md:py-12 text-center text-muted-foreground opacity-50 font-black uppercase tracking-widest italic text-xs md:text-base">{uiMessage(lang, "forum.no_comments_yet")}</div> :
+            {comments.length === 0 ? <div className="py-8 md:py-12 text-center text-muted-foreground font-black uppercase tracking-widest italic text-xs md:text-base">{uiMessage(lang, "forum.no_comments_yet")}</div> :
               comments.map((comment) => (
                 <Card key={comment.id} className="card-duo p-4 md:p-8 bg-card/50 border-border/30 hover:border-primary/20 transition-all flex gap-3 md:gap-6 relative">
-                  <Avatar className="w-8 h-8 md:w-12 md:h-12 rounded-lg md:rounded-2xl border-2 border-border shrink-0"><AvatarImage src={comment.authorPhoto} /><AvatarFallback className="bg-primary/10 text-primary font-black text-xs">{comment.authorName[0]}</AvatarFallback></Avatar>
+                  <Avatar className="w-8 h-8 md:w-12 md:h-12 rounded-lg md:rounded-2xl border-2 border-border shrink-0"><AvatarImage src={comment.authorPhoto} alt="" /><AvatarFallback className="bg-primary/10 text-primary font-black text-xs">{comment.authorName[0]}</AvatarFallback></Avatar>
                   <div className="flex-1 space-y-2 md:space-y-3 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex flex-col">
@@ -479,6 +466,7 @@ export default function PostDetailPage() {
                     </div>
                     <p className="text-xs md:text-lg font-bold text-foreground leading-relaxed break-words">
                       <LatexText text={comment.content} />
+                      <ReportContent target={{ kind: 'comment', id: comment.id, parentId: postId }} lang={lang} />
                     </p>
                   </div>
                 </Card>
@@ -490,7 +478,7 @@ export default function PostDetailPage() {
             <div className="flex flex-col gap-4 md:gap-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-2 md:gap-3">
-                  <Avatar className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl border-2 border-border"><AvatarImage src={user?.photoURL || ''} /><AvatarFallback className="bg-primary/10 text-primary font-black"><User className="w-3 h-3 md:w-4 md:h-4" /></AvatarFallback></Avatar>
+                  <Avatar className="w-8 h-8 md:w-10 md:h-10 rounded-lg md:rounded-xl border-2 border-border"><AvatarImage src={user?.photoURL || ''} alt="" /><AvatarFallback className="bg-primary/10 text-primary font-black"><User className="w-3 h-3 md:w-4 md:h-4" /></AvatarFallback></Avatar>
                   <span className="text-[9px] md:text-[10px] font-black uppercase text-muted-foreground tracking-widest">{user ? t.addComment : t.mustLoginToInteract}</span>
                 </div>
                 {user && (
@@ -514,17 +502,17 @@ export default function PostDetailPage() {
 
                 {newComment.includes('$') && (
                   <div className="p-4 md:p-6 bg-muted/5 rounded-xl md:rounded-2xl border-2 border-dashed border-border/50 animate-in fade-in duration-300">
-                    <span className="text-[8px] md:text-[9px] font-black uppercase text-primary/50 block mb-2 md:mb-3">{t.latexPreview}</span>
+                    <span className="text-[8px] md:text-[9px] font-black uppercase text-primary block mb-2 md:mb-3">{t.latexPreview}</span>
                     <div className="text-sm md:text-base font-bold leading-relaxed"><LatexText text={newComment} /></div>
                   </div>
                 )}
 
                 {user && (
                   <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <p className="text-[8px] md:text-[9px] font-black text-muted-foreground/60 uppercase tracking-widest flex items-center gap-1.5 md:gap-2">
+                    <p className="text-[8px] md:text-[9px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1.5 md:gap-2">
                       <Sigma className="w-2.5 h-2.5 md:w-3 md:h-3" /> {t.latexHelp}
                     </p>
-                    <Button onClick={handleAddComment} disabled={!user || !newComment.trim()} className="btn-duo h-11 md:h-14 rounded-xl md:rounded-2xl bg-primary text-white font-black uppercase tracking-widest flex items-center gap-2 md:gap-3 border-[3px] md:border-4 border-primary/20 w-full md:w-fit md:px-12"><Send className="w-4 h-4 md:w-5 md:h-5" /> {t.send}</Button>
+                    <Button onClick={handleAddComment} disabled={!user || !newComment.trim()} className="btn-duo h-11 md:h-14 rounded-xl md:rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-widest flex items-center gap-2 md:gap-3 border-[3px] md:border-4 border-primary/20 w-full md:w-fit md:px-12"><Send className="w-4 h-4 md:w-5 md:h-5" /> {t.send}</Button>
                   </div>
                 )}
               </div>
@@ -574,7 +562,7 @@ export default function PostDetailPage() {
             </div>
             <div className="flex gap-3 pt-4">
               <Button variant="ghost" onClick={() => setEditingPost(null)} className="btn-duo flex-1 h-12 rounded-xl font-black uppercase text-xs">{t.cancel}</Button>
-              <Button disabled={mutation.pending} onClick={handleUpdatePost} className="btn-duo flex-1 h-12 rounded-xl bg-primary text-white font-black uppercase text-xs">{t.update}</Button>
+              <Button disabled={mutation.pending} onClick={handleUpdatePost} className="btn-duo flex-1 h-12 rounded-xl bg-primary text-primary-foreground font-black uppercase text-xs">{t.update}</Button>
             </div>
           </div>
         </fieldset></DialogContent>
@@ -600,7 +588,7 @@ export default function PostDetailPage() {
             </div>
             <div className="flex gap-3 pt-4">
               <Button variant="ghost" onClick={() => setEditingComment(null)} className="btn-duo flex-1 h-12 rounded-xl font-black uppercase text-xs">{t.cancel}</Button>
-              <Button disabled={mutation.pending} onClick={handleUpdateComment} className="btn-duo flex-1 h-12 rounded-xl bg-primary text-white font-black uppercase text-xs">{t.update}</Button>
+              <Button disabled={mutation.pending} onClick={handleUpdateComment} className="btn-duo flex-1 h-12 rounded-xl bg-primary text-primary-foreground font-black uppercase text-xs">{t.update}</Button>
             </div>
           </div>
         </fieldset></DialogContent>
@@ -615,7 +603,7 @@ export default function PostDetailPage() {
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 flex flex-row gap-3">
             <AlertDialogCancel className="btn-duo flex-1 h-12 rounded-xl font-black uppercase text-xs m-0 bg-card">{t.cancel}</AlertDialogCancel>
-            <AlertDialogAction disabled={mutation.pending} onClick={handleDeletePost} className="btn-duo flex-1 h-12 rounded-xl bg-destructive text-white font-black uppercase text-xs m-0 min-w-[100px] flex items-center justify-center px-8">{t.delete.toUpperCase()}</AlertDialogAction>
+            <AlertDialogAction disabled={mutation.pending} onClick={handleDeletePost} className="btn-duo flex-1 h-12 rounded-xl bg-destructive text-destructive-foreground font-black uppercase text-xs m-0 min-w-[100px] flex items-center justify-center px-8">{t.delete.toUpperCase()}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -629,7 +617,7 @@ export default function PostDetailPage() {
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 flex flex-row gap-3">
             <AlertDialogCancel className="btn-duo flex-1 h-12 rounded-xl font-black uppercase text-xs m-0 bg-card">{t.cancel}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteComment} className="btn-duo flex-1 h-12 rounded-xl bg-destructive text-white font-black uppercase text-xs m-0 min-w-[100px] flex items-center justify-center px-8">{t.delete.toUpperCase()}</AlertDialogAction>
+            <AlertDialogAction onClick={handleDeleteComment} className="btn-duo flex-1 h-12 rounded-xl bg-destructive text-destructive-foreground font-black uppercase text-xs m-0 min-w-[100px] flex items-center justify-center px-8">{t.delete.toUpperCase()}</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

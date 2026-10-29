@@ -2,7 +2,7 @@ import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import type { Firestore } from 'firebase/firestore';
 import { useLearningSession } from '@/hooks/use-learning-session';
-import { history } from './fixtures/quiz';
+import { history, analysis } from './fixtures/quiz';
 const mocks = vi.hoisted(() => ({ write: vi.fn(), emit: vi.fn() }));
 vi.mock('firebase/firestore', () => ({ doc: (...parts: unknown[]) => ({ path: parts.slice(1).join('/') }), setDoc: mocks.write }));
 vi.mock('@/firebase/error-emitter', () => ({ errorEmitter: { emit: mocks.emit } }));
@@ -27,4 +27,30 @@ it('does not navigate back to results after a save finishes beyond reset', async
  let saving!: Promise<boolean>; act(() => { saving = result.current.finish(history); result.current.reset(); });
  await act(async () => { resolve(); expect(await saving).toBe(false); });
  expect(result.current.session.status).toBe('setup');
+});
+
+it('persists recovered feedback and bilingual topics against the original stable history ID', async () => {
+ const { result } = renderHook(() => useLearningSession(user, db, 'en'));
+ mocks.write.mockResolvedValue(undefined);
+ act(() => result.current.start(history.config, []));
+ await act(async () => { await result.current.finish({ ...history, analysis: undefined }); });
+ const firstReference = mocks.write.mock.calls[0][0];
+ await act(async () => expect(await result.current.recoverAnalysis({ ...analysis, topicEn: 'Addition', topicVi: 'Phép cộng' })).toBe(true));
+ expect(mocks.write.mock.calls[1][0]).toEqual(firstReference);
+ expect(mocks.write.mock.calls[1][1]).toMatchObject({ analysis, config: { topicEn: 'Addition', topicVi: 'Phép cộng' } });
+ expect(result.current.session.results?.analysis).toEqual(analysis);
+});
+
+it('keeps recovery retryable after a write failure and refuses an old result callback after reset', async () => {
+ const { result } = renderHook(() => useLearningSession(user, db, 'en'));
+ mocks.write.mockResolvedValue(undefined);
+ act(() => result.current.start(history.config, []));
+ await act(async () => { await result.current.finish({ ...history, analysis: undefined }); });
+ const recover = result.current.recoverAnalysis;
+ mocks.write.mockRejectedValueOnce({ code: 'unavailable' });
+ await act(async () => expect(await recover({ ...analysis, topicEn: 'A', topicVi: 'B' })).toBe(false));
+ expect(result.current.session.results?.analysis).toBeUndefined();
+ act(() => result.current.start(history.config, []));
+ expect(await recover({ ...analysis, topicEn: 'A', topicVi: 'B' })).toBe(false);
+ expect(mocks.write).toHaveBeenCalledTimes(2);
 });

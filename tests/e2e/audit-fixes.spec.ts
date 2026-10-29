@@ -1,16 +1,17 @@
-import { expect,test } from '@playwright/test';
+import { expect, test } from './fixtures';
+import { randomUUID } from 'node:crypto';
 import { getApps,initializeApp } from 'firebase-admin/app';
 import { getFirestore,Timestamp } from 'firebase-admin/firestore';
 
 test('guest Arena requires login and publishing a post waits for a real write', async ({ page }) => {
   if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST) throw new Error('Demo emulators required');
   const db = getFirestore(getApps()[0] ?? initializeApp({ projectId: 'demo-shark-empti' }));
-  const id = `guard-${test.info().project.name}`;
+  const id = `guard-${test.info().project.name}-${randomUUID()}`;
   await db.doc(`arenaExams/${id}`).set({
-    title: 'Guard exam', authorId: 'fixture', authorName: 'Fixture', authorPhoto: '', createdAt: Timestamp.now(), totalAttempts: 0,
+    schemaVersion: 2, questionCount: 1, title: 'Guard exam', authorId: 'fixture', authorName: 'Fixture', authorPhoto: '', createdAt: Timestamp.now(), totalAttempts: 0,
     config: { topic: 'Addition', subject: 'math', grade: 'none', numQuestions: '1', difficulty: 'Recognition', type: 'Multiple Choice', timeLimit: '' },
-    questions: [{ question: '2+2?', correct: '4', options: ['4', '3', '2', '1'], type: 'Multiple Choice', difficulty: 'Recognition', explanation: 'Addition', section: 'Addition' }],
   });
+  await db.doc(`_arenaAnswerKeys/${id}`).set({ schemaVersion: 2, authorId: 'fixture', questions: [{ question: '2+2?', correct: '4', options: ['4', '3', '2', '1'], type: 'Multiple Choice', difficulty: 'Recognition', explanation: 'Addition', section: 'Addition' }] });
   await page.goto(`/arena/${id}`);
   await page.getByRole('button', { name: 'Sign in to start', exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);

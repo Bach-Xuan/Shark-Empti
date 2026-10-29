@@ -79,7 +79,7 @@ export function LatexQuickToolbar({ onSelect }: { onSelect: (s: string) => void 
             <TabsTrigger 
               key={group.id} 
               value={group.id} 
-              className="rounded-xl px-3 md:px-6 py-2 md:py-3 border-2 border-border data-[state=active]:bg-primary data-[state=active]:text-white data-[state=active]:border-primary/20 text-[8px] md:text-xs font-black uppercase tracking-widest transition-all"
+              className="rounded-xl px-3 md:px-6 py-2 md:py-3 border-2 border-border data-[state=active]:bg-primary data-[state=active]:text-primary-foreground data-[state=active]:border-primary/20 text-[8px] md:text-xs font-black uppercase tracking-widest transition-all"
             >
               <group.icon className="w-3.5 h-3.5 md:w-5 md:h-5 mr-1.5 md:mr-2" />
               {group.label[lang]}
@@ -98,7 +98,7 @@ export function LatexQuickToolbar({ onSelect }: { onSelect: (s: string) => void 
                   onClick={() => onSelect(item.code)}
                 >
                   <span className="font-code text-[8px] md:text-sm text-primary truncate flex-1">{item.code}</span>
-                  <span className="text-[6px] md:text-[8px] font-black uppercase opacity-40 truncate ml-1 shrink-0">{item.label[lang]}</span>
+                  <span className="text-[6px] md:text-[8px] font-black uppercase  truncate ml-1 shrink-0">{item.label[lang]}</span>
                 </Button>
               ))}
             </div>

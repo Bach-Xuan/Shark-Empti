@@ -58,7 +58,8 @@ ERROR CATEGORIZATION RULES:
    - Logical contradiction between different answers in the same session.
 4. Careless Mistake (Lỗi Bất cẩn):
    - Missing negative sign, 1-digit deviation, unit mixup in short answer.
-   - Wrong answer provided in < 4 seconds.
+   - Never infer a cognitive cause from response speed alone. Missing timing (including zero) is unknown.
+   - These categories are tentative interpretations, not diagnoses. Use Unclassified when the answers provide insufficient evidence.
 
 COGNITIVE SKILLS SCORING (0-100):
 - Concept Mastery: + if correct on definitions/principles. - if Concept Error occurs.
