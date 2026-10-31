@@ -1,4 +1,4 @@
-# ⚙️ Configuration, Dependencies and Troubleshooting · Shark Empti v1.15.1
+# ⚙️ Configuration, Dependencies and Troubleshooting · Shark Empti v2.0.0 **β**
 
 This guide configures the application and its release environment. See [README](../README.md), [architecture](TECHNICAL_DOCUMENTATION.md), [validation](VALIDATION.md), [account operations](ACCOUNT_OPERATIONS.md), the [data map](backend.json) and [audit register](AUDIT_REPORT.md). Runtime behavior is determined by source, Rules and configuration, not this guide alone.
 
@@ -56,6 +56,25 @@ npx --no-install firebase deploy --project YOUR_FIREBASE_PROJECT_ID --only 'fire
 Review the target and changes before executing the deployment; confirm index readiness afterwards. The CLI login identity and Admin runtime service account have separate permissions. Preserve Forum tombstones and private Arena keys/eligibility when planning deployment or recovery.
 
 Do not infer a missing private key or assume local credentials point to a staging project. If a key is exposed, revoke/rotate it and update the deployment; `.gitignore` alone does not remove committed history.
+
+<a id="timestamp-migration"></a>
+## Timestamp migration
+
+New learning writes store Firestore Timestamp values, and matching Rules reject new ISO/numeric date fields. Deploy the compatible readers/writers before tightening Rules; older clients that still write ISO require refresh. History remains correctly paged while Timestamp values coexist with fixed-width UTC ISO strings produced by the original writer. Other ISO representations, including offsets and date-only strings, must be migrated before they appear in the history feed; until then they count as invalid records. Inventory and migrate these records before rollout to avoid temporarily hiding them.
+
+Inventory the exact target before converting existing `users/{uid}/history.date`, `flashcards.createdAt` and `practice.createdAt`:
+
+```powershell
+npm run migrate:timestamps -- --project=YOUR_FIREBASE_PROJECT_ID
+```
+
+This command reads existing records but makes no writes by default. Its output contains aggregate counts rather than learner content. Review its invalid/convertible counts and retain a verified backup. For an explicitly authorized target, apply conversion with:
+
+```powershell
+npm run migrate:timestamps -- --project=YOUR_FIREBASE_PROJECT_ID --apply --confirm-timestamp-migration
+```
+
+The configured Admin project must match the explicit project. The bounded, transactional conversion preserves original instants and unrelated fields, skips invalid dates, includes records below missing user profiles and refuses deletion locks or an active backup barrier. It can be repeated after interruption. Rerun the inventory to verify zero convertible records; invalid dates require separate review. Do not run conversion concurrently with a legacy restore or older ISO-writing clients. No new index definition is needed for the type-specific single-field history queries; confirm the target has not disabled the normal `date` index. Application epoch milliseconds, numeric `*Ms` protocol/lease fields, durations, local calendar-day keys and external JSON metadata have distinct purposes and are not converted by this command.
 
 ## 🤖 OpenRouter setup
 

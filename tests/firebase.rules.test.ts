@@ -19,6 +19,18 @@ afterEach(async () => testEnv?.clearFirestore());
 afterAll(async () => testEnv?.cleanup());
 
 describe('Firestore access policy', () => {
+  it.each([['history', 'date'], ['flashcards', 'createdAt'], ['practice', 'createdAt']])('requires canonical timestamps for %s writes while retaining legacy reads and deletion', async (group, field) => {
+    const db = testEnv.authenticatedContext('learner').firestore();
+    const reference = doc(db, `users/learner/${group}/time`);
+    await assertFails(setDoc(reference, { [field]: '2026-09-03T12:00:00Z' }));
+    await assertFails(setDoc(reference, { [field]: Date.now() }));
+    await assertFails(setDoc(reference, { unrelated: true }));
+    await testEnv.withSecurityRulesDisabled(context => setDoc(doc(context.firestore(), reference.path), { [field]: '2026-09-03T12:00:00Z' }));
+    await assertSucceeds(getDoc(reference));
+    await assertSucceeds(updateDoc(reference, { [field]: serverTimestamp() }));
+    await assertFails(updateDoc(reference, { [field]: 'invalid' }));
+    await assertSucceeds(deleteDoc(reference));
+  });
   it('blocks new private writes under deletion or an active backup barrier while preserving owner reads', async () => {
     const db = testEnv.authenticatedContext('learner').firestore();
     await assertSucceeds(setDoc(doc(db, 'users/learner/notes/main'), { text: 'Owned' }));

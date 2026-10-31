@@ -12,7 +12,7 @@ it('keeps topic and task identity across display locales and selected-session su
   expect(vi.topicId).toBe(en.topicId);
   expect(vi.recommendations[0].id).toBe(en.recommendations[0].id);
   expect(vi.recommendations[0].text).toBe('Luyện tập');
-  const added = { ...session, id: 'second', date: '2026-09-04', analysis: { ...session.analysis!, en: { ...session.analysis!.en, recommendations: ['New'] }, vi: { ...session.analysis!.vi, recommendations: ['Mới'] } } };
+  const added = { ...session, id: 'second', date: Date.parse('2026-09-04'), analysis: { ...session.analysis!, en: { ...session.analysis!.en, recommendations: ['New'] }, vi: { ...session.analysis!.vi, recommendations: ['Mới'] } } };
   const all = calculateDashboardStats([session, added], translations.en, 'en')!.processedGroupedInsights[0];
   expect(all.recommendations.find(rec => rec.text === 'Practice')?.id).toBe(en.recommendations[0].id);
   expect(calculateDashboardStats([added, session], translations.en, 'en')).toEqual(calculateDashboardStats([session, added], translations.en, 'en'));

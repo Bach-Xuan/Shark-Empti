@@ -5,7 +5,7 @@ import ts from 'typescript';
 import { expect,it } from 'vitest';
 
 // Brand/version, native language names and technical identifiers are intentional.
-const exceptions = new Set(['SHARK EMPTI', 'SHARK EMPTI v1.15.1', 'v1.15.1', 'SHARK COINS', 'English', 'Tiếng Việt', 'UID:']);
+const exceptions = new Set(['SHARK EMPTI', 'v2.0.0', 'β', 'SHARK COINS', 'English', 'Tiếng Việt', 'UID:']);
 const visibleAttributes = new Set(['title', 'placeholder', 'aria-label', 'alt']);
 function* sourceFiles(directory: string): Generator<string> {
   for (const entry of readdirSync(directory, { withFileTypes: true })) {

@@ -1,6 +1,6 @@
 {
   "name": "shark-empti",
-  "version": "1.15.1",
+  "version": "2.0.0-beta",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack -p 9002",
@@ -31,7 +31,8 @@
     "report:queries": "firebase emulators:exec --project demo-shark-empti --only auth,firestore \"node scripts/query-comparison.mjs\"",
     "report:comparison": "firebase emulators:exec --project demo-shark-empti --only auth,firestore \"node scripts/performance-comparison.mjs\"",
     "jobs:storage:check": "node --conditions=react-server --env-file-if-exists=.env --import tsx scripts/check-job-storage.ts",
-    "jobs:restore": "node --conditions=react-server --env-file-if-exists=.env --import tsx scripts/restore-job-backup.ts"
+    "jobs:restore": "node --conditions=react-server --env-file-if-exists=.env --import tsx scripts/restore-job-backup.ts",
+    "migrate:timestamps": "node --conditions=react-server --env-file-if-exists=.env --import tsx scripts/migrate-learning-times.ts"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.6",

@@ -240,8 +240,8 @@ if (!authLoading && !user) {
     ? new Date(user.metadata.creationTime).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })
     : '---';
 
-  const formatSessionDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US', {
+  const formatSessionDate = (millis: number) => {
+    return new Date(millis).toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US', {
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
@@ -250,7 +250,7 @@ if (!authLoading && !user) {
     });
   };
 
-  const searchMemberSince = searchResult?.createdAt
+  const searchMemberSince = searchResult?.createdAt != null
     ? formatStoredDate(searchResult.createdAt, lang, { day: 'numeric', month: 'long', year: 'numeric' }) : '---';
 
   if (authLoading || profileLoading) {

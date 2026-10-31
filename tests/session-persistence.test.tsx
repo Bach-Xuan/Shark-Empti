@@ -1,10 +1,10 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import type { Firestore } from 'firebase/firestore';
+import { Timestamp, type Firestore } from 'firebase/firestore';
 import { useLearningSession } from '@/hooks/use-learning-session';
 import { history, analysis } from './fixtures/quiz';
 const mocks = vi.hoisted(() => ({ write: vi.fn(), emit: vi.fn() }));
-vi.mock('firebase/firestore', () => ({ doc: (...parts: unknown[]) => ({ path: parts.slice(1).join('/') }), setDoc: mocks.write }));
+vi.mock('firebase/firestore', async importOriginal => ({ ...await importOriginal<typeof import('firebase/firestore')>(), doc: (...parts: unknown[]) => ({ path: parts.slice(1).join('/') }), setDoc: mocks.write }));
 vi.mock('@/firebase/error-emitter', () => ({ errorEmitter: { emit: mocks.emit } }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 const user = { uid: 'learner' }, db = {} as Firestore;
@@ -16,8 +16,10 @@ it('keeps the quiz on failed saves and retries the same record without undefined
  expect(result.current.session.status).toBe('quiz');
  const [reference, data] = mocks.write.mock.calls[0];
  expect(data).not.toHaveProperty('analysis'); expect(data.schemaVersion).toBe(2);
+ expect(data.date).toBeInstanceOf(Timestamp);
  await act(async () => expect(await result.current.finish(history)).toBe(true));
  expect(mocks.write.mock.calls[1][0]).toEqual(reference);
+ expect(mocks.write.mock.calls[1][1].date.isEqual(data.date)).toBe(true);
  expect(result.current.session.status).toBe('result');
 });
 it('does not navigate back to results after a save finishes beyond reset', async () => {
@@ -38,6 +40,7 @@ it('persists recovered feedback and bilingual topics against the original stable
  await act(async () => expect(await result.current.recoverAnalysis({ ...analysis, topicEn: 'Addition', topicVi: 'Phép cộng' })).toBe(true));
  expect(mocks.write.mock.calls[1][0]).toEqual(firstReference);
  expect(mocks.write.mock.calls[1][1]).toMatchObject({ analysis, config: { topicEn: 'Addition', topicVi: 'Phép cộng' } });
+ expect(mocks.write.mock.calls[1][1].date.toMillis()).toBe(result.current.session.results?.date);
  expect(result.current.session.results?.analysis).toEqual(analysis);
 });
 

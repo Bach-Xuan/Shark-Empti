@@ -33,7 +33,7 @@ describe('public persisted record readers', () => {
   });
   it('does not throw on malformed dates and accepts actual SDK timestamp shapes', () => {
     expect(readForumPost('id', { ...post, createdAt: { toDate() { throw Error('broken'); } } })?.createdAt).toBeNull();
-    expect(readForumPost('id', { ...post, createdAt: { toDate: () => new Date(123) } })?.createdAt).toEqual(new Date(123));
+    expect(readForumPost('id', { ...post, createdAt: { toDate: () => new Date(123) } })?.createdAt).toBe(123);
   });
   it.each([
     { ...exam, config: null }, { ...exam, questions: [] }, { ...exam, questions: [null] },

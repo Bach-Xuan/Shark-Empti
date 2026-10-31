@@ -101,7 +101,7 @@ export function calculateDashboardStats(
   const topicInsights = new Map<string, TopicInsight>();
 
   // Deterministic recency ordering also makes capped lists independent of fetch order.
-  [...history].sort((a, b) => a.date.localeCompare(b.date) ||
+  [...history].sort((a, b) => a.date - b.date ||
     (a.id ?? JSON.stringify(a.config)).localeCompare(b.id ?? JSON.stringify(b.config))).forEach(session => {
     const topic =
       currentLang === "vi"

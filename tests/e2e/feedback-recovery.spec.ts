@@ -38,6 +38,7 @@ test('recovered feedback survives a denied save, reaches the same History/Dashbo
     await expect(retry).toBeVisible();
     const saved = await db.collection('users/' + uid + '/history').get();
     expect(saved.size).toBe(1);
+    const completedAt = saved.docs[0].get('date').toMillis();
     const historyRef = saved.docs[0].ref;
     feedbackUnavailable = false;
     await retry.click();
@@ -53,6 +54,7 @@ test('recovered feedback survives a denied save, reaches the same History/Dashbo
     expect((await db.collection('users/' + uid + '/history').get()).size).toBe(1);
     expect((await historyRef.get()).get('analysis.en.recommendations')).toEqual(['Practice daily']);
     expect((await historyRef.get()).get('analysis.vi.recommendations')).toEqual(['Luyện tập hằng ngày']);
+    expect((await historyRef.get()).get('date').toMillis()).toBe(completedAt);
     await page.evaluate(() => localStorage.setItem('shark_help_dashboard_seen', 'true'));
     await page.getByRole('navigation', { name: uiMessage('en', 'navigation.main') }).getByRole('button', { name: translations.en.dashboard, exact: true }).click();
     await expect(page.getByText('Practice daily', { exact: true }).first()).toBeVisible();

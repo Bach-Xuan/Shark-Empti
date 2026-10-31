@@ -51,7 +51,7 @@ it('shares the established duration range across Quiz runtime and persisted Aren
  }
 });
 it('identifies legacy history while retaining absent and invalid optional analysis', () => {
- const base = { date: '2026-09-13', config: { topic: 'x' }, quizResults: [] };
+ const base = { date: '2026-09-13T00:00:00.000Z', config: { topic: 'x' }, quizResults: [] };
  for (const analysis of [undefined, { broken: true }]) expect(readHistoryItem('id', { ...base, analysis })).toMatchObject({ schemaVersion: 1, analysis: undefined });
  expect(readHistoryItem('id', { ...base, schemaVersion: 2 })?.schemaVersion).toBe(2);
  expect(readHistoryItem('id', { ...base, schemaVersion: 99 })).toBeNull();

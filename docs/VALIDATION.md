@@ -34,7 +34,7 @@ npm run test:integration
 
 Lint checks project code; typecheck validates the TypeScript program. Maintenance checks declared imports, package/lock agreement, documented npm scripts and local links, compiler/lint scope and ignored generated paths. Unit/component results cover exercised branches in their own denominator; integration separately exercises Rules, authenticated APIs and emulator-backed workflows. Do not add coverage counters from separate suites or treat a skipped case as passed. V8 coverage is produced under `coverage/`.
 
-Integration includes expiry-denial, renewed-quota cleanup and Firestore-only retention cases. Rules and integration commands start demo Emulators. Check the first failing assertion and emulator log before retrying; fixture and Emulator results are not proof that deployed Rules, indexes, IAM or production data match.
+Integration includes expiry-denial, renewed-quota cleanup and Firestore-only retention cases. Timestamp regressions cover canonical writes and Rules, mixed ISO/Timestamp history pagination, retry-stable completion dates, and repeatable migration across missing parents and multiple pages. Migration tests verify dry-run isolation, preservation of original instants/content and refusal during deletion or backup barriers. Rules and integration commands start demo Emulators. Check the first failing assertion and emulator log before retrying; fixture and Emulator results are not proof that deployed Rules, indexes, IAM or production data match. See [timestamp migration](CONFIGURATION.md#timestamp-migration) before converting a remote dataset.
 
 ## Optimized build and browser matrix
 

@@ -1,7 +1,7 @@
 import { expect, test } from './fixtures';
 import { signInDemo } from './auth';
 import { getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { translations } from '../../src/lib/translations';
 import { uiMessage } from '../../src/lib/i18n';
 import { history } from '../fixtures/quiz';
@@ -16,7 +16,7 @@ for (const mode of ['flashcards', 'practice'] as const) {
     expect(owners).toHaveLength(1);
     const uid = owners[0].id;
     await db.doc(`users/${uid}/history/recovery-source`).set({
-      ...history, userId: uid, schemaVersion: 2,
+      ...history, date: Timestamp.fromMillis(history.date), userId: uid, schemaVersion: 2,
       quizResults: [{ ...history.quizResults[0], userAnswer: '3', isCorrect: false }],
     });
     const creations: string[] = [];
@@ -59,6 +59,7 @@ for (const mode of ['flashcards', 'practice'] as const) {
       expect(restored.flipped).toBe(true);
       await expect(page.getByRole('button', { name: uiMessage('en', 'playgroundview.reverse'), exact: true })).toHaveAttribute('aria-pressed', 'true');
       expect((await db.collection(`users/${uid}/flashcards`).get()).size).toBe(1);
+      expect((await db.collection(`users/${uid}/flashcards`).get()).docs[0].get('createdAt')).toBeInstanceOf(Timestamp);
       await page.getByRole('button', { name: translations.en.finishSession, exact: true }).click();
     } else {
       expect(restored.id).toBe(before.id);
@@ -69,6 +70,7 @@ for (const mode of ['flashcards', 'practice'] as const) {
       const sessions = await db.collection(`users/${uid}/practice`).get();
       expect(sessions.size).toBe(1);
       expect(sessions.docs[0].id).toBe(before.id);
+      expect(sessions.docs[0].get('createdAt')).toBeInstanceOf(Timestamp);
       expect(sessions.docs[0].get('userAnswers')).toHaveLength(2);
     }
     await expect.poll(progress).toBeNull();

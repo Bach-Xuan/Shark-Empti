@@ -17,6 +17,7 @@ export function usePagedCollection<T>(source: Query<DocumentData> | null, read: 
  const [error, setError] = useState<FirestorePermissionError | null>(null);
  const [retryEpoch, setRetryEpoch] = useState(0);
  const [invalidRecords, setInvalidRecords] = useState(0);
+ const [firstPageVersion, setFirstPageVersion] = useState(0);
  const report = useCallback((cause: unknown) => {
   const problem = new FirestorePermissionError({ path: 'paged-collection', operation: 'list' }, cause);
   errorEmitter.emit('permission-error', problem);
@@ -40,6 +41,7 @@ export function usePagedCollection<T>(source: Query<DocumentData> | null, read: 
   const unsubscribe = onSnapshot(query(source, limit(PAGE_SIZE)), snapshot => {
    clearTimeout(timer);
    if (generation !== epoch.current) return;
+   setFirstPageVersion(previous => previous + 1);
    cursor.current = snapshot.docs.at(-1) ?? null;
    seenIds.current = new Set(snapshot.docs.map(doc => doc.id));
    const items = decode(snapshot.docs);
@@ -67,5 +69,5 @@ export function usePagedCollection<T>(source: Query<DocumentData> | null, read: 
   } catch (cause) { if (generation === epoch.current && cursor.current === anchor) { setError(report(cause)); setItems([]); cursor.current = null; setHasMore(false); } }
   finally { if (generation === epoch.current) { busy.current = false; setLoading(false); } }
  }, [source, hasMore, decode, report]);
- return { items, loading, hasMore, loadMore, error, retry, invalidRecords };
+ return { items, loading, hasMore, loadMore, error, retry, invalidRecords, firstPageVersion };
 }

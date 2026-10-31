@@ -68,7 +68,8 @@ export interface QuizHistoryItem {
   totalTime: number;
   config: QuizConfig;
   analysis?: QuizAnalysis;
-  date: string;
+  /** UTC epoch milliseconds after reading; persisted as a Firestore Timestamp. */
+  date: number;
   lang: Language;
 }
 

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { cognitiveMetricsSchema,languageAnalysisSchema as labels } from './analysis-schema';
 import type { QuizHistoryItem } from './types';
+import { readTimeMillis } from './time';
 
 const text = z.union([z.string(), z.number()]).transform(String);
 const analysis = z.object({
@@ -20,7 +21,10 @@ const historySchema = z.object({
     difficulty: z.string().default('Mixed'), numQuestions: text.default(''), timeLimit: text.optional(), excludeNotes: z.string().optional(),
     topicEn: z.string().optional(), topicVi: z.string().optional(),
   }),
-  totalTime: z.number().finite().nonnegative().default(0), date: z.string(), lang: z.enum(['vi', 'en']).default('en'),
+  totalTime: z.number().finite().nonnegative().default(0),
+  // Only the original writer's fixed-width UTC strings sort chronologically in
+  // Firestore. Other valid ISO forms must be migrated before joining the feed.
+  date: z.unknown().transform(value => typeof value === 'string' && !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) ? null : readTimeMillis(value)).pipe(z.number()), lang: z.enum(['vi', 'en']).default('en'),
   analysis: analysis.optional().catch(undefined),
 });
 

@@ -22,7 +22,7 @@ import { showErrorToast,showUnexpectedErrorToast } from '@/lib/error-toast';
 import { TranslationSet } from '@/lib/translations';
 import { Flashcard,Language } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { addDoc,collection } from 'firebase/firestore';
+import { addDoc,collection,serverTimestamp } from 'firebase/firestore';
 import {
 ArrowLeft,
 ArrowRight,
@@ -110,7 +110,7 @@ export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, init
           sourceType: initialConcept ? 'weak_point' : 'manual',
           sourceValue: topic,
           cards: result.data.cards,
-          createdAt: new Date().toISOString()
+          createdAt: serverTimestamp()
         }).catch(error => {
           errorEmitter.emit('permission-error', new FirestorePermissionError({ path: sessionRef.path, operation: 'create' }, error));
         });

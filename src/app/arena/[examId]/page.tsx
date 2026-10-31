@@ -205,7 +205,7 @@ function ArenaDetailSession({ examId }: { examId: string }) {
     submitting.current = true;
     pendingSubmission.current ??= {
       body: JSON.stringify({ answers: results.quizResults.map(result => result.userAnswer), requestId: activeAttempt.current }),
-      results: { ...results, ...(analysis ? { analysis } : {}), date: new Date().toISOString(), lang },
+      results: { ...results, ...(analysis ? { analysis } : {}), date: Date.now(), lang },
     };
     const pending = pendingSubmission.current;
     const controller = new AbortController();

@@ -11,6 +11,11 @@ service cloud.firestore {
           || get(/databases/$(database)/documents/_serviceState/maintenance).data.expiresAtMs <= request.time.toMillis());
     }
     function validText(value, maximum) { return value is string && value.size() > 0 && value.size() <= maximum && value.matches('[\\s\\S]*\\S[\\s\\S]*'); }
+    function validLearningTime(collection) {
+      return request.method == 'delete'
+        || (collection == 'history' ? request.resource.data.date is timestamp
+          : collection in ['flashcards', 'practice'] ? request.resource.data.createdAt is timestamp : true);
+    }
     function validAuthor(data) {
       return validText(data.authorId, 128) && validText(data.authorName, 200)
         && data.authorPhoto is string && data.authorPhoto.size() <= 2048
@@ -85,7 +90,7 @@ service cloud.firestore {
       allow delete: if false;
       match /{collection}/{document=**} {
         allow read: if owner(userId);
-        allow write: if writableOwner(userId);
+        allow write: if writableOwner(userId) && validLearningTime(collection);
       }
     }
 

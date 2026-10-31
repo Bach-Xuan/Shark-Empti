@@ -66,7 +66,7 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
             <div className="min-w-0 flex flex-col">
               <div className="flex items-baseline gap-1.5 md:gap-2">
                 <span className="font-headline font-black text-base sm:text-lg md:text-2xl leading-none text-primary tracking-tight uppercase">SHARK EMPTI</span>
-                <span className="hidden sm:inline text-[8px] md:text-[10px] font-black text-muted-foreground tracking-widest uppercase ml-1">v1.15.1</span>
+                <span className="hidden sm:inline text-[8px] md:text-[10px] font-black text-muted-foreground tracking-widest uppercase ml-1">v2.0.0 <strong className="normal-case">β</strong></span>
               </div>
               <span className="text-[7px] md:text-[9px] font-black text-muted-foreground uppercase tracking-[0.15em] leading-tight whitespace-normal break-words">
                 {t.appTagline}

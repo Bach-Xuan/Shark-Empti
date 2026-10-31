@@ -1,9 +1,10 @@
 import { z } from 'zod';
+import { readTimeMillis } from './time';
 const profileSchema = z.object({
   displayName: z.string().catch(''),
   photoURL: z.string().catch(''),
   bio: z.string().catch(''),
-  createdAt: z.unknown().optional(),
+  createdAt: z.unknown().transform(readTimeMillis).default(null),
 });
 export type LearnerProfile = z.infer<typeof profileSchema>;
 /** Legacy optional fields are normalized; arbitrary Firestore fields never reach the view. */

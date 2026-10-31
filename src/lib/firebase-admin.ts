@@ -21,6 +21,7 @@ function getAdminApp() {
     return getApps()[0] ?? initializeApp({ projectId });
   }
   return getApps()[0] ?? initializeApp({
+    projectId: required('FIREBASE_ADMIN_PROJECT_ID'),
     credential: cert({
       projectId: required('FIREBASE_ADMIN_PROJECT_ID'),
       clientEmail: required('FIREBASE_ADMIN_CLIENT_EMAIL'),

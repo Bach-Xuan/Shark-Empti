@@ -1,4 +1,4 @@
-# 🦈 Shark Empti · v1.15.1
+# 🦈 Shark Empti · v2.0.0 **β**
 
 [![XERJ Corpus Hub contributor](https://hub.xerj.org/contributors/Bach-Xuan/badge.svg)](https://hub.xerj.org/contributors/Bach-Xuan)
 
@@ -54,11 +54,11 @@ Install browser engines with `npx --no-install playwright install chromium webki
 
 ## 📚 Documentation
 
-- [Configuration](docs/CONFIGURATION.md): environment, Firebase, OpenRouter, deployment and troubleshooting.
+- [Configuration](docs/CONFIGURATION.md): environment, Firebase, OpenRouter, timestamp migration, deployment and troubleshooting.
 - [Technical documentation](docs/TECHNICAL_DOCUMENTATION.md): architecture, data ownership and security contracts.
 - [Backend data map](docs/backend.json): descriptive entities, storage paths and interfaces; executable code, schemas and Rules remain authoritative.
 - [Audit register](docs/AUDIT_REPORT.md): finding statuses and unresolved verification boundaries.
 - [Validation](docs/VALIDATION.md): built-in tests, interpretation and evidence limits.
 - [Account operations](docs/ACCOUNT_OPERATIONS.md): background export/deletion, retention and encrypted backup/restore.
 
-The interface supports Vietnamese and English; preferences persist between pages and tabs. Camera access requires HTTPS or localhost and explicit permission. Lists load 50 records per page; client-side search/statistics reflect loaded records. Documented browser targets are Safari 16.4+, Chrome 111+ and Firefox 128+; current engine tests do not establish exact-version or physical-device acceptance. See the [audit](docs/AUDIT_REPORT.md) before release.
+The interface supports Vietnamese and English; preferences persist between pages and tabs. Camera access requires HTTPS or localhost and explicit permission. Lists expose 50 records per page; client-side search/statistics reflect exposed records. During timestamp migration, history merges two bounded candidate streams as described in the [data contract](docs/TECHNICAL_DOCUMENTATION.md). Documented browser targets are Safari 16.4+, Chrome 111+ and Firefox 128+; current engine tests do not establish exact-version or physical-device acceptance. See the [audit](docs/AUDIT_REPORT.md) before release.

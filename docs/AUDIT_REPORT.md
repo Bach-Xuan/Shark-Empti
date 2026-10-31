@@ -1,6 +1,6 @@
-# 📋 Consolidated Technical Audit Report · Shark Empti v1.15.1
+# 📋 Consolidated Technical Audit Report · Shark Empti v2.0.0 **β**
 
-This register records 74 findings: **63 resolved and 11 unresolved**. Names summarize each concern; status records its disposition. Local tests, deployed operation and device validation are distinct evidence. F02, D07, D20, D23 and D25 are closed by owner decision on local acceptance; their deployment verification is deferred.
+This register records 74 findings: **63 resolved and 11 unresolved**. Names summarize each concern; status records its disposition. Local tests, deployed operation and device validation are distinct evidence.
 
 [Technical documentation](TECHNICAL_DOCUMENTATION.md) describes current behavior; [validation](VALIDATION.md) explains available checks, and [account operations](ACCOUNT_OPERATIONS.md) covers operational safeguards. A resolved entry is not a certification of untested deployment or provider behavior.
 
@@ -36,7 +36,7 @@ This register records 74 findings: **63 resolved and 11 unresolved**. Names summ
 
 | ID | Finding | Status | Last Updated |
 |---|---|---|---|
-| F02 | Inadequate Validation of Persisted and Legacy Firestore Data | Resolved — local acceptance; deployment verification deferred | 31 October 2026 |
+| F02 | Inadequate Validation of Persisted and Legacy Firestore Data | Resolved | 31 October 2026 |
 | F03 | Non-Durable History Persistence Caused by `undefined` Values and Unawaited Writes | Resolved | 19 September 2026 |
 | F04 | Prototype-Key Collisions in Topic Aggregation | Resolved | 3 September 2026 |
 | F05 | Incorrect Denominators in Per-Skill Aggregate Scores | Resolved | 3 September 2026 |
@@ -55,7 +55,7 @@ This register records 74 findings: **63 resolved and 11 unresolved**. Names summ
 | D04 | Report-Selection Checkboxes Can Toggle Twice per Interaction | Resolved | 19 September 2026 |
 | D05 | Stale Setup Validation Can Start a Quiz After Context Changes | Resolved | 19 September 2026 |
 | D06 | Forum Edit Drafts Are Discarded Before Write Confirmation | Resolved | 20 September 2026 |
-| D07 | Post Deletion Leaves Publicly Readable Orphaned Comments | Resolved — local acceptance; deployment verification deferred | 31 October 2026 |
+| D07 | Post Deletion Leaves Publicly Readable Orphaned Comments | Resolved | 31 October 2026 |
 | D08 | Arena “Ask Guru” Action Has No User-Facing Effect | Resolved | 19 September 2026 |
 | D09 | Report Printing Is Constrained by the Dialog Scroll Container | Resolved | 19 September 2026 |
 | D10 | Duplicate Error Codes and English Text in Vietnamese Toasts | Resolved | 12 September 2026 |
@@ -67,11 +67,11 @@ This register records 74 findings: **63 resolved and 11 unresolved**. Names summ
 | D16 | Arena Leaderboard Applies Its Result Limit Before the Duration Tie-Break | Resolved | 29 October 2026 |
 | D17 | English Bonus Copy Misrepresents the Arena Reward Rule | Resolved | 29 October 2026 |
 | D18 | Activity Tracking Can Lose Concurrent Day Updates | Resolved | 19 September 2026 |
-| D20 | Indexability and Discoverability Policy Is Undefined Across Public and Authenticated Routes | Resolved — local acceptance; deployment verification deferred | 31 October 2026 |
+| D20 | Indexability and Discoverability Policy Is Undefined Across Public and Authenticated Routes | Resolved | 31 October 2026 |
 | D21 | Custom Not-Found Experience Is Functionally Present but Incomplete | Resolved | 31 October 2026 |
 | D22 | User Avatar Images Lack Alternative Text | Resolved | 29 October 2026 |
-| D23 | Authenticated Profile Reads Expose Private Email Data | Resolved — local acceptance; deployment verification deferred | 31 October 2026 |
-| D25 | Profile Deletion Removes Protected Coin State but Retains Descendants | Resolved — local acceptance; deployment verification deferred | 31 October 2026 |
+| D23 | Authenticated Profile Reads Expose Private Email Data | Resolved | 31 October 2026 |
+| D25 | Profile Deletion Removes Protected Coin State but Retains Descendants | Resolved | 31 October 2026 |
 | D26 | Quiz Duration Limits Disagree Between Setup and Runtime | Resolved | 29 October 2026 |
 | D27 | Recovered AI Feedback Is Not Persisted to Learning History | Resolved | 31 October 2026 |
 | D28 | Form Naming, Contrast and Page Semantics Remain Incomplete | Resolved | 31 October 2026 |
@@ -82,8 +82,8 @@ This register records 74 findings: **63 resolved and 11 unresolved**. Names summ
 | D33 | Practice Short Answers Use Unqualified Exact-Text Grading | Resolved | 29 October 2026 |
 | D34 | Authentication Controls and Chat Panels Fail Small-Viewport Layout | Resolved | 31 October 2026 |
 | D35 | Production Browser Checks Do Not Verify Demo Build Configuration | Resolved | 31 October 2026 |
-| D36 | Expiry Cleanup Can Delete Renewed Quota and Budget Records | Resolved — transactional expiry recheck; local regression verified | 31 October 2026 |
-| D37 | AI Generation Expiry Is Not Enforced Independently of Scheduled Cleanup | Resolved — access expiry enforced; independent signed retention supported locally | 31 October 2026 |
+| D36 | Expiry Cleanup Can Delete Renewed Quota and Budget Records | Resolved | 31 October 2026 |
+| D37 | AI Generation Expiry Is Not Enforced Independently of Scheduled Cleanup | Resolved | 31 October 2026 |
 | N01 | Inconsistent Naming and File-Name Conventions | Resolved | 13 September 2026 |
 | N02 | Domain Types and Schemas Do Not Consistently Represent Their Lifecycle Stage | Resolved | 13 September 2026 |
 | N03 | Readability Debt and Potentially Unused Modules | Resolved | 13 September 2026 |

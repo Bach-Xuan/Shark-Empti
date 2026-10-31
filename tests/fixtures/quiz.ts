@@ -7,7 +7,7 @@ export const analysis: QuizAnalysis = {
   cognitiveMetrics: { conceptMastery: 100, applicationSkill: 100, problemDecomposition: 100, logicalReasoning: 100, errorAwareness: 100, instructionFollowing: 100 },
 };
 export const history: QuizHistoryItem = {
-  date: '2026-09-03', lang: 'en', totalTime: 1, analysis,
+  date: Date.parse('2026-09-03'), lang: 'en', totalTime: 1, analysis,
   config: { topic: 'Addition', subject: 'math', grade: 'none', numQuestions: '1', type: 'Multiple Choice', difficulty: 'Recognition' },
   quizResults: [{ ...question, isCorrect: true, userAnswer: '4', timeTakenSeconds: 1 }],
 };

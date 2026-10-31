@@ -1,6 +1,6 @@
 {
   "$comment": "Descriptive data map, not an executable validation schema. Technical identifiers follow the source; editing this file changes no runtime behavior. Shared JSON body reads have a ten-second deadline. AI responses are bounded at 2,000,000 decoded bytes and results at 750,000 serialized UTF-8 bytes before ledger persistence.",
-  "x-version": "1.15.1",
+  "x-version": "2.0.0-beta",
   "x-authority": {
     "description": "Actual contracts: Firestore Rules, AI/API Zod schemas, history/profile readers and server-api.ts. Updating this file changes no validation, migration or access policy.",
     "documentation": "TECHNICAL_DOCUMENTATION.md",
@@ -146,8 +146,8 @@
           "type": "object"
         },
         "date": {
-          "type": "string",
-          "format": "date-time"
+          "$ref": "#/$defs/FirestoreTimestamp",
+          "description": "Canonical Firestore Timestamp; migrate:timestamps converts supported legacy ISO strings. History readers accept original fixed-width UTC strings during migration."
         },
         "lang": {
           "enum": [
@@ -226,8 +226,8 @@
           }
         },
         "createdAt": {
-          "type": "string",
-          "format": "date-time"
+          "$ref": "#/$defs/FirestoreTimestamp",
+          "description": "Canonical Firestore Timestamp; migrate:timestamps converts supported legacy ISO strings. History readers accept original fixed-width UTC strings during migration."
         }
       }
     },
@@ -251,8 +251,8 @@
           "type": "number"
         },
         "createdAt": {
-          "type": "string",
-          "format": "date-time"
+          "$ref": "#/$defs/FirestoreTimestamp",
+          "description": "Canonical Firestore Timestamp; migrate:timestamps converts supported legacy ISO strings. History readers accept original fixed-width UTC strings during migration."
         }
       }
     },

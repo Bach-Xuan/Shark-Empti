@@ -1,6 +1,6 @@
 import 'server-only';
 import type { Firestore } from 'firebase-admin/firestore';
-import { FieldPath, FieldValue } from 'firebase-admin/firestore';
+import { FieldPath, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { readArenaExam } from './public-firestore-schema';
 import { isTrustedArenaExam } from './arena-scoring';
 
@@ -33,7 +33,7 @@ export async function migrateLegacyArena(db: Firestore, apply = false) {
         const { id: _id, questions, ...metadata } = exam;
         transaction.create(backup, { snapshot: fresh.data(), backedUpAt: FieldValue.serverTimestamp() });
         transaction.create(keys, { schemaVersion: 2, authorId: exam.authorId, questions, createdAt: FieldValue.serverTimestamp() });
-        transaction.set(row.ref, { ...metadata, schemaVersion: 2, questionCount: questions.length, practiceOnly: true, firstRewardClaimed: true });
+        transaction.set(row.ref, { ...metadata, createdAt: metadata.createdAt === null ? null : Timestamp.fromMillis(metadata.createdAt), schemaVersion: 2, questionCount: questions.length, practiceOnly: true, firstRewardClaimed: true });
         return true;
       });
       if (migrated) result.migrated++;

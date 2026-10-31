@@ -1,7 +1,7 @@
 import { expect, test } from './fixtures';
 import { signInDemo } from './auth';
 import { getApps, initializeApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { translations } from '../../src/lib/translations';
 
 test('999-minute quiz restores its original history ID, answers and clock without regenerating', async ({ page }) => {
@@ -52,6 +52,7 @@ test('999-minute quiz restores its original history ID, answers and clock withou
   const history = await db.collection(`users/${uid}/history`).get();
   expect(history.size).toBe(1);
   expect(history.docs[0].id).toBe(before.id);
+  expect(history.docs[0].get('date')).toBeInstanceOf(Timestamp);
   expect(history.docs[0].get('config.timeLimit')).toBe('999');
   expect(history.docs[0].get('quizResults')).toHaveLength(2);
   expect(await progress()).toBeNull();

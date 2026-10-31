@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { Timestamp } from 'firebase-admin/firestore';
 import { beforeAll, beforeEach, expect, it, vi } from 'vitest';
 import { POST as createPost } from '@/app/api/forum/route';
 import { PATCH as mutatePost } from '@/app/api/forum/[postId]/route';
@@ -82,7 +83,7 @@ it('does not restore a hidden post over an author deletion tombstone', async () 
 it('migrates legacy answer exposure atomically into non-rewarded practice and never sends a key at start', async () => {
   const db = getAdminDb();
   const questions = [{ question: '2+2?', type: 'Short Answer', correct: '4', explanation: 'Addition', difficulty: 'Easy' }];
-  const legacy = { authorId: uid, title: 'Legacy', totalAttempts: 0, questions, config: { subject: 'math', grade: '12', topic: 'Math', type: 'Mixed', difficulty: 'Easy', numQuestions: '1' } };
+  const legacy = { authorId: uid, title: 'Legacy', totalAttempts: 0, createdAt: Timestamp.fromMillis(123456), questions, config: { subject: 'math', grade: '12', topic: 'Math', type: 'Mixed', difficulty: 'Easy', numQuestions: '1' } };
   await db.doc('arenaExams/exam').set(legacy);
   expect((await start(request({ requestId: crypto.randomUUID() }), examParams)).status).toBe(409);
   expect((await migrateLegacyArena(db)).eligible).toBe(1);
@@ -91,6 +92,7 @@ it('migrates legacy answer exposure atomically into non-rewarded practice and ne
   expect((await migrateLegacyArena(db, true)).migrated).toBe(0);
   const metadata = (await db.doc('arenaExams/exam').get()).data()!;
   expect(metadata.questions).toBeUndefined(); expect(metadata.practiceOnly).toBe(true);
+  expect(metadata.createdAt.toMillis()).toBe(123456);
   expect((await db.doc('_arenaLegacyBackups/exam').get()).get('snapshot')).toEqual(legacy);
   const requestId = crypto.randomUUID();
   const started = await (await start(request({ requestId }), examParams)).json();

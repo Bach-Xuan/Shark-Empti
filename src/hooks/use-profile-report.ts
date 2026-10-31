@@ -52,7 +52,7 @@ export function useProfileReport(user: { uid: string } | null, t: TranslationSet
         return topicA.localeCompare(topicB);
       });
     } else {
-      result.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      result.sort((a, b) => b.date - a.date);
     }
 
     return result;

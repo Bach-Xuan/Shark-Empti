@@ -46,7 +46,7 @@ async function main() {
     assert.equal((await start(request(token, { requestId: attemptId }), params)).status, 200);
     const scored = await submit(request(token, { requestId: attemptId, answers: ['4'] }), params);
     assert.equal(scored.status, 200); assert.equal((await scored.json()).coinsAwarded, 150);
-    await db.doc(`users/${uid}/history/session`).set({ schemaVersion: 2, config, date: '2026-01-01T00:00:00.000Z', lang: 'en', totalTime: 3, quizResults: [{ ...questions[0], userAnswer: '4', isCorrect: true, timeTakenSeconds: 3 }] });
+    await db.doc(`users/${uid}/history/session`).set({ schemaVersion: 2, config, date: Timestamp.fromDate(new Date('2026-01-01T00:00:00.000Z')), lang: 'en', totalTime: 3, quizResults: [{ ...questions[0], userAnswer: '4', isCorrect: true, timeTakenSeconds: 3 }] });
     const post = { title: 'Synthetic post', content: 'Synthetic content', subject: 'math', authorId: uid, authorName: 'Synthetic fixture', authorPhoto: '', createdAt: Timestamp.now(), likedBy: [], likesCount: 0, commentsCount: 0 };
     await db.doc('posts/restore-hidden').set(post);
     const reported = await report(request(token, { target: { kind: 'post', id: 'restore-hidden' }, reason: 'Synthetic drill review', requestId: crypto.randomUUID() }));

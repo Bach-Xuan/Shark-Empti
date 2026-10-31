@@ -1,6 +1,6 @@
 'use client';
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
-import { doc, setDoc, type Firestore } from 'firebase/firestore';
+import { doc, setDoc, Timestamp, type Firestore } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { initialSession, learningSessionReducer, type QuizQuestion } from '@/lib/learning-session';
@@ -15,6 +15,7 @@ export function useLearningSession(user: { uid: string } | null, db: Firestore, 
   const [draftId, setDraftId] = useState<string | null>(null);
   const generation = useRef(0);
   const saveId = useRef<string | null>(null);
+  const completedAt = useRef<number | null>(null);
   const renderedSaveId = draftId;
   const userId = user?.uid;
 
@@ -43,6 +44,7 @@ export function useLearningSession(user: { uid: string } | null, db: Firestore, 
   const reset = useCallback(() => {
     generation.current++;
     saveId.current = null;
+    completedAt.current = null;
     setDraftId(null);
     if (userId) {
       removeDraft(userId, 'quiz-session');
@@ -54,6 +56,7 @@ export function useLearningSession(user: { uid: string } | null, db: Firestore, 
   const start = useCallback((config: QuizConfig, questions: QuizQuestion[] | null = null) => {
     generation.current++;
     saveId.current = crypto.randomUUID();
+    completedAt.current = null;
     setDraftId(saveId.current);
     if (userId) removeDraft(userId, 'quiz-progress');
     dispatch({ type: 'start', config, questions });
@@ -66,12 +69,12 @@ export function useLearningSession(user: { uid: string } | null, db: Firestore, 
     const epoch = generation.current;
     const combined: QuizHistoryItem = {
       ...results, ...(analysis ? { analysis } : {}),
-      schemaVersion: 2, date: new Date().toISOString(), lang,
+      schemaVersion: 2, date: completedAt.current ??= Date.now(), lang,
     };
     const reference = doc(db, 'users', userId, 'history', saveId.current ??= crypto.randomUUID());
     try {
       // Firestore rejects undefined; optional fields are absent from the wire record.
-      await setDoc(reference, JSON.parse(JSON.stringify({ ...combined, userId })));
+      await setDoc(reference, { ...JSON.parse(JSON.stringify({ ...combined, userId })), date: Timestamp.fromMillis(combined.date) });
       if (generation.current !== epoch) return false;
       removeDraft(userId, 'quiz-session');
       removeDraft(userId, 'quiz-progress');
@@ -91,9 +94,9 @@ export function useLearningSession(user: { uid: string } | null, db: Firestore, 
     const { topicEn, topicVi, ...analysis } = feedback;
     const reference = doc(db, 'users', userId, 'history', renderedSaveId);
     try {
-      await setDoc(reference, JSON.parse(JSON.stringify({
+      await setDoc(reference, { ...JSON.parse(JSON.stringify({
         analysis, config: { ...session.results.config, topicEn, topicVi },
-      })), { merge: true });
+      })), date: Timestamp.fromMillis(session.results.date) }, { merge: true });
       if (generation.current !== epoch || saveId.current !== renderedSaveId) return false;
       dispatch({ type: 'recover-analysis', analysis, topicEn, topicVi });
       return true;

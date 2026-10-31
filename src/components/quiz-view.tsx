@@ -146,7 +146,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
     setCurrentIdx(value.index); setAnswers(value.answers); setCurrentFeedback(value.feedback);
     setShortAnswerInput(value.input); setQuestionStartTime(value.questionStartedAtMs);
     if (value.completion && typeof value.completion === 'object' && 'results' in value.completion) {
-      const stored = readHistoryItem('draft-completion', { ...value.completion.results as object, ...('analysis' in value.completion ? { analysis: value.completion.analysis } : {}), date: new Date().toISOString(), lang });
+      const stored = readHistoryItem('draft-completion', { ...value.completion.results as object, ...('analysis' in value.completion ? { analysis: value.completion.analysis } : {}), date: Date.now(), lang });
       if (stored && stored.quizResults.length === questions.length) {
         pendingResult.current = { results: stored, ...(stored.analysis ? { analysis: stored.analysis } : {}) };
         setFailedCompletion(pendingResult.current);

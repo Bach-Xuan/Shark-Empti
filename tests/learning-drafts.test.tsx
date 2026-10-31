@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({ feedback: vi.fn(), write: vi.fn() }));
 vi.mock('@/ai/client-flows', () => ({ personalizedQuizPerformanceFeedback: mocks.feedback, generateQuestions: vi.fn(), shortAnswerAnalysis: vi.fn() }));
 vi.mock('@/lib/error-toast', () => ({ showErrorToast: vi.fn() }));
 vi.mock('@/firebase/error-emitter', () => ({ errorEmitter: { emit: vi.fn() } }));
-vi.mock('firebase/firestore', () => ({ doc: (...parts: string[]) => ({ path: parts.slice(1).join('/') }), setDoc: mocks.write }));
+vi.mock('firebase/firestore', async importOriginal => ({ ...await importOriginal<typeof import('firebase/firestore')>(), doc: (...parts: string[]) => ({ path: parts.slice(1).join('/') }), setDoc: mocks.write }));
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.clearAllMocks(); });
 
 it('isolates accounts, removes previous-owner drafts at Auth boundaries, and never touches unrelated browser preferences', () => {

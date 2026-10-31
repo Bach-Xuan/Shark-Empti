@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { questionContentSchema } from '@/ai/question-schema';
 import { parseNumericAnswer } from './arena-scoring';
-import type { StoredDate } from './date-format';
+import { readTimeMillis } from './time';
 import type { ArenaAttempt, ArenaExam, ForumComment, ForumPost } from './types';
 import { QUIZ_LIMITS } from './quiz-config';
 
@@ -10,14 +10,7 @@ const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const identity = text(128);
 const photo = z.string().max(2048).refine(value => value === '' || /^https?:\/\//i.test(value));
 // Dates are presentation metadata: a corrupt or pending legacy timestamp is unknown.
-const storedDate = z.unknown().transform((value): StoredDate => {
-  try {
-    const date = value instanceof Date ? value : typeof value === 'string' || typeof value === 'number'
-      ? new Date(value) : value && typeof value === 'object' && 'toDate' in value && typeof value.toDate === 'function'
-        ? value.toDate() : null;
-    return date instanceof Date && Number.isFinite(date.getTime()) ? date : null;
-  } catch { return null; }
-}).default(null);
+const storedDate = z.unknown().transform(readTimeMillis).default(null);
 const author = {
   authorId: identity,
   authorName: text(200).default('Learner'),

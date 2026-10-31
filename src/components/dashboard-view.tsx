@@ -115,7 +115,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
   const dashboardStats = useMemo(() => stats === undefined ? calculateDashboardStats(history, t, lang) : stats, [stats, history, t, lang]);
 
   const sortedHistory = useMemo(() =>
-    [...history].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    [...history].sort((a, b) => b.date - a.date)
   , [history]);
 
   const allErrors = useMemo(() => {
@@ -123,11 +123,11 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
       session.quizResults
         .filter(r => !r.isCorrect)
         .map(r => ({ ...r, sessionDate: session.date, topic: lang === 'vi' ? (session.config.topicVi || session.config.topic) : (session.config.topicEn || session.config.topic) }))
-    ).sort((a, b) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime());
+    ).sort((a, b) => b.sessionDate - a.sessionDate);
   }, [history, lang]);
 
 
-  const getStartTime = (finishDate: string, durationSeconds: number) => {
+  const getStartTime = (finishDate: number, durationSeconds: number) => {
     const finish = new Date(finishDate);
     const start = new Date(finish.getTime() - durationSeconds * 1000);
     return start.toLocaleTimeString(lang === 'vi' ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' });

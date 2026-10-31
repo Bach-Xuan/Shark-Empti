@@ -26,7 +26,7 @@ it('prints every topic directly under body, with completed tasks matched by stab
   expect(document.querySelector('.profile-print-report')).toBeNull();
 });
 it('resets report selection on account changes and reads completion for a selected subset', () => {
-  mocks.items = [{ ...history, id: 'first' }, { ...history, id: 'second', date: '2026-09-04' }, history];
+  mocks.items = [{ ...history, id: 'first' }, { ...history, id: 'second', date: Date.parse('2026-09-04') }, history];
   const group = calculateDashboardStats([history], translations.en, 'en')!.processedGroupedInsights[0];
   writeRoadmapChecks('one', { [group.topicId]: { [group.recommendations[0].id]: true } });
   const { result, rerender } = renderHook(({ uid, lang }: { uid: string; lang: 'en' | 'vi' }) => useProfileReport({ uid }, translations[lang], lang), { initialProps: { uid: 'one', lang: 'en' } });
