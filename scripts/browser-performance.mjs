@@ -39,7 +39,10 @@ try {
       await client.send('Performance.enable');
       for (const cache of ['cold', 'warm']) {
         await page.goto(origin + route, { waitUntil: 'load' });
-        await (route === '/login' ? page.getByRole('button', { name: /Google/i }) : page.locator('main')).waitFor();
+        // Historical Suspense HTML can retain a hidden intro main. Wait for the
+        // destination itself so neither revision measures the loading fallback.
+        await (route === '/login' ? page.getByRole('button', { name: /Google/i })
+          : page.getByRole('heading', { level: 1, name: route === '/forum' ? /^Forum(?:\s|$)/ : /^Arena$/ })).waitFor();
         // Same fixed settling interval for both revisions; not an assertion of network idle.
         await page.waitForTimeout(1000);
         const navigation = await page.evaluate(() => {

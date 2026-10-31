@@ -1,337 +1,115 @@
 # 🛠️ Technical Documentation · Shark Empti v1.15.1
 
-This document describes the architecture and contracts of the current source. [AUDIT_REPORT.md](AUDIT_REPORT.md) records implementation status and acceptance evidence; [CONFIGURATION.md](CONFIGURATION.md) provides setup and operational procedures.
+This guide describes runtime ownership and contracts. See [configuration](CONFIGURATION.md), the [backend data map](backend.json), [validation](VALIDATION.md), [account operations](ACCOUNT_OPERATIONS.md) and the [audit register](AUDIT_REPORT.md). Executable source, schemas, Rules and configuration take precedence over descriptive documentation.
 
-## 🧭 Quick Navigation
-
-| Reader goal | Read first |
-|---|---|
-| Determine the source of truth for a behavior or setting | Section 1 |
-| Understand runtime ownership, client boundaries, and data flow | Sections 2–4 |
-| Review AI behavior, user-facing safeguards, or dependencies | Sections 5–7 |
-| Assess test coverage, deployment limits, and evidence | Sections 8–9 and [AUDIT_REPORT.md](AUDIT_REPORT.md) |
-| Look up domain terms or follow an AI request | [Technical glossary](#technical-glossary) and [AI request lifecycle](#ai-request-lifecycle) |
-
-The source files named in Section 1 remain authoritative when a documentation statement and executable behavior diverge.
-
-## 1. 🧭 Scope and Authoritative Sources
+## 🧭 Sources of truth
 
 | Concern | Authority |
 |---|---|
-| Runtime/dependency ranges | `package.json`, `.nvmrc` |
-| Dependency resolutions | `package-lock.json` |
-| Advisory review | `scripts/dependency-audit.mjs`, `config/dependency-audit-policy.json` |
-| Desired indexes and TTL | `firestore.indexes.json`; deployed readiness requires verification |
-| Next configuration | `next.config.ts` |
-| Client Firebase variables | `src/firebase/config.ts` |
-| Firebase Admin variables | `src/lib/firebase-admin.ts` |
-| Current AI models, payload and retry orchestration | `src/ai/config/model.ts`, `src/ai/openrouter.ts`, `src/ai/error-classifier.ts`, `src/ai/generation-store.ts` |
-| AI input/output contracts | `src/ai/operation-registry.ts`, `src/ai/question-schema.ts`, `src/ai/flows/*` |
-| AI client protocol | `src/ai/client.ts`, `src/ai/client-flows.ts`, `src/ai/protocol.ts` |
-| HTTP API contracts | `src/app/api/**/route.ts`, `src/lib/server-api.ts` |
-| Firestore client authorization | `firestore.rules`, `firebase.json` |
-| Persisted-data readers | `src/lib/history-schema.ts`, `src/lib/profile-schema.ts` and consumers |
-| CI/test execution | `package.json#scripts`, `.github/workflows/ci.yml`, test configs |
-| Route-level script budgets | `config/bundle-budgets.json` |
-| Descriptive data map | `docs/backend.json`; not a validator |
+| Runtime, dependency ranges and resolutions | `package.json`, `.nvmrc`, `package-lock.json` |
+| Client/server environment and initialization | `src/firebase/config.ts`, `src/lib/firebase-admin.ts`, `.env.example` |
+| API behavior and authentication | `src/app/api/**/route.ts`, `src/lib/server-api.ts` |
+| Client authorization and indexes | `firestore.rules`, `firestore.indexes.json`, `firebase.json` |
+| AI operations, state and provider | `src/ai/operation-registry.ts`, `src/ai/client.ts`, `src/ai/generation-store.ts`, `src/ai/openrouter.ts` |
+| Stored data validation | `src/lib/history-schema.ts`, `src/lib/profile-schema.ts`, domain schemas/readers |
+| Jobs, backup and deletion | `src/lib/jobs/`, [account operations](ACCOUNT_OPERATIONS.md) |
+| Tests, CI and budgets | `package.json`, test configs, `.github/workflows/ci.yml`, `config/bundle-budgets.json` |
 
-When documentation differs from an executable authority above, that authority determines current behavior and documentation must be updated in the same change. `backend.json` creates no collection, index, TTL, migration or access policy.
+`backend.json` is a descriptive inventory: editing it creates no collection, index, migration or policy.
 
-## 2. 🏗️ Runtime Topology and Ownership
+## 🏗️ Runtime and ownership
 
-The application uses Next.js App Router. `src/app/layout.tsx` owns root HTML/styles/preferences and the route-aware provider boundary. Public information/ordinary 404s do not initialize Firebase or Focus Shield. `src/app/page.tsx` is a public/Auth gateway; `src/components/learning-app.tsx` loads the private learning workflow only after account bootstrap. Dashboard/Playground remain split by view, and KaTeX JS/CSS loads only for actual math. Separate routes provide authentication, Profile, Forum, Arena and privileged moderation. These are code-loading boundaries, not a speed claim until final measurement.
+Next.js App Router owns public pages, API routes and the private learning UI. The root layout owns styles, language/theme and route-aware providers. Public information pages and ordinary 404s do not initialize Firebase/camera UI. Authentication initializes once; authenticated children wait for idempotent profile bootstrap. UID-keyed private state resets on account change, while preferences remain outside it. Bootstrap repairs missing public fields without overwriting biography/coins and removes legacy public email; failures retain Auth and offer retry.
 
-`AppPreferencesProvider` owns language/theme state, validates local storage, updates `html.lang`/dark class and synchronizes storage events across tabs. `FirebaseProvider` owns one `onAuthStateChanged`; the private subtree is keyed by UID or anonymous so account changes reset private state. Preferences remain outside that subtree.
+Setup → academic validation → question generation → Quiz answers/feedback → Result → `users/{uid}/history/{id}` → Dashboard is the primary learning flow. Playground manages Flashcards and Practice; Arena and Forum use authenticated server APIs for mutations. Dashboard/Playground and TensorFlow resources load on demand; KaTeX loads for math. Render boundaries catch render failures, while handlers must handle network, subscription, camera and clipboard failures at their source.
 
-When `NEXT_PUBLIC_USE_EMULATORS` is `true`, client initialization connects Auth and Firestore to the local demo emulators. The current source does not set a Firestore long-polling option, so WebKit/emulator transport remains a runtime-validation concern. Empty toast viewport space allows pointer events through; visible notifications remain interactive.
+The validated essential `shark_preferences` cookie aligns SSR/client language and theme. Legacy preferences migrate, and storage events synchronize tabs. Catalogs provide VI/EN parity; user-created content, model IDs, error codes and mathematical notation are not automatically translated. Local Inter/Space Grotesk assets include Vietnamese and OFL licenses. Loading skeletons follow route layout with bounded recovery states; reduced motion and focus behavior remain supported.
 
-Home owns the non-session navigation section. `useLearningSession` owns reducer transitions, stable save IDs and durable completion; `useHistory` owns the paged history source. Quiz owns answers, timer, generation/feedback UI and retries. Navigation reset/unmount invalidates late completions.
+WebKit uses supported Firestore forced long polling with auto-detection disabled and a five-second hanging GET; other engines use SDK defaults. More frequent empty requests may affect bandwidth. Shared document/paged readers use 15-second deadlines, safe errors and retry; deployment and exact minimum browser acceptance remain separate.
 
-Dashboard and Playground are dynamically imported. TensorFlow.js runtime/model load only when Focus Shield is enabled. Root `error.tsx`/`global-error.tsx` and local `ErrorBoundary` handle render failure only; event, request, subscription, camera and clipboard failures must be caught at their source.
+## 🗄️ Data and storage
 
-## 3. 🗄️ Data Flow and Persisted Data
-
-Primary learning flow:
-
-```text
-Setup
-  -> academic validation
-  -> question generation
-  -> Quiz answers/timer/feedback
-  -> Result
-  -> users/{uid}/history/{id}
-  -> Dashboard statistics
-```
-
-Playground generates and saves flashcard/practice sessions in user subcollections. Arena creation and attempt submission use authenticated Admin APIs. Forum post creation/edit/like use client Firestore under Rules; post cascade deletion and comment creation/deletion use authenticated Admin APIs, while comment edit/like use client Rules.
-
-### 3.1. 📁 Firestore Paths
-
-| Path | Principal data | Current access |
-|---|---|---|
-| `users/{uid}` | `displayName`, `photoURL`, `bio`, `sharkCoins`, timestamps; email remains in Auth | Owner reads; signed-in known-UID reads only for public-shaped records; list/root delete denied; coins Admin-only |
-| `users/{uid}/history/{id}` | `userId`, `schemaVersion`, `config`, `quizResults`, `totalTime`, optional `analysis`, ISO `date`, `lang` | Owner read/write |
-| `users/{uid}/notes/main` | `content`, `updatedAt` | Owner read/write |
-| `users/{uid}/activity/main` | `activeDays`, `updatedAt` | Owner read/write |
-| `users/{uid}/flashcards/{id}` | source, cards, ISO `createdAt` | Owner read/write |
-| `users/{uid}/practice/{id}` | concept, questions, answers, score, ISO `createdAt` | Owner read/write |
-| `posts/{postId}` | post, author, counters, likes, timestamps | Public read; budgeted Admin create/edit/desired-state likes and cascade delete; all direct client writes denied |
-| `posts/{postId}/comments/{commentId}` | comment, author, likes, timestamps | Read only under a live, non-tombstoned parent; budgeted Admin create/edit/like/delete; all direct client writes denied |
-| `arenaExams/{examId}` | V2 title/config/author, `questionCount`, `practiceOnly`, reward/count metadata; no questions | V2 public read; authenticated Admin creation/moderation; all direct client mutations and legacy reads denied |
-| `arenaExams/{examId}/attempts/{attemptId}` | participant, score, server duration, ranking/timing versions, timestamp | Public read under a live V2 exam; Admin create only |
-| `_arenaAnswerKeys/{examId}`, `_arenaEligibility/{hash}` | private bank; first eligible ranked-start clock/consumed result | Admin only; never published or reset by client retries |
-| `_communityReports/{id}`, `_moderationArchives/{hash}`, `_moderationActions/{hash}` | private reports, reversible content archive and attributable decision trail | Budgeted authenticated reporting; current-live-claim moderator API only for decisions |
-| `_accountRequests/{hash}` | owner UID/kind/status/timestamps | Owner request/status API; private pending-operator queue, not automatic fulfilment |
-| `_arenaSessions/{hash}` | UID, exam, server start, question fingerprint, consumed result, expiry | Admin only; 24-hour logical expiry |
-| `_requestReceipts/{hash}` | fingerprint, result, createdAt, expiresAt | Admin-only; no client grant |
-| `_aiGenerations/{generationId}` | owner, operation, fingerprint, validated input while active, attempt leases/outcomes, recoverable validated result/error, expiresAt | Admin-only; explicit client deny |
-| `_aiQuota/{scope}` | first-reservation-anchored fixed-window usage, active generation reservations, expiresAt | Admin-only; explicit client deny |
-| `_requestBudgets/{scope}` | user/global token-bucket credits, optional byte credits, refill timestamp, expiry | Admin-only; atomic request/storage admission; no client access |
-| `_forumDeletions/{postId}` | authorId, pending/complete status, timestamps | Owner read; Admin write; persistent recovery and ID-reuse protection |
-
-The `users/{uid}/history` reader uses Zod with defaults for selected legacy omissions; records with corrupt core shape are excluded from the view rather than modified/deleted. The profile reader also normalizes selected missing fields. Forum/Arena feeds and detail views use the shared public Firestore schemas; Admin endpoints independently validate inputs and persisted parent/exam records before mutation or scoring.
-
-Shared streamed JSON parsing enforces each route's UTF-8 byte limit and a ten-second body-read deadline, honours upstream cancellation and does not wait on a stalled stream-cancel callback. These input budgets are separate from provider, token and operation deadlines.
-
-AI provider bodies are limited to 2,000,000 decoded bytes under the provider's abort/deadline signal; validated results are capped at 750,000 serialized UTF-8 bytes before finalization. The ledger independently enforces persistability and atomically fails invalid output while releasing its lease/quota. Envelope parsing, content parsing, validation and storage are separate content-free checkpoints. Numeric/date Retry-After hints over one minute end the current operation instead of retrying early or overflowing a stored timestamp; later manual retry remains possible.
-
-`activeDays` is a `YYYY-MM-DD -> boolean` map. It records the day the activity calendar runs, not proof of quiz completion. Roadmap checks, language, theme and one-time interface guidance state live in localStorage rather than Firestore.
-
-Roadmap writes use `shark_roadmap_checks:v2:{uid}`. Topic identity is the stored subject/grade/topic tuple; recommendation identity is its persisted bilingual text pair. Neither depends on the display locale or list index. Exact duplicate pairs collapse, while edited content creates a new task.
-
-The previous `shark_roadmap_checks:{uid}` and unscoped `shark_roadmap_checks` keys remain unchanged. Their positional/localized identities cannot be reliably matched, so they are not imported and V2 completion starts empty. Other localStorage keys are `shark_lang`, `shark_theme`, `shark_chat_seen`, `shark_help_setup_seen`, `shark_help_dashboard_seen`, `shark_help_playground_seen` and `shark_help_forum_seen`.
-
-### 3.2. 📅 Dates and Timestamps
-
-Unfinished Quiz, Practice and Flashcards use owner-scoped `sessionStorage` keys under `shark:draft:v1:{uid}:`. Validated drafts expire after 24 hours without a checkpoint and are capped at 1 MB each. They do not sync across tabs/devices; Auth changes remove other-owner drafts and sign-out removes all learning drafts. Storage failure produces a visible warning. Quiz restores questions, stable history ID, progress and failed-save feedback; Practice retains its stable ID; Flashcards restore without generating/archiving again. Arena retains the server UUID/progress but only server keys, eligibility and clocks authorize scores/rewards. Explicit discard/completion clears the relevant draft. Leave guards are best-effort UX, not guaranteed persistence/security.
-
-- Profile, notes, posts, comments, Arena exams/attempts, Arena timing sessions, receipts, AI generations and AI quota records mainly use native Firestore/server timestamps.
-- Quiz history, flashcards and practice sessions currently write ISO strings.
-- `StoredDate`/format adapters accept the persisted representations needed by the UI.
-- Never change date representation or backfill production data by editing `backend.json` alone.
-
-### 3.3. ⚠️ Persistence Semantics and Limitations
-
-- Quiz and practice await stable-ID saves before completion. Flashcard archival is awaited but failure leaves generated cards usable with an error notice.
-- An object containing nested `undefined` can be rejected by Firestore.
-- Post deletion now uses an authenticated server cascade with an atomic parent-removal/tombstone transaction. Local Rules deny comment reads when the parent is absent or tombstoned, including pre-existing orphans. These protections require deployment of the updated Rules; old orphan records are not silently migrated or deleted by this code change.
-- `activeDays` writes use an explicit mask for the current date leaf and `updatedAt`, independently of cached maps. Emulator tests cover stale-device ordering and offline reconciliation; the day is still based on the user's local calendar.
-
-These limitations are tracked in the audit; a descriptive data-map edit does not change finding status.
-
-Retention policies distinguish application expiry from asynchronous storage cleanup:
-
-| Record | Current retention or expiry contract |
+| Scope | Principal records and access |
 |---|---|
-| Request receipt | `expiresAt` is seven days after creation; retained receipts remain replayable until deletion |
-| AI generation | 24-hour retention is a local/staging hypothesis awaiting operational acceptance |
-| AI quota | Expiry follows the fixed-window recovery period |
-| Request budget | Two refill periods; delayed TTL deletion does not reset unexpired credits |
-| Arena timing session | API enforces a 24-hour logical lifetime, independently of delayed TTL cleanup |
-| Forum deletion tombstone | No TTL; retained for owner recovery and post-ID reuse protection |
+| `users/{uid}` | Public-shaped profile; owner reads, known-UID reads restricted to public fields, list/root deletion denied; email stays in Auth and coins are server-owned. |
+| `users/{uid}/history`, `notes`, `activity`, `flashcards`, `practice` | Owner learning data. Readers accept supported legacy omissions and reject malformed core data without silently deleting it. |
+| `posts/{postId}/comments/{commentId}` | Public Forum reads require a live non-tombstoned parent; authenticated, budgeted server APIs handle post/comment mutations. Direct client writes are denied. |
+| `arenaExams/{examId}/attempts/{id}` | Public V2 metadata and eligible ranking attempts. Question banks, sessions, eligibility and legacy backups are private server records. |
+| `_communityReports`, `_moderationArchives`, `_moderationActions` | Private reports, reversible archives and decision history; current server-assigned moderator claim is required for decisions. |
+| `_aiGenerations`, `_aiQuota`, `_requestBudgets`, `_requestReceipts` | Server-owned generation state, leases, usage budgets and idempotency receipts; browser access is denied. |
+| `_forumDeletions` | Owner-readable, server-written deletion tombstones for recovery and ID-reuse prevention. |
+| `_accountJobs`, `_accountLocks`, `_deletionJournal`, worker/budget/service state | Private background operations and account protection; see [account operations](ACCOUNT_OPERATIONS.md). |
 
-`firestore.indexes.json` declares the expiry TTL policies above, excluding persistent Forum tombstones. Deployed activation remains unverified. The [configuration guide](CONFIGURATION.md#retention-operations) describes metadata inspection and legacy receipt backfill; P04 in [the audit report](AUDIT_REPORT.md) retains the historical missing-index, disabled-TTL and IAM 403 evidence.
+[backend.json](backend.json) contains the complete path/entity/interface inventory. Profile/notes/community/ledger records use Firestore timestamps where applicable; history, Flashcards and Practice use ISO strings, with adapters for supported legacy forms. Activity uses a local-day `YYYY-MM-DD` map; activity is not proof of quiz completion. History versions 1/2 and selected unversioned legacy records are supported; unknown future versions are rejected. Lists initially load 50 records and fetch older pages by cursor: client search, statistics and reports describe loaded records.
 
-## 4. 🔐 Authentication, Rules, and Server APIs
+Quiz/Practice wait for stable-ID persistence; Flashcard save failure leaves generated cards usable with an error. Owner-scoped sessionStorage drafts for Quiz, Practice and Flashcards expire after 24 hours without a checkpoint and are limited to 1 MB; they do not sync across devices/tabs. Auth transitions invalidate other-owner drafts, and completion/discard clears them. Leave guards are best-effort, not guaranteed persistence. Roadmap checkboxes use `shark_roadmap_checks:v2:{uid}` and stable content identities; older positional keys are retained but not imported because their identities are ambiguous.
 
-### 4.1. 🔑 Firebase Authentication
+AI generation reads, replay, claims, cancellation and finalization reject expired records. Signed Firestore retention can run with `RETENTION_ENABLED=true` independently of B2/account jobs; quota expiry is rechecked inside the deleting transaction. Logical expiry differs from physical cleanup: Arena sessions and AI generation use 24-hour bounds; request receipts expire after seven days but replay while retained; budgets retain their configured recovery/refill periods. Forum deletion tombstones have no TTL because they prevent ID reuse. Spark uses ordinary expiry indexes and signed bounded cleanup; native TTL is outside this plan. See [retention](ACCOUNT_OPERATIONS.md#retention-on-spark).
 
-The client uses `GoogleAuthProvider` with popup sign-in. The account-scoped provider owns an idempotent profile bootstrap after every Auth transition, including restored sessions. Authenticated children wait for bootstrap; a repair failure preserves Auth and exposes a retry. Missing public fields are repaired without overwriting biography/coins, and a legacy profile email is removed while email remains in owner-only Auth. Known-UID lookup cannot read records with private/unknown fields, and collection enumeration/root deletion are denied. Route Handlers receive `Authorization: Bearer <Firebase ID token>` and `authenticatedUser()` verifies it through Firebase Admin Auth. Missing/invalid/expired tokens produce `AUTH-REQUIRED` or `AUTH-INVALID`.
+Client data ownership also matters during delayed responses. Profile biography and Quick Notes retain dirty drafts through snapshots and failed saves; owner changes invalidate old completions. History save IDs remain stable across retries. Activity updates write the current local-day leaf and timestamp rather than replacing a cached map, so concurrent days do not overwrite one another. Stored dates are adapted at the reader boundary; updating the descriptive data map alone does not migrate them.
 
-### 4.2. 🛡️ Firebase Admin Initialization
+The preference cookie stores a validated locale/theme value; SSR and client use the same choice. Policy/age confirmation is owner-only under users/{uid}/preferences/service, and eligibility is self-declared from age 16 without a date-of-birth field. A deletion receipt is essential browser storage and is also available as a local file. Neither preference nor receipt is an advertising or analytics identifier.
 
-Outside the Emulator, `src/lib/firebase-admin.ts` initializes from `FIREBASE_ADMIN_PROJECT_ID`, `FIREBASE_ADMIN_CLIENT_EMAIL` and `FIREBASE_ADMIN_PRIVATE_KEY`. In the Emulator, both Auth and Firestore host variables must exist and the project must start with `demo-`. Admin SDK bypasses Firestore Rules; API code owns authorization and validation.
+## 🔐 API and authorization
 
-### 4.3. 🏆 Arena Start and Submit APIs
+Client Google sign-in uses Firebase Auth. Routes verify bearer ID tokens via Admin Auth and derive identity server-side. Outside Emulators, Admin requires the three `FIREBASE_ADMIN_*` values; Emulator mode requires both Auth/Firestore hosts and a `demo-` project. Admin bypasses Rules, so each route enforces authorization, payload and transaction rules itself.
 
-`POST /api/arena` validates full configuration/questions and numeric short answers and derives identity from Admin Auth. A budgeted idempotent transaction creates public V2 metadata **without questions**, and a private `_arenaAnswerKeys/{examId}` bank. Browser exam/answer-bank writes are denied. Feeds filter `schemaVersion == 2`. The explicit-target migration inventories by default, backs up each eligible legacy document privately, and atomically converts it to `practiceOnly` V2 metadata/private keys. Previously exposed answers are never relabelled as a new rewarded competition; invalid/free-text/oversized/conflicting records require operator review.
+Shared JSON reading enforces each route's UTF-8 byte limit, a ten-second deadline and cancellation. Errors return safe `{ error, code, values }` responses without credentials, provider bodies or raw stacks. API schemas and route code define domain-specific bounds.
 
-`POST /api/arena/{examId}/start` accepts a UUID in at most 4 KB and returns prompts without keys/explanations after committing a private user/exam session. Replay retains its clock. `_arenaEligibility` anchors the first potentially ranked clock across distinct UUIDs: abandon/restart does not reset timing. The first eligibility window is at most 24 hours and cannot be reopened after expiry. The client enters a blind, non-AI-graded quiz only after acknowledgement.
+### Arena
 
-`POST /api/arena/{examId}/submit`
+`POST /api/arena` validates questions and creates public V2 metadata without questions plus a private answer bank. `POST /api/arena/{examId}/start` accepts a UUID and commits a private session; retries retain the first eligible server clock. `POST /api/arena/{examId}/submit` accepts at most 50 answers and the same UUID, grades server-side, and atomically commits the session, compact receipt, score and eligible reward. Same-ID replays recover the result; changed answers conflict.
 
-```ts
-{
-  answers: string[];       // maximum 50; each string maximum 2,000 characters
-  requestId: string;       // UUID from the authenticated start request; required
-}
-```
+Only a non-author's first eligible completion ranks/earns symbolic coins. Retakes, authors, legacy practice and submissions outside the timer plus grace cannot earn rank/rewards. Duration is server-observed; top-ten ordering uses score, duration and ID. Canonical review appears after accepted submission. The migration inventories and backs up legacy exams before converting eligible records to practice-only; previously exposed answers cannot become a new rewarded competition. This is community practice, not a proctored exam.
 
-The submit body is bounded to 128 KB. The transaction validates the private key/session/fingerprint and grades all answers. Only a non-author's first eligible completion is ranked/rewarded. Retakes, authors, migrated practice and submissions outside a configured timer plus five seconds transport grace receive no coins/rank. A participant has one V2 leaderboard document. Reward, counter, compact receipt and consumed session commit atomically. Same-ID replays recover the result; changed answers return 409. Canonical answer review is released only after accepted submission, without duplicating the full bank inside receipts.
+Start accepts at most 4 KB and returns prompts without private keys/explanations after the session commits. Submission accepts at most 128 KB, 50 answers of at most 2,000 characters each, and the start UUID. A configured timer has five seconds' transport grace; the ranked first-start eligibility window is at most 24 hours and a new UUID cannot reopen it. One participant occupies one V2 leaderboard slot; only the first eligible non-author receives the one-time 50-point pioneer bonus. Existing attempts are not retroactively ranked. Sharing released answers, external assistance and multiple accounts remain outside any proctoring claim.
 
-Initial start and both retake controls share attempt initialization. Transport retries retain the exact serialized answers and request ID; a retake clears that snapshot and receives a new ID. Account/exam changes and unmount revoke pending client completions. Exam and leaderboard subscription failures retain localized safe diagnostics and offer resubscription. Guru assistance is disabled with an explanation during an Arena attempt and is available through the contextual chatbot after completion.
+The client preserves the exact serialized submission and UUID for a transport retry. A deliberate retake resets that snapshot and receives a new UUID. Score review appears after server acknowledgement; Guru assistance is disabled during the attempt and becomes available after completion. AI feedback is outside timed answering.
 
-Duration uses server-observed start/submit times, rounded upward with a one-second minimum; client durations are ignored. AI feedback follows accepted server review, not timed answering. Network/idle time remains included. This is community practice, not a proctored assessment: external assistance, account sharing and redistribution of released answers cannot be ruled out.
+### Forum, moderation and account controls
 
-Only `rankingVersion: 2`/`timingVersion: 1` attempts enter the ordered top ten (score descending, duration ascending, ID ascending). Existing attempts are not retroactively ranked. The first eligible non-author globally receives the one-time 50-point bonus; coins are symbolic/non-redeemable. Deploy indexes/Rules and migration together. Keys/eligibility and legacy backups have no TTL while the exam/lifecycle remains active; account/retention controls remain S05 work.
+Authenticated, budgeted APIs create/edit/like posts and create/edit/like/delete comments. Parent/tombstone checks, author ownership, counters and receipt replay are transactional. Post deletion atomically removes the parent and creates an owner-readable tombstone; server cascade removes descendants and the owner can retry partial failure. Existing orphan records are not automatically swept from a deployed database.
 
-### 4.4. 💬 Forum Comment and Post Deletion APIs
+Reports and moderation use private server APIs. Current `moderator: true` Admin claims authorize each hide/restore; archived content cannot overwrite a live post or deletion tombstone. No role or staffed response SLA is implied by operator contact. Account export/deletion jobs and minimal post-sign-out receipts are documented in [account operations](ACCOUNT_OPERATIONS.md); old manual-review requests never initiate deletion automatically.
 
-`POST /api/forum` creates posts with server-derived identity and a UUID. `PATCH /api/forum/{postId}` accepts explicit `edit-post`, `edit-comment` or desired-state `like` mutations. Ownership, field limits, live-parent/tombstone checks, counters and contribution/byte budgets are transactional. Rules deny browser post/comment writes so SDK calls cannot bypass budgets. New no-op reaction IDs still consume a mutation allowance; receipt replays do not. `REQUEST_BUDGETS` ceilings are provisional safeguards, not calibrated production capacity.
+Forum endpoints include POST /api/forum, PATCH /api/forum/{postId}, POST /api/forum/{postId}/comments and authenticated DELETE routes for comments and posts. Comment content is trimmed to 1–2,000 characters. Reaction requests express a desired state; receipt replays are idempotent, while new no-op IDs still consume mutation allowance. The report queue reads up to 50 oldest open/hidden items; restoration cannot overwrite live content, and a comment decision adjusts its parent counter. Decisions retain actor, reason and time in private records. Budget ceilings are provisional, not calibrated production capacity.
 
-`POST /api/forum/{postId}/comments`
-
-```ts
-{ content: string; requestId?: string }
-```
-
-Content is trimmed and constrained to 1–2,000 characters. The API verifies the token, obtains identity from Admin Auth, creates a comment and increments `commentsCount` in an idempotent transaction.
-
-`DELETE /api/forum/{postId}/comments?commentId={commentId}` verifies token, existence and `authorId`, then deletes the comment and decrements the counter transactionally. Comment creation validates the parent and rejects deletion-in-progress within its transaction.
-
-`DELETE /api/forum/{postId}` verifies ownership and atomically removes the parent while creating `_forumDeletions/{postId}`. Admin SDK recursive deletion then removes descendants in bounded bulk operations.
-
-The minimal tombstone contains `authorId`, status and timestamps. It prevents ID reuse and authorizes retries after partial failure. Only its owner can read it; clients cannot mutate it. The Forum interface supports recovery of pending deletions, and there is no background cleanup worker. Tombstones have no TTL because expiry would reopen ID reuse; they must remain until a replacement policy exists. Deploying code alone does not clean up production data.
-
-### 4.5. 🚨 Safe Errors
-
-Profile offers a paged **learning-data** download for the explicitly supported owner datasets (profile/Auth identity, history, notes, activity, flashcards, practice). Tagged JSON preserves timestamps/bytes/references/non-finite numbers; no passwords, tokens or other Auth credentials are included. Each page is bounded and each multi-part file records continuation/completion. This is live paged data, not a complete community/AI/account export or atomic backup. `/api/account/requests` saves bounded, private complete-export/deletion-review requests and exposes only the authenticated owner's statuses. It does not delete data, grant moderators account-data access or promise fulfilment; real operator/contact and lifecycle processing remain unconfigured S05 acceptance work.
-
-Reports use `/api/community/reports`, authenticated UUID replay and per-user/global budgets. `/moderation` retrieves up to 50 oldest open/hidden reports through a private Admin API. Current Admin Auth `moderator: true` claims authorize every decision; a stale browser claim cannot retain a revoked role. Hide archives/removes public content atomically; restore cannot overwrite live content or a Forum deletion tombstone. Comment hide/restore adjusts the parent counter. Private audit records retain actor/reason/time. No role is granted by default and no response SLA/operator coverage is claimed. Hidden reports remain in the queue until restored; operators must review backlog coverage.
-
-Public home/about provide meaningful bilingual HTML, canonical/descriptive/social metadata and truthful SoftwareApplication JSON-LD. Only those routes enter the sitemap (empty in preview/demo). Forum/Arena stay public-read but UGC, login/register/profile/moderation and draft-policy routes carry noindex/nofollow. Robots allows page crawling for noindex discovery and disallows `/api/`; it does not single out AI bots. Optional `llms.txt` describes public information only, not access control. `SITE_URL` must be the verified production origin. Public information/ordinary 404 routes do not initialize Firebase/camera UI. `SITE_INFO` visibly contains unconfigured operator/contact placeholders and must be replaced/reviewed before production acceptance.
-
-`apiFailure()` returns `{ error, code, values }` JSON. Configuration failure is 503, input parse failure is 400, domain `ApiError` retains its declared status, and unknown failure becomes 500 `APP-REQUEST-FAILED`. Responses must not contain tokens, private keys, raw stacks or provider bodies.
-
-## 5. 🤖 AI Transport and Validation
-
-Seven public operations exist: academic validation, question generation, flashcard generation, practice generation, short-answer analysis, personalized quiz feedback and AI coaching chatbot. Browser callers use the shared client state machine in `src/ai/client.ts`; they do not select models or attempt ordinals.
-
-`POST /api/ai/generations` authenticates the Firebase ID token before bounded JSON parsing, validates the operation input through the server-only registry and creates or replays an idempotent short-lived record. `POST /api/ai/generations/{generationId}/attempt` transactionally claims one of at most three attempts, calls `requestStructuredOnce()` outside the transaction and finalizes only a matching lease. `GET` recovers status/results after response loss, and `DELETE` records cancellation. Browser access to `_aiGenerations` and `_aiQuota` is denied by Rules.
-
-Current model priority:
-
-```text
-thinkingmachines/inkling:free
-google/gemma-4-31b-it:free
-nvidia/nemotron-3.5-lightning:free
-```
-
-Gemma receives native JSON Schema; Inkling/Nemotron receive a JSON-only instruction. Each adapter invocation makes at most one OpenRouter request, checks non-2xx responses and embedded error envelopes, parses supported JSON forms and validates the operation-specific output schema and cross-field rules. Normalized failures are classified as terminal, retry-next-model, retry-after or cancelled before another claim is permitted.
-
-The provider deadline is 20 seconds and the lease is 35 seconds. The ledger enforces two concurrent generations per user, a staging-hypothesis budget of 30 weighted attempts per 15-minute window and a global ceiling of 300. Each window resets relative to its first reservation; this is not sliding-window accounting. The protocol is enabled by default outside production; production creation requires `AI_GENERATION_PROTOCOL_ENABLED=true`. Visitor warm-up and process-scoped model preference do not exist. Deployment duration, quota calibration, TTL activation and canary acceptance remain pending and must not be inferred from local tests.
-
-Chat review context occurs once in the system message, prior conversation turns once in provider messages, and the current user input once at the end. The caller supplies prior turns without appending the current turn to history.
+Public home/about offer SSR content and descriptive/canonical/social metadata; only these stable routes enter the sitemap, which is empty in preview/demo. Forum/Arena remain publicly readable but UGC, account, moderation and service-information routes are noindex/nofollow. Robots permits page crawling to observe noindex and disallows API routes. SITE_URL must match the deployed origin; local metadata checks do not establish crawler acceptance.
 
 <a id="ai-request-lifecycle"></a>
+## 🤖 AI request lifecycle
 
-### 5.1. AI Request Lifecycle
+Seven operations cover academic validation, question generation, Flashcards, Practice, short-answer analysis, quiz feedback and coaching. `POST /api/ai/generations` authenticates before bounded parsing, validates input and creates/replays an owner-bound record. `POST .../{id}/attempt` claims a lease, makes at most one provider request outside the transaction and finalizes only the matching lease. `GET` recovers authoritative status after response loss; `DELETE` requests cancellation. The server selects up to three ordinals: `thinkingmachines/inkling:free`, `google/gemma-4-31b-it:free`, `nvidia/nemotron-3.5-lightning:free`.
 
-```mermaid
-sequenceDiagram
-    participant Browser
-    participant API as Authenticated AI API
-    participant Ledger as Firestore generation ledger
-    participant Provider as OpenRouter
-    Browser->>API: Create generation with operation and input
-    API->>Ledger: Validate and create or replay record
-    API-->>Browser: Generation ID and state
-    Browser->>API: Request attempt
-    API->>Ledger: Claim allowed ordinal and lease
-    API->>Provider: One request for the claimed attempt
-    Provider-->>API: Result or failure
-    API->>Ledger: Finalize matching lease
-    API-->>Browser: Result, retryable state or terminal error
-    opt Attempt response is lost
-        Browser->>API: GET generation status
-        API->>Ledger: Read authoritative state
-        API-->>Browser: Recover state before another attempt
-    end
-```
+Provider deadline is 20 seconds, lease 35 seconds, each client request 30 seconds and operation recovery 120 seconds. Creation-response loss retries the same UUID/input at most once; ambiguous attempt failures read status before another claim. Expired leases settle transactionally, release concurrency and advance or terminate within the attempt ceiling. Cancellation does not guarantee an already-dispatched provider request stops immediately. Provisional per-user/global quotas and traffic/storage token buckets are distinct from provider limits; calibration remains outstanding.
 
-The diagram shows a successful claim. Authentication, validation, quota rejection or an active lease can end an invocation before any provider request. The browser follows the returned state and delay; the server determines whether another ordinal is available. Cancellation is recorded through `DELETE` and may remain `cancel_requested` while an attempt is active. A cancellation request does not guarantee that an already dispatched provider request stops immediately.
+Provider bodies are bounded to 2,000,000 decoded bytes, persisted results to 750,000 serialized UTF-8 bytes. Parsing/schema/cross-field validation and persistence have content-free checkpoints with a hashed correlation ID. Safe errors omit prompts, outputs, credentials and raw provider responses. Production creation requires `AI_GENERATION_PROTOCOL_ENABLED=true`; local tests do not establish deployed timeouts, quota calibration or live recovery.
 
-Creation-response loss retries the same UUID/input at most once. Attempt HTTP rejections such as 401/403/429 are surfaced rather than mistaken for a lost response. Ambiguous transport/server failures read authoritative status before further work, and do not immediately repeat a rejected claim. Each client request has a 30-second timeout, including token waiting; an operation has a 120-second recovery deadline. All seven wrappers accept caller cancellation, and cancellation dispatch is best-effort and independently bounded. `GET` transactionally settles expired leases, releases concurrency slots and advances or terminates within the three-attempt ceiling. A stale finalizer returns a safe lease conflict rather than overwriting newer work.
+The provider priority is fixed in src/ai/config/model.ts; the browser cannot choose models or attempt numbers. Gemma receives native JSON Schema, while the other adapters receive a JSON-only instruction. A 429/auth rejection is not treated as response loss. Retry-After hints longer than one minute end the current operation rather than overflowing or retrying early. Current provisional limits permit two concurrent generations per user and 30 weighted attempts per user / 300 globally per 15-minute fixed window, distinct from provider quota and admission byte/count buckets.
 
-Creation is admitted transactionally through user/global token buckets, with both record-count and serialized-input-byte limits. Idempotent replay of an existing generation consumes no additional creation/storage credit. All four API operations additionally consume a bounded traffic budget. `src/lib/request-budget.ts` is the authoritative provisional policy; these admission buckets are separate from weighted provider-attempt quotas, and their production calibration remains pending.
+Checkpoint events cover creation, claim, dispatch/receipt, parsing, validation, finalization and expired-lease recovery. Known Firestore failures produce a safe persistence classification; unexpected failures retain a generic boundary plus failed stage. Client cancellation is independently bounded and best-effort. The live deployed duration, proxy, privacy of telemetry and quota behavior require their own verification.
 
-Content-free checkpoints cover creation, claim, provider dispatch/receipt, parsing, validation, finalization, lease recovery and read/cancel failures. They use a hashed generation correlation ID, never prompts, results, credentials, lease IDs or raw exception/provider bodies. Known Firestore failures receive `AI-PERSISTENCE-UNAVAILABLE`; unexpected failures retain the generic safe boundary and a failed-stage event. Local tests do not establish deployed logging, staging fault recovery or canary acceptance; M01/F01/D19 remain the release gates for that evidence.
+## 🖥️ Focus Shield and client safety
 
-## 6. 🖥️ Client Behavior, Internationalization, and Focus Shield
+Focus Shield starts only after user action in a secure context with camera permission. It loads TensorFlow/model lazily, throttles inference at 800 ms and uses ownership/generation guards. Stop and failure paths release the owned camera tracks, animation frame and model without globally disposing the shared backend. Local lifecycle tests do not establish attention accuracy, physical-device compatibility or permission-revocation behavior. AI and camera estimates are experimental, not diagnoses.
 
-Profile biography drafts belong to one mounted account session. `useProfileBio` protects edits through delayed snapshots and failed saves, waits for acknowledgement before resuming pristine synchronization, and revokes old save completions. `useDoc` hides snapshots from a previous document path immediately when account ownership changes.
+Dirty profile/notes/forum drafts survive relevant snapshots or failed saves. Stale asynchronous results are revoked after owner/configuration changes and unmount. Report printing uses an independent print surface and represents charts as tables. Native focus/visibility scrolling avoids moving controls during a pointer interaction; intentional smooth commands honor reduced motion.
 
-`translations.ts` retains domain copy; `src/lib/i18n` retains common/error/UI messages. Tests enforce VI/EN key and interpolation parity. Brand names, error codes, model identifiers, scientific notation, LaTeX and user content are not automatically translated. Locale changes do not regenerate or translate history.
+Focus Shield ignores late camera/model completions after stop or account/session change, cancels owned animation work, stops tracks and detaches video on failures. TensorFlow backend resources can be shared, so only the feature's owned model is disposed. Printed reports use separate flow and page breaks, with tables for chart data. Keyboard focus remains visible, screen-reader labels use the active locale and user content is not translated. The audit tracks remaining browser/device and human-labelled model-validation gaps.
 
-Quick Notes retains a dirty draft across snapshots and reports success only after the write completes. Forum creation and coordinated edits/deletion use pending locks; editors retain drafts until persistence is confirmed. Setup academic validation uses a versioned configuration snapshot and a synchronous submit lock. Configuration, locale, callback ownership changes and unmount revoke older results, including late failures. This prevents stale client transitions; it does not claim cancellation of upstream AI work.
+## 🧪 Dependencies and verification
 
-Report selection and roadmap checkboxes have one semantic state-change owner. Printed reports use an independent body-level print surface rather than the dialog scroll area, with print-specific colors, unconstrained flow and page-break rules. Chart values are represented as tables in print. The opt-in `tests/report-print.browser.test.tsx` accepts `REPORT_PRINT_BROWSER=chrome|msedge|chromium|firefox|webkit`; Chromium PDF output goes to ignored `tmp/pdfs/`. Browser/PDF acceptance must be distinguished from DOM regression tests.
-
-Focus Shield:
-
-- starts only after user action;
-- requires a secure context (`https` or `localhost`) and camera permission;
-- dynamically imports TensorFlow runtime/model;
-- uses generation/start guards to reject late resources;
-- stops tracks, cancels animation frames, detaches video and disposes the owned model on stop and initialization/playback/inference failures;
-- presents localized recoverable failures and allows a fresh session on retry; the owned-resource lifecycle is covered by 55 focus/camera regression tests;
-- preserves the shared TensorFlow backend rather than globally disposing resources another consumer may own;
-- uses `tf.tidy` and an 800 ms inference throttle.
-
-A recorded headed-Chromium check used the local HP Wide Vision HD Camera, produced 640 × 480 video in two start/stop cycles and verified all tracks ended. This does not establish other devices, lighting, permission revocation or exact minimum browser versions.
-
-## 7. 📦 Dependency Boundaries
-
-`package.json` is the authority for direct dependency ranges, and the lockfileVersion 3 `package-lock.json` is the authority for resolved direct and transitive versions. Repeating the complete inventory here caused version facts to drift without adding architectural context.
-
-The main runtime groups are Next.js and React, Firebase client/Admin SDKs, Zod validation, Radix UI primitives, TensorFlow.js, KaTeX and Recharts. The development toolchain comprises TypeScript and ESLint, Vitest and Testing Library, Firebase Emulator tooling, Playwright, Tailwind/PostCSS, coverage and TSX execution. Consult the manifest and lockfile for exact versions.
-
-For upgrades, review runtime engines, peer ranges, changelogs, advisories and affected consumers; then perform a clean install and run the relevant validation layers. Avoid adding a dependency for behavior already provided by the supported platform or Node runtime.
-
-The security update keeps Firebase 12, React 19.2, TypeScript 6 and ESLint 9 rather than combining major migrations. Next/its ESLint config, Zod, Firebase Admin and the Vitest/coverage patch pair were upgraded together with compatible affected transitive packages. Two exact-parent overrides are intentional: Firestore 4.17.1 uses patched gRPC 1.13.7 (retaining proto-loader 0.7), and development-only get-uri 6.0.5 uses basic-ftp 6.2.3. The latter's documented breaking default rejects separate FTP transfer hosts; that stricter behavior is retained, not bypassed. Dependency-contract/loopback tests and Emulator regressions gate these exceptions. Remove/reassess them when the parent updates; do not silently broaden them or apply npm's suggested Firebase downgrade. Current advisory results remain a separate release gate.
-
-Script imports are direct dependency contracts too: the metadata inspector declares `google-auth-library`, and the advisory/maintenance runners declare `semver`. Their development declarations do not imply that an overlapping transitive dependency disappears from production. `npm run check:maintenance` checks direct imports and manifest/lock agreement; it performs no advisory lookup or package upgrade.
-
-## 8. 🧪 Testing, CI, and Deployment Limitations
-
-| Layer | Config/script | Scope |
-|---|---|---|
-| Static | `npm run lint`, `npm run typecheck` | ESLint and TypeScript |
-| Maintenance | `npm run check:maintenance` | Declared imports, lock agreement, documented command/file targets and generated-output boundaries |
-| Unit/component | `npm test` | jsdom/node fixtures; no production network |
-| Coverage | `npm run test:coverage` | V8 for instrumented suite; not the complete system |
-| Rules | `npm run test:rules` | Firestore Rules through Emulator |
-| Integration | `npm run test:integration` | Auth/Firestore Emulator and server APIs |
-| E2E | `npm run test:e2e` | Next dev or production server, demo Firebase, AI fixture; Chromium desktop/mobile, WebKit and Firefox |
-| Print layout | `REPORT_PRINT_BROWSER` plus `node node_modules/vitest/vitest.mjs run tests/report-print.browser.test.tsx` | Opt-in browser fixture; both languages/themes; Chromium PDF output; see configuration guide for PowerShell syntax |
-| Build | `npm run build` | Optimized Next artifact; no font-network dependency |
-| Production smoke | `npm run test:production` | Six page routes, script budgets, SSR/social/crawler metadata, safe 404/source-map probes and unauthenticated AI/community/account API boundaries |
-| Bundle/performance | `npm run report:bundle`, `npm run report:performance` | Build inventory and synthetic dataset baseline; not browser interaction timing |
-| Dependency assessment | `npm run audit:dependencies` | Registry report tied to the lockfile hash; policy blocks high/critical findings and registry errors |
-| Infrastructure metadata | `node scripts/inspect-firestore.mjs` | Read-only inspection of every configured composite-index group and all five declared TTL policies |
-| Receipt expiry inventory | `node --conditions=react-server --env-file=.env --import tsx scripts/receipt-retention.ts` | Read-only by default; `--apply` only backfills missing expiry values |
-| Browser measurement | `npm run report:browser`, `npm run report:comparison` | Production guest-route cold/warm, heap, DOM, resource and Forum input timing; historical comparison requires a separately built checkout |
-| Query comparison | `npm run report:queries` | Local demo Emulator, 100/1,000/10,000 records, unbounded versus 50-record queries |
-| Physical camera | No checked-in command | Requires independent device verification |
-| Live AI adapter | `npm run ai:smoke` | Live OpenRouter and operation schemas; quota/cost possible; does not exercise auth, ledger or recovery |
-
-CI runs `npm ci → dependency audit → lint → typecheck → coverage → integration → build → install Chromium/WebKit/Firefox → development E2E → production E2E → bundle report → production HTTP smoke → synthetic performance baseline` on Ubuntu with Node 24/JDK 21. Browser-performance and query-comparison commands run independently under controlled measurement conditions. Workflow configuration does not prove a successful hosted run.
-
-TypeScript includes application, scripts, tests and root TypeScript configurations plus Next-generated route types. Local runtimes, scratch files and reports are excluded; Git ignore rules alone do not exclude files from the compiler. Playwright writes failure artifacts explicitly to `test-results`. Reports remain separate from disposable test/cache output; [artifact maintenance](CONFIGURATION.md#maintenance-and-generated-artifacts) defines cleanup scopes and retention.
-
-The existence or success of a test suite does not establish remote CI, deployed Firestore indexes/Rules, production Vercel runtime, Safari/Firefox minimum versions, physical-camera behavior, live-provider reliability or current vulnerability applicability. Those device/browser limits remain V02 validation scope; they do not change the completed Focus Shield lifecycle remediation recorded as F11. Builds use local system font stacks and do not require Google Fonts.
-
-## 9. 📑 Implementation and Validation Evidence
-
-History versions 1 and 2 remain readable; absent versions identify legacy records, and unknown future versions are rejected. Numeric quiz settings are validated separately from draft and persisted strings. `usePagedCollection` limits initial live subscriptions to 50 records and cursor-fetches older pages on demand. Statistics, search and report labels describe loaded-record scope.
-
-This document defines the implemented architecture and the validation layers available in the checkout. Dated test results, finding-level evidence and unresolved acceptance criteria belong in [the audit report](AUDIT_REPORT.md); executable commands and environment requirements belong in [the configuration guide](CONFIGURATION.md). A historical result must not be treated as proof of current remote CI, deployed Firestore configuration, production runtime behavior, live-provider reliability or physical-device compatibility.
+The manifest/lockfile govern exact dependencies. Runtime includes Next/React, Firebase, Zod, Radix, TensorFlow, KaTeX and Recharts; development uses TypeScript, ESLint, Vitest, Firebase Emulators and Playwright. Parent-scoped overrides for Firestore/gRPC and get-uri/basic-ftp are intentional and require reassessment on parent updates. Maintenance checks imports and lock agreement; advisory assessment uses the separate registry-backed command. See [validation](VALIDATION.md) for commands, output, demo-build fingerprinting, browser coverage and cleanup.
 
 <a id="technical-glossary"></a>
+## 📖 Technical glossary
 
-## 10. 📖 Technical Glossary
-
-| Term | Meaning in this repository |
+| Term | Meaning |
 |---|---|
-| Generation | One AI operation, with validated input, an owner and at most three server-ordered attempts |
-| Generation ledger | Private Firestore records that coordinate generation state, leases, cancellation and recoverable results |
-| Attempt | In AI, one claimed model ordinal; in Arena, one scored quiz submission. These are separate records and lifecycles |
-| Lease | Temporary ownership of an AI attempt; only a matching lease may finalize its result |
-| Idempotency receipt | Stored request fingerprint and result used to replay a mutation without duplicating its effects |
-| Fingerprint | A representation used to compare request content or exam questions and detect incompatible reuse |
-| Quota reservation | Transactional accounting for concurrency and weighted AI usage; it is separate from provider account limits |
-| Tombstone | Persistent Forum deletion record that supports owner recovery and prevents reuse of a deleted post ID |
-| TTL | Firestore's asynchronous deletion policy for an expiry field; distinct from expiry checks enforced by API code |
-| Loaded-record scope | Search, statistics and reports cover fetched records; older pages are included only after loading |
-| Historical evidence | A result tied to an earlier revision or environment, retained for traceability rather than assumed current |
-| Staging / canary | Pre-release validation environment / limited production exposure with defined acceptance and stop criteria |
+| Generation / attempt | One AI operation / one server-claimed model ordinal; Arena attempts are a separate concept. |
+| Ledger / lease | Private generation state / temporary ownership fenced at finalization. |
+| Idempotency receipt | Stored request fingerprint/result that prevents repeated effects while retained. |
+| Tombstone | Persistent Forum deletion marker for recovery and post-ID reuse prevention. |
+| Expiry / cleanup | Application authorization deadline / later bounded physical deletion. |
+| Loaded-record scope | Search, statistics and reports include only pages fetched by the client. |
+| Staging / canary | Isolated pre-release verification / limited exposure with defined stop criteria. |

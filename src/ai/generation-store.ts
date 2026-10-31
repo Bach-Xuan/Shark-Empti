@@ -2,7 +2,7 @@ import 'server-only';
 import { createHash,randomUUID } from 'node:crypto';
 import { FieldValue,Timestamp,type Transaction } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase-admin';
-import { ApiError } from '@/lib/server-api';
+import { ApiError, assertWritable } from '@/lib/server-api';
 import { createAppError,type AppError } from '@/lib/app-error';
 import { getAiOperationDefinition } from './operation-registry';
 import type { AiGenerationState,AiOperation,AiProtocolResponse } from './protocol';
@@ -37,6 +37,12 @@ function canonical(value: unknown): string {
 const fingerprint = (uid: string, operation: AiOperation, input: unknown) => createHash('sha256').update(canonical([uid, operation, input])).digest('hex');
 const safeError = (failure: NormalizedAiFailure): AppError => createAppError(failure.code, failure.kind === 'configuration' ? 'The AI service is not configured.' : 'The AI request could not be completed.');
 
+function assertGenerationLifetime(record: GenerationRecord) {
+  if (!(record.expiresAt instanceof Timestamp) || record.expiresAt.toMillis() <= Date.now()) {
+    throw new ApiError('APP-NOT-FOUND', 404, 'Generation was not found.');
+  }
+}
+
 function response(id: string, record: GenerationRecord): AiProtocolResponse {
   return { generationId: id, state: record.status, ...(record.result !== undefined ? { data: record.result } : {}), ...(record.terminalError ? { error: record.terminalError } : {}), ...(record.status === 'running' ? { pollAfterMs: 1_000 } : {}) };
 }
@@ -51,6 +57,7 @@ export async function createGeneration(id: string, uid: string, operation: AiOpe
       const current = snapshot.data() as GenerationRecord;
       if (current.ownerUid !== uid) throw new ApiError('APP-NOT-FOUND', 404, 'Generation was not found.');
       if (current.inputFingerprint !== inputFingerprint || current.operation !== operation) throw new ApiError('APP-REQUEST-CONFLICT', 409, 'Generation ID was already used with different data.');
+      assertGenerationLifetime(current);
       return response(id, current);
     }
     const now = Timestamp.now();
@@ -69,6 +76,7 @@ export async function getGeneration(id: string, uid: string): Promise<AiProtocol
     const snapshot = await transaction.get(ref);
     if (!snapshot.exists || snapshot.get('ownerUid') !== uid) throw new ApiError('APP-NOT-FOUND', 404, 'Generation was not found.');
     const record = snapshot.data() as GenerationRecord;
+    assertGenerationLifetime(record);
     const now = Timestamp.now();
     const expired = record.inFlight && record.inFlight.leaseExpiresAt.toMillis() <= now.toMillis();
     if ((record.status === 'cancel_requested' && (!record.inFlight || expired)) || (record.status === 'running' && expired)) {
@@ -117,9 +125,11 @@ export async function claimGeneration(id: string, uid: string): Promise<{ kind: 
   const db = getAdminDb();
   const ref = db.collection(COLLECTION).doc(id);
   return db.runTransaction(async transaction => {
+    await assertWritable(transaction, uid);
     const snapshot = await transaction.get(ref);
     if (!snapshot.exists || snapshot.get('ownerUid') !== uid) throw new ApiError('APP-NOT-FOUND', 404, 'Generation was not found.');
     const record = snapshot.data() as GenerationRecord;
+    assertGenerationLifetime(record);
     const now = Timestamp.now();
     if (['succeeded', 'failed', 'cancelled', 'cancel_requested'].includes(record.status)) return { kind: 'response', value: response(id, record) };
     if (record.status === 'running' && record.inFlight && record.inFlight.leaseExpiresAt.toMillis() > now.toMillis()) return { kind: 'response', value: response(id, record) };
@@ -159,6 +169,7 @@ export async function finalizeGeneration(id: string, uid: string, leaseId: strin
     const snapshot = await transaction.get(ref);
     if (!snapshot.exists || snapshot.get('ownerUid') !== uid) throw new ApiError('APP-NOT-FOUND', 404, 'Generation was not found.');
     const record = snapshot.data() as GenerationRecord;
+    assertGenerationLifetime(record);
     if (record.inFlight?.leaseId !== leaseId) throw new ApiError('AI-LEASE-CONFLICT', 409, 'The attempt lease has changed. Refresh its authoritative status.');
     const now = Timestamp.now();
     await releaseQuota(transaction, uid, id);
@@ -205,6 +216,7 @@ export async function cancelGeneration(id: string, uid: string): Promise<AiProto
     const snapshot = await transaction.get(ref);
     if (!snapshot.exists || snapshot.get('ownerUid') !== uid) throw new ApiError('APP-NOT-FOUND', 404, 'Generation was not found.');
     const record = snapshot.data() as GenerationRecord;
+    assertGenerationLifetime(record);
     if (['succeeded', 'failed', 'cancelled'].includes(record.status)) return response(id, record);
     const state = record.status === 'running' ? 'cancel_requested' : 'cancelled';
     const terminalError = createAppError('AI-CANCELLED', 'The AI request was cancelled.');

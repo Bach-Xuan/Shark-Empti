@@ -37,6 +37,7 @@ export default function ResultView({ t, lang, results, onViewDashboard, onRetake
   const [analysisData, setAnalysisData] = useState<QuizAnalysis | null>(results.analysis || null);
   const [requestLanguage] = useState(lang);
   const mounted = useRef(true);
+  const generatedFeedback = useRef<{ source: ResultViewProps['results']; value: PersonalizedQuizFeedbackOutput } | null>(null);
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   const [isAnalyzing, setIsAnalyzing] = useState(!results.analysis);
   const [error, setError] = useState<boolean>(false);
@@ -46,24 +47,30 @@ export default function ResultView({ t, lang, results, onViewDashboard, onRetake
     setIsAnalyzing(true);
     setError(false);
     try {
-      const data = await personalizedQuizPerformanceFeedback({
-        quizResults: results.quizResults,
-        originalTopic: results.config.topic
-      }, { signal: aiRequest.start() });
-      if (!mounted.current) return;
-      if (!data.ok) {
-        showErrorToast(data.error, requestLanguage);
-        setError(true);
-        return;
+      let feedback = generatedFeedback.current?.source === results ? generatedFeedback.current.value : undefined;
+      if (!feedback) {
+        const data = await personalizedQuizPerformanceFeedback({
+          quizResults: results.quizResults,
+          originalTopic: results.config.topic
+        }, { signal: aiRequest.start() });
+        if (!mounted.current) return;
+        if (!data.ok) {
+          showErrorToast(data.error, requestLanguage);
+          setError(true);
+          return;
+        }
+        feedback = data.data;
+        // A failed Firestore merge retries this result, without another provider call.
+        generatedFeedback.current = { source: results, value: feedback };
       }
-      if (!isArena && !await onRecoverAnalysis?.(data.data)) {
+      if (!isArena && !await onRecoverAnalysis?.(feedback)) {
         if (mounted.current) {
           setError(true);
           showUnexpectedErrorToast('APP-PERSISTENCE-UNAVAILABLE', '', {}, requestLanguage);
         }
         return;
       }
-      if (mounted.current) setAnalysisData(data.data);
+      if (mounted.current) setAnalysisData(feedback);
     } catch (e) {
       console.error("AI Performance Analysis failed", e);
       if (!mounted.current) return;

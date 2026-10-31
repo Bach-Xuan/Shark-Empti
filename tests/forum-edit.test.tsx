@@ -13,6 +13,8 @@ vi.mock('@/components/latex-toolbar', () => ({ LatexQuickToolbar: () => null }))
 vi.mock('@/components/ui-text', () => ({ UiText: () => null }));
 vi.mock('@/components/app-preferences', () => ({ useLanguageState: () => ['en', vi.fn()], useThemeState: () => ['light', vi.fn()] }));
 vi.mock('@/firebase', () => ({ useUser: () => ({ user: { uid: 'author' }, loading: false }), useFirestore: () => 'database' }));
+vi.mock('@/firebase/provider', () => ({ useFirestore: () => 'database' }));
+vi.mock('@/components/route-skeleton', () => ({ RouteSkeleton: () => <div role="status">Loading</div> }));
 vi.mock('@/firebase/firestore/use-user-notes', () => ({ useUserNotes: () => ({ notes: '', updateNotes: vi.fn() }) }));
 vi.mock('@/firebase/error-emitter', () => ({ errorEmitter: { emit: mocks.emit } }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));

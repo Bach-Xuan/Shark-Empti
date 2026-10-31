@@ -34,12 +34,12 @@ afterEach(() => {
   }
 });
 
-it('keeps a dry run non-mutating and preserves reports, credentials and installed runtimes', () => {
+it('inventories temporary reports without mutating a dry run or touching credentials/runtimes', () => {
   const root = fixture();
   for (const file of ['coverage/old.html', 'reports/evidence.json', '.env', '.tools/java/runtime', 'node_modules/package/index.js']) write(root, file);
   ageTree(root);
   const selected = cleanGenerated(root, { mode: 'artifacts', dryRun: true });
-  expect(selected).toMatchObject([{ path: 'coverage', retained: false }]);
+  expect(selected).toMatchObject([{ path: 'coverage', retained: false }, { path: 'reports', retained: false }]);
   for (const file of ['coverage/old.html', 'reports/evidence.json', '.env', '.tools/java/runtime', 'node_modules/package/index.js']) expect(fs.existsSync(path.join(root, file))).toBe(true);
 });
 

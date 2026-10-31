@@ -179,3 +179,21 @@ it.each([
   expect((await attempt(request(), context(id))).status).toBe(422);
   expect(provider).toHaveBeenCalledOnce();
 });
+
+it('rejects expired generations on replay, status, claim and cancellation without provider work', async () => {
+  const id = randomUUID(); await createGeneration(id, uid, 'academic-validation', input);
+  await getAdminDb().doc('_aiGenerations/' + id).update({ expiresAt: Timestamp.fromMillis(Date.now() - 1) });
+  await expect(createGeneration(id, uid, 'academic-validation', input)).rejects.toMatchObject({ status: 404 });
+  await expect(getGeneration(id, uid)).rejects.toMatchObject({ status: 404 });
+  await expect(claimGeneration(id, uid)).rejects.toMatchObject({ status: 404 });
+  expect((await cancel(request(undefined), context(id))).status).toBe(404);
+  expect(provider).not.toHaveBeenCalled();
+});
+
+it('rejects finalization that crosses the generation deadline', async () => {
+  const id = randomUUID(); await createGeneration(id, uid, 'academic-validation', input);
+  const claim = await claimGeneration(id, uid); if (claim.kind !== 'claimed') throw Error('Expected claim');
+  await getAdminDb().doc('_aiGenerations/' + id).update({ expiresAt: Timestamp.fromMillis(Date.now() - 1) });
+  await expect(finalizeGeneration(id, uid, claim.leaseId, claim.attempt, 1, { data: { isAcademic: true } })).rejects.toMatchObject({ status: 404 });
+  expect((await getAdminDb().doc('_aiGenerations/' + id).get()).get('result')).toBeUndefined();
+});

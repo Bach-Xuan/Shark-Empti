@@ -19,6 +19,24 @@ afterEach(async () => testEnv?.clearFirestore());
 afterAll(async () => testEnv?.cleanup());
 
 describe('Firestore access policy', () => {
+  it('blocks new private writes under deletion or an active backup barrier while preserving owner reads', async () => {
+    const db = testEnv.authenticatedContext('learner').firestore();
+    await assertSucceeds(setDoc(doc(db, 'users/learner/notes/main'), { text: 'Owned' }));
+    await testEnv.withSecurityRulesDisabled(context => setDoc(doc(context.firestore(), '_accountLocks/learner'), { status: 'deleting' }));
+    await assertSucceeds(getDoc(doc(db, 'users/learner/notes/main')));
+    await assertFails(setDoc(doc(db, 'users/learner/notes/new'), { text: 'Rejected' }));
+    await testEnv.withSecurityRulesDisabled(async context => {
+      await deleteDoc(doc(context.firestore(), '_accountLocks/learner'));
+      await setDoc(doc(context.firestore(), '_serviceState/maintenance'), { active: true, expiresAtMs: Date.now() + 60000 });
+    });
+    await assertFails(updateDoc(doc(db, 'users/learner/notes/main'), { text: 'Rejected' }));
+    await testEnv.withSecurityRulesDisabled(context => setDoc(doc(context.firestore(), '_serviceState/maintenance'), { active: true, expiresAtMs: 1 }));
+    await assertSucceeds(updateDoc(doc(db, 'users/learner/notes/main'), { text: 'Allowed after expiry' }));
+    for (const collection of ['_accountJobs', '_accountLocks', '_deletionJournal', '_jobWorkerState', '_jobBudgets', '_serviceState']) {
+      await assertFails(getDoc(doc(db, collection + '/private')));
+      await assertFails(setDoc(doc(db, collection + '/forged'), { active: false }));
+    }
+  });
   it('orders all tied Arena scores by duration and ID before limiting, excluding legacy timing', async () => {
     await testEnv.withSecurityRulesDisabled(async context => {
       const db = context.firestore();

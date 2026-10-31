@@ -10,6 +10,7 @@ import { readForumPost } from '@/lib/public-firestore-schema';
 import { deleteForumPost, communityRequest, mutateForum } from '@/lib/forum-client';
 import { isDocumentId } from '@/lib/document-id';
 import { uiMessage } from '@/lib/i18n';
+import { publicAuthorName } from '@/lib/i18n/public';
 import { subjectBadgeClassName, subjectOptions } from '@/lib/subjects';
 import { useMemo as usePageMemo } from 'react';
 
@@ -486,7 +487,7 @@ export default function ForumPage() {
                 <div className="flex gap-3 md:gap-6">
                   <Avatar className="w-9 h-9 md:w-16 md:h-16 rounded-xl md:rounded-2xl border-2 md:border-4 border-border shadow-duo group-hover:border-primary/30 transition-colors shrink-0">
                     <AvatarImage src={post.authorPhoto} alt="" />
-                    <AvatarFallback className="bg-primary/10 text-primary font-black text-[10px] md:text-lg">{post.authorName[0]}</AvatarFallback>
+                    <AvatarFallback className="bg-primary/10 text-primary font-black text-[10px] md:text-lg">{publicAuthorName(lang, post.authorId, post.authorName)[0]}</AvatarFallback>
                   </Avatar>
 
                   <div className="flex-1 space-y-2 md:space-y-4 min-w-0">
@@ -549,7 +550,7 @@ export default function ForumPage() {
                     </p>
 
                     <div className="flex items-center justify-between pt-2 md:pt-4 border-t-2 border-border/30">
-                      <span className="text-[7px] md:text-[10px] font-black text-primary uppercase tracking-widest truncate max-w-[80px] md:max-w-[150px]">{post.authorName}</span>
+                      <span className="text-[7px] md:text-[10px] font-black text-primary uppercase tracking-widest truncate max-w-[80px] md:max-w-[150px]">{publicAuthorName(lang, post.authorId, post.authorName)}</span>
                       <div className="flex items-center gap-2 md:gap-6">
                         <ReportContent target={{ kind: 'post', id: post.id }} lang={lang} />
                         <button

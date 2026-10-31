@@ -11,6 +11,7 @@ import { isDocumentId } from '@/lib/document-id';
 import { readDraft, writeDraft, removeDraft, parseWith, arenaSessionDraftSchema } from '@/lib/learning-drafts';
 import AiChatbot from '@/components/ai-chatbot';
 import { uiMessage } from '@/lib/i18n';
+import { publicAuthorName } from '@/lib/i18n/public';
 import { quizLabel } from '@/lib/quiz-labels';
 
 import Navigation from '@/components/navigation';
@@ -385,9 +386,9 @@ function ArenaDetailSession({ examId }: { examId: string }) {
                          <div className="col-span-6 flex items-center gap-2 md:gap-3 min-w-0">
                             <Avatar className="w-8 h-8 md:w-10 md:h-10 border-2 border-border shrink-0">
                                <AvatarImage src={item.userPhoto} alt="" />
-                               <AvatarFallback>{item.userName[0]}</AvatarFallback>
+                               <AvatarFallback>{publicAuthorName(lang, item.userId, item.userName)[0]}</AvatarFallback>
                             </Avatar>
-                            <span className="font-black text-[10px] md:text-sm uppercase tracking-tight truncate">{item.userName}</span>
+                            <span className="font-black text-[10px] md:text-sm uppercase tracking-tight truncate">{publicAuthorName(lang, item.userId, item.userName)}</span>
                          </div>
                          <div className="col-span-2 text-right font-black text-sm md:text-xl text-primary">{item.score}%</div>
                          <div className="col-span-2 text-right font-black text-[9px] md:text-xs text-muted-foreground">{Math.floor(item.duration / 60)}:{ (item.duration % 60).toString().padStart(2, '0') }</div>

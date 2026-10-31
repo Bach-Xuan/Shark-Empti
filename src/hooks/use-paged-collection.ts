@@ -34,14 +34,18 @@ export function usePagedCollection<T>(source: Query<DocumentData> | null, read: 
   const generation = ++lifecycle.current;
   busy.current = false; cursor.current = null; seenIds.current.clear(); setItems([]); setHasMore(false); setLoading(!!source); setError(null); setInvalidRecords(0);
   if (!source) return;
+  const timer = setTimeout(() => {
+   if (generation === epoch.current) { setError(report({ code: 'deadline-exceeded' })); setLoading(false); setHasMore(false); }
+  }, 15000);
   const unsubscribe = onSnapshot(query(source, limit(PAGE_SIZE)), snapshot => {
+   clearTimeout(timer);
    if (generation !== epoch.current) return;
    cursor.current = snapshot.docs.at(-1) ?? null;
    seenIds.current = new Set(snapshot.docs.map(doc => doc.id));
    const items = decode(snapshot.docs);
    setItems(items); setInvalidRecords(snapshot.docs.length - items.length); setError(null); setHasMore(snapshot.size === PAGE_SIZE); setLoading(false);
-  }, cause => { if (generation === epoch.current) { setError(report(cause)); setItems([]); setHasMore(false); cursor.current = null; setLoading(false); } });
-  return () => { lifecycle.current++; unsubscribe(); };
+  }, cause => { clearTimeout(timer); if (generation === epoch.current) { setError(report(cause)); setItems([]); setHasMore(false); cursor.current = null; setLoading(false); } });
+  return () => { clearTimeout(timer); lifecycle.current++; unsubscribe(); };
  }, [source, decode, report, retryEpoch]);
  const retry = useCallback(() => setRetryEpoch(value => value + 1), []);
  const loadMore = useCallback(async () => {
@@ -49,7 +53,8 @@ export function usePagedCollection<T>(source: Query<DocumentData> | null, read: 
   const generation = epoch.current, anchor = cursor.current;
   busy.current = true; setLoading(true);
   try {
-   const snapshot = await getDocs(query(source, startAfter(anchor), limit(PAGE_SIZE)));
+   let timer: ReturnType<typeof setTimeout> | undefined;
+   const snapshot = await Promise.race([getDocs(query(source, startAfter(anchor), limit(PAGE_SIZE))), new Promise<never>((_, reject) => { timer = setTimeout(() => reject({ code: 'deadline-exceeded' }), 15000); })]).finally(() => clearTimeout(timer));
    // First-page changes invalidate an in-flight continuation as well.
    if (generation !== epoch.current || cursor.current !== anchor) return;
    cursor.current = snapshot.docs.at(-1) ?? anchor;
@@ -59,7 +64,7 @@ export function usePagedCollection<T>(source: Query<DocumentData> | null, read: 
    setInvalidRecords(previous => previous + unseen.length - additions.length);
    setItems(previous => [...previous, ...additions]);
    setHasMore(snapshot.size === PAGE_SIZE);
-  } catch (cause) { if (generation === epoch.current) { setError(report(cause)); setItems([]); cursor.current = null; setHasMore(false); } }
+  } catch (cause) { if (generation === epoch.current && cursor.current === anchor) { setError(report(cause)); setItems([]); cursor.current = null; setHasMore(false); } }
   finally { if (generation === epoch.current) { busy.current = false; setLoading(false); } }
  }, [source, hasMore, decode, report]);
  return { items, loading, hasMore, loadMore, error, retry, invalidRecords };

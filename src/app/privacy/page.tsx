@@ -1,4 +1,4 @@
 import { ServiceInformation } from '@/components/service-information';
-import { privateMetadata } from '@/lib/site-metadata';
-export const metadata = { ...privateMetadata, title: 'Privacy and account data' };
-export default function Privacy() { return <ServiceInformation section="privacy" />; }
+import { serviceMetadata } from '@/lib/service-metadata';
+export const generateMetadata = () => serviceMetadata('privacy');
+export default function Page() { return <ServiceInformation section="privacy" />; }

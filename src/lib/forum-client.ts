@@ -13,7 +13,7 @@ export async function communityRequest(user: Pick<User, 'getIdToken'>, path: str
   try {
     const token = await Promise.race([user.getIdToken(), aborted]);
     if (controller.signal.aborted) throw { code: 'APP-UNAVAILABLE', values: {} };
-    const response = await fetch(path, { method, signal: controller.signal, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+    const response = await fetch(path, { method, signal: controller.signal, headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, ...(method === 'GET' ? {} : { body: JSON.stringify(body) }) });
     const payload: unknown = await response.json().catch(() => null);
     if (!response.ok) {
       const code = payload && typeof payload === 'object' && 'code' in payload && typeof payload.code === 'string' && /^(?:APP|AUTH|FORUM|COMMUNITY)-[A-Z0-9-]{1,60}$/.test(payload.code) ? payload.code : 'APP-REQUEST-FAILED';

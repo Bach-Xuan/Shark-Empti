@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({ callbacks: [] as Array<(snapshot: unknown) => 
 vi.mock('@/firebase/error-emitter', () => ({ errorEmitter: { emit: mocks.report } }));
 vi.mock('firebase/firestore', () => ({ query: (...args: unknown[]) => args, limit: mocks.limit, startAfter: (cursor: unknown) => cursor, getDocs: mocks.get,
  onSnapshot: (_: unknown, callback: (snapshot: unknown) => void, error: (cause: unknown) => void) => { mocks.callbacks.push(callback); mocks.errors.push(error); return mocks.unsubscribe; } }));
-afterEach(() => { cleanup(); vi.clearAllMocks(); mocks.callbacks = []; mocks.errors = []; });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.clearAllMocks(); mocks.callbacks = []; mocks.errors = []; });
 const page = (start: number, count: number) => ({ size: count, docs: Array.from({ length: count }, (_, i) => ({ id: String(start + i), data: () => ({ value: start + i }) })) });
 const source = {} as Query;
 it('bounds reads to one page and appends a cursor page only on demand', async () => {
@@ -73,4 +73,33 @@ it('distinguishes listener failure from empty data and resubscribes with an expl
  act(() => mocks.callbacks[1](page(1, 1)));
  expect(result.current.error).toBeNull();
  expect(result.current.items).toEqual(['1']);
+});
+
+it('offers retry when the first subscription never settles and rejects its late callback after retry', () => {
+ vi.useFakeTimers();
+ const { result } = renderHook(() => usePagedCollection(source, id => id));
+ act(() => vi.advanceTimersByTime(20_000));
+ expect(result.current.loading).toBe(false);
+ expect(result.current.error?.code).toBe('FIRESTORE-TIMEOUT');
+ const previous = mocks.callbacks[0];
+ act(() => result.current.retry());
+ expect(result.current.loading).toBe(true);
+ act(() => previous(page(90, 1)));
+ expect(result.current.items).toEqual([]);
+ act(() => mocks.callbacks[1](page(0, 1)));
+ expect(result.current.error).toBeNull();
+ expect(result.current.items).toEqual(['0']);
+});
+
+it('ends an unresponsive continuation with a recoverable error rather than an empty success', async () => {
+ vi.useFakeTimers();
+ const { result } = renderHook(() => usePagedCollection(source, id => id));
+ act(() => mocks.callbacks[0](page(0, PAGE_SIZE)));
+ mocks.get.mockReturnValue(new Promise(() => undefined));
+ let pending!: Promise<void>;
+ act(() => { pending = result.current.loadMore(); });
+ await act(async () => { vi.advanceTimersByTime(20_000); await pending; });
+ expect(result.current.loading).toBe(false);
+ expect(result.current.error?.code).toBe('FIRESTORE-TIMEOUT');
+ expect(result.current.hasMore).toBe(false);
 });

@@ -301,7 +301,8 @@ export default function PracticeMode({ t, lang, weakPoints, totalAttempts, total
           </div>
         </div>
 
-        <Card className="card-duo p-5 md:p-16 min-h-[350px] md:min-h-[550px] flex flex-col justify-between shadow-none hover:shadow-[0_15px_0_0_var(--duo-shadow)] transition-all relative overflow-hidden">
+        {/* Keep answer/feedback targets still while the learner scrolls between them. */}
+        <Card className="card-duo hover:translate-y-0 p-5 md:p-16 min-h-[350px] md:min-h-[550px] flex flex-col justify-between shadow-none hover:shadow-[0_15px_0_0_var(--duo-shadow)] transition-all relative overflow-hidden">
           <div className="absolute top-0 right-0 w-64 h-64 bg-primary/5 rounded-full -mr-32 -mt-32 blur-3xl pointer-events-none" />
 
           <div className="space-y-6 md:space-y-12 relative z-10">

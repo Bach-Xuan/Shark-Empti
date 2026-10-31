@@ -3,12 +3,14 @@ import { afterEach, expect, it, vi } from 'vitest';
 import type { User, Auth } from 'firebase/auth';
 import type { Firestore } from 'firebase/firestore';
 import type { FirebaseApp } from 'firebase/app';
+import type { ReactNode } from 'react';
 
 const mocks = vi.hoisted(() => ({ observer: null as null | ((user: unknown) => void), repair: vi.fn() }));
 vi.mock('firebase/auth', () => ({ onAuthStateChanged: (_auth: unknown, next: (user: unknown) => void) => { mocks.observer = next; return vi.fn(); } }));
 vi.mock('@/firebase/profile-bootstrap', () => ({ ensureLearnerProfile: mocks.repair }));
 vi.mock('@/components/firebase-error-listener', () => ({ FirebaseErrorListener: () => null }));
 vi.mock('@/components/app-preferences', () => ({ useAppPreferences: () => ({ lang: 'en' }) }));
+vi.mock('@/components/service-consent', () => ({ ServiceConsent: ({ children }: { children: ReactNode }) => children }));
 import { FirebaseProvider } from '@/firebase/provider';
 
 function mount() {
@@ -22,7 +24,7 @@ it('holds authenticated children until profile bootstrap completes after a delay
   mount();
   act(() => mocks.observer!({ uid: 'one' } as User));
   expect(screen.queryByText('Private application')).toBeNull();
-  expect(screen.getByRole('main').getAttribute('aria-busy')).toBe('true');
+  expect(screen.getByRole('status').closest('[aria-busy]')?.getAttribute('aria-busy')).toBe('true');
   await act(async () => finish());
   expect(screen.getByText('Private application')).toBeTruthy();
 });

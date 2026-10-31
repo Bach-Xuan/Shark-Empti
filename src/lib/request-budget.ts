@@ -2,7 +2,7 @@ import 'server-only';
 import { createHash } from 'node:crypto';
 import { Timestamp, type Transaction } from 'firebase-admin/firestore';
 import { getAdminDb } from './firebase-admin';
-import { ApiError } from './server-api';
+import { ApiError, assertWritable } from './server-api';
 
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
@@ -27,6 +27,7 @@ type Bucket = { tokens?: number; bytes?: number; updatedAtMs?: number };
 
 /** Read first, commit last: callers can finish all business reads before any write. */
 export async function prepareRequestBudget(transaction: Transaction, uid: string, scope: BudgetScope, bytes = 0, now = Date.now()) {
+  await assertWritable(transaction, uid);
   const policy = REQUEST_BUDGETS[scope];
   if (!Number.isSafeInteger(bytes) || bytes < 0) throw new Error('Invalid budget cost.');
   const owner = createHash('sha256').update(uid).digest('hex');

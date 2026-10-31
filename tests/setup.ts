@@ -1,3 +1,6 @@
 // Shared browser shims can be added here as UI coverage grows.
 import { beforeEach } from 'vitest';
-beforeEach(() => { if (typeof sessionStorage !== 'undefined') sessionStorage.clear(); });
+beforeEach(() => {
+  if (typeof sessionStorage !== 'undefined') sessionStorage.clear();
+  if (typeof document !== 'undefined') document.cookie = 'shark_preferences=; Path=/; Max-Age=0';
+});

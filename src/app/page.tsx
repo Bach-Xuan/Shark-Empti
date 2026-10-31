@@ -1,12 +1,7 @@
-'use client';
-import dynamic from 'next/dynamic';
-import { useUser } from '@/firebase';
+import { HomeEntry } from '@/components/home-entry';
 import { PublicIntro } from '@/components/public-intro';
 
-const LearningApp = dynamic(() => import('@/components/learning-app'), { loading: () => <PublicIntro /> });
-
-/** The public entry does not download Quiz/Result/Playground code before Auth. */
+/** Useful public HTML without using the introduction as an Auth/loading screen. */
 export default function Home() {
-  const { user, loading } = useUser();
-  return user && !loading ? <LearningApp /> : <PublicIntro />;
+  return <><HomeEntry /><noscript><PublicIntro /></noscript></>;
 }

@@ -1,6 +1,6 @@
 import 'server-only';
 import { FieldValue, type Firestore } from 'firebase-admin/firestore';
-import { ApiError } from './server-api';
+import { ApiError, assertWritable } from './server-api';
 import { isDocumentId } from './document-id';
 
 export function requireDocumentId(id: string) {
@@ -17,6 +17,7 @@ export async function deleteForumPostTree(db: Firestore, postId: string, uid: st
   const postRef = db.collection('posts').doc(postId);
   const markerRef = db.collection('_forumDeletions').doc(postId);
   const complete = await db.runTransaction(async transaction => {
+    await assertWritable(transaction, uid);
     const [post, marker] = await Promise.all([transaction.get(postRef), transaction.get(markerRef)]);
     const authorId = marker.exists ? marker.get('authorId') : post.get('authorId');
     if (!marker.exists && !post.exists) throw new ApiError('FORUM-NOT-FOUND', 404, 'Post not found.');

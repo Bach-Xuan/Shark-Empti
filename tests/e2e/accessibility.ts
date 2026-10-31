@@ -7,6 +7,7 @@ export async function accessibilityViolations(page: Page, rules?: string[]) {
   // Measure stable text, not intermediate fade/colour transitions. Infinite
   // decorative effects must not make accessibility verification hang.
   await page.evaluate(async () => {
+    await document.fonts.ready;
     const finite = document.getAnimations().filter(animation =>
       animation.playState === 'running' && animation.effect?.getComputedTiming().iterations !== Infinity,
     );
@@ -22,7 +23,7 @@ export async function accessibilityViolations(page: Page, rules?: string[]) {
     }).axe;
     const runOnly = selectedRules
       ? { type: 'rule', values: selectedRules }
-      : { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa'] };
+      : { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'] };
     return (await axe.run({ runOnly })).violations.map(item => ({
       id: item.id,
       nodes: item.nodes.slice(0, 6).map(node => ({ target: node.target, html: node.html, failure: node.failureSummary })),

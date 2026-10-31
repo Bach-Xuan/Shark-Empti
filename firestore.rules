@@ -3,6 +3,13 @@ service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() { return request.auth != null; }
     function owner(userId) { return signedIn() && request.auth.uid == userId; }
+    function writableOwner(userId) {
+      return owner(userId)
+        && !exists(/databases/$(database)/documents/_accountLocks/$(userId))
+        && (!exists(/databases/$(database)/documents/_serviceState/maintenance)
+          || get(/databases/$(database)/documents/_serviceState/maintenance).data.active != true
+          || get(/databases/$(database)/documents/_serviceState/maintenance).data.expiresAtMs <= request.time.toMillis());
+    }
     function validText(value, maximum) { return value is string && value.size() > 0 && value.size() <= maximum && value.matches('[\\s\\S]*\\S[\\s\\S]*'); }
     function validAuthor(data) {
       return validText(data.authorId, 128) && validText(data.authorName, 200)
@@ -44,6 +51,12 @@ service cloud.firestore {
     }
 
     // Server-controlled transport state. Browser access is always denied.
+    match /_accountJobs/{document=**} { allow read, write: if false; }
+    match /_accountLocks/{document=**} { allow read, write: if false; }
+    match /_deletionJournal/{document=**} { allow read, write: if false; }
+    match /_jobWorkerState/{document=**} { allow read, write: if false; }
+    match /_jobBudgets/{document=**} { allow read, write: if false; }
+    match /_serviceState/{document=**} { allow read, write: if false; }
     match /_aiGenerations/{document=**} { allow read, write: if false; }
     match /_aiQuota/{document=**} { allow read, write: if false; }
     match /_requestBudgets/{document=**} { allow read, write: if false; }
@@ -66,12 +79,13 @@ service cloud.firestore {
       // owner-only until repaired; Rules cannot hide individual document fields.
       allow get: if owner(userId) || (signedIn() && resource.data.keys().hasOnly(['displayName', 'photoURL', 'bio', 'createdAt', 'updatedAt', 'sharkCoins']));
       allow list: if false;
-      allow create: if owner(userId) && request.resource.data.keys().hasOnly(['displayName', 'photoURL', 'bio', 'createdAt', 'updatedAt']);
-      allow update: if owner(userId) && !request.resource.data.keys().hasAny(['email'])
+      allow create: if writableOwner(userId) && request.resource.data.keys().hasOnly(['displayName', 'photoURL', 'bio', 'createdAt', 'updatedAt']);
+      allow update: if writableOwner(userId) && !request.resource.data.keys().hasAny(['email'])
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'photoURL', 'bio', 'createdAt', 'updatedAt', 'email']);
       allow delete: if false;
       match /{collection}/{document=**} {
-        allow read, write: if owner(userId);
+        allow read: if owner(userId);
+        allow write: if writableOwner(userId);
       }
     }
 

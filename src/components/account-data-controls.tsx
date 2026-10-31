@@ -1,68 +1,109 @@
 'use client';
+import Link from 'next/link';
+import { RECEIPT_STORAGE_KEY, type DeletionReceipt } from '@/lib/account-receipt';
 import { useEffect, useRef, useState } from 'react';
-import { useUser } from '@/firebase';
-import { useMutation } from '@/hooks/use-mutation';
-import { useRequestScope } from '@/hooks/use-request-scope';
-import { communityRequest } from '@/lib/forum-client';
-import { ACCOUNT_EXPORT_DATASETS } from '@/lib/account-data';
-import { accountMessages } from '@/lib/i18n/account';
-import { showErrorToast } from '@/lib/error-toast';
-import { getAiError } from '@/lib/ai-error-message';
-import type { Language } from '@/lib/types';
-import { Button } from './ui/button';
+import { GoogleAuthProvider, reauthenticateWithPopup } from 'firebase/auth';
 import { z } from 'zod';
+import { useUser } from '@/firebase';
+import { communityRequest } from '@/lib/forum-client';
+import { jobMessages } from '@/lib/i18n/jobs';
+import { jobStatuses, type JobView } from '@/lib/jobs/types';
+import type { Language } from '@/lib/types';
 
-const Page = z.object({ dataset: z.enum(ACCOUNT_EXPORT_DATASETS), uid: z.string(), documents: z.array(z.object({ path: z.string(), data: z.unknown() })).max(10), identity: z.unknown().optional(), nextCursor: z.string().nullable() });
-type Cursor = { dataset: number; after?: string; part: number };
+const View = z.object({ id: z.string().uuid(), kind: z.enum(['export', 'deletion']), status: z.enum(jobStatuses), processed: z.number(), parts: z.number().int().nonnegative().max(5000), expiresAtMs: z.number(), errorCode: z.string().optional() });
 export function AccountDataControls({ lang }: { lang: Language }) {
   const { user } = useUser();
-  const copy = accountMessages[lang];
-  const mutation = useMutation();
-  const requestScope = useRequestScope();
-  const [cursor, setCursor] = useState<Cursor>({ dataset: 0, part: 1 });
-  const [status, setStatus] = useState<'part' | 'done' | 'saved' | null>(null);
+  const copy = jobMessages[lang];
+  const [jobs, setJobs] = useState<JobView[]>([]), [enabled, setEnabled] = useState<boolean | null>(null);
+  const [receipt, setReceipt] = useState<DeletionReceipt | null>(null);
+  const [error, setError] = useState(false), [busy, setBusy] = useState(false), [checked, setChecked] = useState(false), [revision, setRevision] = useState(0);
+  const ids = useRef<Partial<Record<'export' | 'deletion', string>>>({});
   const alive = useRef(true);
-  const requestIds = useRef<Partial<Record<'export' | 'deletion', string>>>({});
-  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
-  const failure = (error: unknown) => showErrorToast(getAiError(error), lang);
-  const download = async () => {
+  const downloadController = useRef<AbortController | null>(null);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; downloadController.current?.abort(); }; }, []);
+  useEffect(() => {
     if (!user) return;
-    await mutation.run(async () => {
-      const signal = requestScope.start();
-      let next = { ...cursor }, bytes = 0;
-      const pages: z.infer<typeof Page>[] = [];
-      while (next.dataset < ACCOUNT_EXPORT_DATASETS.length && bytes < 6_000_000) {
-        const dataset = ACCOUNT_EXPORT_DATASETS[next.dataset];
-        const page = Page.parse(await communityRequest(user, '/api/account/export', { dataset, ...(next.after ? { cursor: next.after } : {}) }, 'POST', signal));
-        if (!alive.current) return;
-        if (page.uid !== user.uid || page.dataset !== dataset || page.nextCursor === next.after) throw { code: 'APP-DATA-INVALID' };
-        pages.push(page); bytes += new TextEncoder().encode(JSON.stringify(page)).length;
-        next = page.nextCursor ? { ...next, after: page.nextCursor } : { dataset: next.dataset + 1, part: next.part };
+    const controller = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    let deadline: ReturnType<typeof setTimeout>;
+    const refresh = async () => {
+      let nextPoll: number | undefined;
+      deadline = setTimeout(() => { setError(true); controller.abort(); }, 30_000);
+      try {
+        const result = z.object({ enabled: z.boolean(), jobs: z.array(View) }).parse(await communityRequest(user, '/api/account/jobs', undefined, 'GET', controller.signal));
+        if (receipt && !result.jobs.some(job => job.id === receipt.id)) {
+          const response = await fetch('/api/account/jobs/' + receipt.id, { headers: { 'X-Deletion-Receipt': receipt.receipt }, signal: controller.signal });
+          if (response.ok) {
+            const completed = View.pick({ id: true, kind: true, status: true, expiresAtMs: true }).parse(await response.json());
+            result.jobs.push({ ...completed, parts: 0, processed: 0 });
+          }
+        }
+        if (!controller.signal.aborted) { setJobs(result.jobs); setEnabled(result.enabled); setError(false); }
+        if (result.enabled && result.jobs.some(job => ['queued', 'running'].includes(job.status))) nextPoll = 12_000;
+        else if (result.enabled && result.jobs.some(job => job.status === 'waiting_quota')) nextPoll = 15 * 60_000;
+      } catch { if (!controller.signal.aborted) setError(true); }
+      finally { clearTimeout(deadline); }
+      if (!controller.signal.aborted && nextPoll) timer = setTimeout(refresh, nextPoll);
+    };
+    void refresh();
+    return () => { controller.abort(); clearTimeout(timer); clearTimeout(deadline); };
+  }, [user, revision, receipt]);
+  const create = async (kind: 'export' | 'deletion') => {
+    if (!user || busy || (kind === 'deletion' && !checked)) return;
+    setBusy(true); setError(false);
+    const requestId = ids.current[kind] ??= crypto.randomUUID();
+    try {
+      await reauthenticateWithPopup(user, new GoogleAuthProvider());
+      const result = View.extend({ receipt: z.string().optional() }).parse(await communityRequest(user, '/api/account/jobs', { kind, requestId, ...(kind === 'deletion' ? { confirmDeletion: true } : {}) }));
+      if (kind === 'deletion' && result.receipt) {
+        const value = { id: result.id, receipt: result.receipt };
+        if (alive.current) setReceipt(value);
+        try { localStorage.setItem(RECEIPT_STORAGE_KEY, JSON.stringify(value)); } catch { /* A receipt file remains available when browser storage is blocked. */ }
       }
-      if (!alive.current) return;
-      const complete = next.dataset === ACCOUNT_EXPORT_DATASETS.length;
-      const file = new Blob([JSON.stringify({ format: 'shark-learning-data-v1', scope: 'known-private-learning', exportedAt: new Date().toISOString(), complete, continuation: complete ? null : next, pages }, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(file);
-      const link = document.createElement('a'); link.href = url; link.download = `shark-learning-data-part-${cursor.part}.json`;
-      document.body.append(link); link.click(); link.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setCursor(complete ? { dataset: 0, part: 1 } : { ...next, part: cursor.part + 1 });
-      setStatus(complete ? 'done' : 'part');
-    }, failure);
+      if (alive.current) { setJobs(previous => [result, ...previous.filter(job => job.id !== result.id)]); setRevision(value => value + 1); }
+      delete ids.current[kind];
+    } catch { if (alive.current) setError(true); }
+    finally { if (alive.current) setBusy(false); }
   };
-  const request = async (kind: 'export' | 'deletion') => {
-    if (!user || (kind === 'deletion' && !window.confirm(copy.confirm))) return;
-    requestIds.current[kind] ??= crypto.randomUUID();
-    const result = await mutation.run(() => communityRequest(user, '/api/account/requests', { kind, requestId: requestIds.current[kind] }, 'POST', requestScope.start()), failure);
-    if (result.ok) setStatus('saved');
+  const download = async (id: string, part: number) => {
+    if (!user || busy) return;
+    setBusy(true);
+    const controller = new AbortController(); downloadController.current = controller;
+    const timer = setTimeout(() => controller.abort(), 30_000);
+    try {
+      const token = await Promise.race([user.getIdToken(), new Promise<never>((_, reject) => controller.signal.addEventListener('abort', () => reject(Error('Download deadline')), { once: true }))]);
+      const response = await fetch('/api/account/jobs/' + id + '?part=' + part, { headers: { Authorization: 'Bearer ' + token }, signal: controller.signal });
+      if (!response.ok) throw Error('Download failed');
+      const url = URL.createObjectURL(await response.blob()), anchor = document.createElement('a');
+      anchor.href = url; anchor.download = 'shark-account-' + part + '.json'; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch { if (alive.current) setError(true); }
+    finally { clearTimeout(timer); if (alive.current) setBusy(false); }
   };
-  return <section aria-labelledby="account-data-heading" className="space-y-4 rounded-2xl border p-5">
-    <h2 id="account-data-heading" className="text-xl font-bold">{copy.title}</h2>
-    <p className="text-sm">{copy.scope}</p><p className="text-sm text-muted-foreground">{copy.warning}</p>
+  return <section className="service-surface space-y-4" aria-busy={busy}>
+    <h2 className="service-heading text-xl">{copy.title}</h2>
+    <p className="text-sm leading-relaxed">{copy.description}</p>
+    <p className="text-sm text-muted-foreground">{copy.reauth}</p>
+    {enabled === null && !error && <p className="text-sm" role="status">{copy.loading}</p>}
+    {enabled === false && <p className="text-sm" role="status">{copy.unavailable}</p>}
+    {error && <p role="alert">{copy.error}</p>}
     <div className="flex flex-wrap gap-3">
-      <Button disabled={!user || mutation.pending} onClick={download}>{cursor.part > 1 ? copy.next : copy.download}</Button>
-      <Button variant="outline" disabled={!user || mutation.pending} onClick={() => request('export')}>{copy.request}</Button>
-      <Button variant="outline" disabled={!user || mutation.pending} onClick={() => request('deletion')}>{copy.deletion}</Button>
+      <button className="btn-duo min-h-11 rounded-2xl border-2 bg-card px-4 font-bold disabled:opacity-60" disabled={busy || !enabled} onClick={() => void create('export')}>{copy.export}</button>
+      <button className="service-link" disabled={busy} onClick={() => setRevision(value => value + 1)}>{copy.retry}</button>
     </div>
-    {status && <p role="status">{copy[status]}</p>}
+    <div className="space-y-3 rounded-2xl border-2 border-destructive/60 p-4">
+      <p className="text-sm leading-relaxed">{copy.warning}</p>
+      <label className="flex items-start gap-3 text-sm"><input className="mt-1 h-5 w-5 shrink-0 accent-primary" type="checkbox" checked={checked} onChange={event => setChecked(event.target.checked)} /><span>{copy.confirm}</span></label>
+      <button className="btn-duo min-h-11 rounded-2xl border-2 border-destructive px-4 font-bold text-destructive disabled:opacity-60" disabled={busy || !enabled || !checked} onClick={() => void create('deletion')}>{copy.deletion}</button>
+    </div>
+    <ul className="space-y-3" aria-live="polite">{jobs.map(job => <li className="rounded-2xl border-2 p-4 text-sm" key={job.id}>
+      <p className="font-bold">{job.kind === 'export' ? copy.export : copy.deletion}: {copy.status[job.status]}</p>
+      {job.errorCode === 'ACCOUNT-JOB-EXPIRED' && <p>{copy.processingExpired}</p>}
+      {job.status === 'ready' && <div className="mt-3 flex flex-wrap gap-2">{Array.from({ length: job.parts }, (_, part) => <button key={part} className="service-link border-2" disabled={busy} onClick={() => void download(job.id, part)}>{part === job.parts - 1 ? copy.manifest : copy.part + ' ' + (part + 1)}</button>)}</div>}
+    </li>)}</ul>
+    <p className="text-sm">{copy.receiptInfo} <Link className="service-link" href="/account/status">{copy.receipt}</Link></p>
+    {receipt && <button className="service-link border-2" onClick={() => {
+      const url = URL.createObjectURL(new Blob([JSON.stringify(receipt)], { type: 'application/json' })), anchor = document.createElement('a');
+      anchor.href = url; anchor.download = 'shark-deletion-receipt.json'; anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }}>{copy.saveReceipt}</button>}
   </section>;
 }

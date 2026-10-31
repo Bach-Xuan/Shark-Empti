@@ -1,0 +1,33 @@
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+import type { Firestore } from 'firebase/firestore';
+const mocks = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn() }));
+vi.mock('firebase/firestore', () => ({ doc: () => 'consent', getDoc: mocks.read, setDoc: mocks.write, serverTimestamp: () => 'server-time' }));
+vi.mock('@/components/app-preferences', () => ({ useAppPreferences: () => ({ lang: 'en' }) }));
+import { ServiceConsent } from '@/components/service-consent';
+afterEach(() => { cleanup(); vi.clearAllMocks(); });
+it('requires an explicit eligibility checkbox and successful policy persistence before rendering learning features', async () => {
+  mocks.read.mockResolvedValue({ get: () => undefined });
+  let finish!: () => void;
+  mocks.write.mockReturnValue(new Promise<void>(resolve => { finish = resolve; }));
+  render(<ServiceConsent uid="learner" firestore={{} as Firestore}><p>Learning features</p></ServiceConsent>);
+  const button = await screen.findByRole('button', { name: 'Confirm and continue' });
+  expect((button as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.click(screen.getByRole('checkbox'));
+  expect((button as HTMLButtonElement).disabled).toBe(false);
+  fireEvent.click(button);
+  expect(screen.queryByText('Learning features')).toBeNull();
+  expect(mocks.write).toHaveBeenCalledWith('consent', { policyVersion: '2', minimumAge: 16, acceptedAt: 'server-time' });
+  finish();
+  await waitFor(() => expect(screen.getByText('Learning features')).toBeTruthy());
+});
+it('does not admit an old confirmation or a failed confirmation write', async () => {
+  mocks.read.mockResolvedValue({ get: (field: string) => field === 'policyVersion' ? '1' : 16 });
+  mocks.write.mockRejectedValue(new Error('Offline'));
+  render(<ServiceConsent uid="learner" firestore={{} as Firestore}><p>Learning features</p></ServiceConsent>);
+  fireEvent.click(await screen.findByRole('checkbox'));
+  fireEvent.click(screen.getByRole('button', { name: 'Confirm and continue' }));
+  await screen.findByRole('alert');
+  expect(screen.queryByText('Learning features')).toBeNull();
+  expect(screen.getByRole('button', { name: 'Try again' })).toBeTruthy();
+});

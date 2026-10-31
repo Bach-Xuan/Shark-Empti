@@ -7,6 +7,7 @@ import { useAiRequestScope } from '@/hooks/use-ai-request-scope';
 import { formatStoredDate } from '@/lib/date-format';
 import { readArenaExam, arenaConfigSchema } from '@/lib/public-firestore-schema';
 import { uiMessage } from '@/lib/i18n';
+import { publicAuthorName } from '@/lib/i18n/public';
 import { quizLabel } from '@/lib/quiz-labels';
 import { useMemo as usePageMemo } from 'react';
 
@@ -263,9 +264,9 @@ export default function ArenaPage() {
                         <div className="flex items-center gap-2">
                           <Avatar className="w-8 h-8 rounded-lg border-2 border-border">
                             <AvatarImage src={exam.authorPhoto} alt="" />
-                            <AvatarFallback>{exam.authorName[0]}</AvatarFallback>
+                            <AvatarFallback>{publicAuthorName(lang, exam.authorId, exam.authorName)[0]}</AvatarFallback>
                           </Avatar>
-                          <span className="text-[9px] font-black text-primary uppercase tracking-widest truncate max-w-[100px]">{exam.authorName}</span>
+                          <span className="text-[9px] font-black text-primary uppercase tracking-widest truncate max-w-[100px]">{publicAuthorName(lang, exam.authorId, exam.authorName)}</span>
                         </div>
                         <div className="flex items-center gap-2 text-muted-foreground">
                            <Play className="w-4 h-4 fill-current" />

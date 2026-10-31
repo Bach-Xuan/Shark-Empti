@@ -17,7 +17,7 @@ import { TranslationSet } from '@/lib/translations';
 import { QuizAnalysis,QuizConfig,QuizHistoryItem,QuizResultItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { AlertTriangle,BookOpen,CheckCircle2,Clock,Loader2,Sparkles,XCircle } from 'lucide-react';
-import { useCallback,useEffect,useMemo,useRef,useState } from 'react';
+import { useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState } from 'react';
 import { useAiRequestScope } from '@/hooks/use-ai-request-scope';
 import { useLearningDraft, useLearningLeaveGuard } from '@/hooks/use-learning-draft';
 import { quizDraftSchema, removeDraft, type QuizDraft } from '@/lib/learning-drafts';
@@ -43,6 +43,13 @@ interface QuizViewProps {
 }
 
 export default function QuizView({ t, lang, config, initialQuestions, onFinish, onReady, onAskGuru, askGuruDisabledReason, numericShortAnswers = false, blindAnswers = false, draftOwner, draftId, draftAvailable = true, startedAtMs }: QuizViewProps) {
+  useLayoutEffect(() => {
+    // Stop any outstanding explicit scroll before the answer controls are painted.
+    const root = document.documentElement;
+    const scroller = document.scrollingElement ?? root;
+    scroller.scrollTop = window.scrollY;
+    scroller.scrollLeft = window.scrollX;
+  }, []);
   const aiRequest = useAiRequestScope();
   const [currentIdx, setCurrentIdx] = useState(0);
   const [questions, setQuestions] = useState<QuizQuestion[]>(initialQuestions || []);

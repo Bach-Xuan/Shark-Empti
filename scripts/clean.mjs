@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 export const CLEANUP_TARGETS = {
   build: ['.next'],
-  artifacts: ['coverage', 'test-results', 'playwright-report', 'blob-report', 'tmp/pdfs'],
+  artifacts: ['coverage', 'reports', 'test-results', 'playwright-report', 'blob-report', 'tmp/pdfs'],
   cache: ['.next/cache', '.next/dev', '.tools/tmp'],
 };
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -32,7 +32,7 @@ function inspect(target) {
   return { bytes, newest };
 }
 
-/** Fixed project-relative scopes only. Reports, credentials, dependencies and
+/** Fixed project-relative scopes only. Credentials, dependencies and
  * installed local runtimes are intentionally outside the cleanup inventory.
  * @param {string} root
  * @param {{ mode: string; olderThanDays?: number; dryRun?: boolean; now?: number; trackedPaths?: string[] }} options
@@ -81,7 +81,7 @@ function main() {
     console.log(`${action}: ${entry.path} (${(entry.bytes / 1024 / 1024).toFixed(1)} MiB)`);
   }
   const selected = entries.filter(entry => !entry.retained);
-  console.log(`${dryRun ? 'Selected' : 'Removed'} ${selected.length} artifact paths; ${(selected.reduce((sum, entry) => sum + entry.bytes, 0) / 1024 / 1024).toFixed(1)} MiB. Reports and installed runtimes retained.`);
+  console.log(`${dryRun ? 'Selected' : 'Removed'} ${selected.length} artifact paths; ${(selected.reduce((sum, entry) => sum + entry.bytes, 0) / 1024 / 1024).toFixed(1)} MiB. Credentials, dependencies and installed runtimes retained.`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

@@ -2,7 +2,7 @@ import { getAdminAuth,getAdminDb } from '@/lib/firebase-admin';
 import { requireDocumentId } from '@/lib/forum-deletion';
 import { readForumPost, forumCommentSchema } from '@/lib/public-firestore-schema';
 import { readLimitedJson } from '@/lib/server-json';
-import { ApiError,apiFailure,authenticatedUser,idempotentTransaction } from '@/lib/server-api';
+import { ApiError,apiFailure,authenticatedUser,idempotentTransaction,assertWritable } from '@/lib/server-api';
 import { FieldValue } from 'firebase-admin/firestore';
 import { NextRequest,NextResponse } from 'next/server';
 import { z } from 'zod';
@@ -58,6 +58,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     requireDocumentId(commentId);
     const db = getAdminDb();
     await db.runTransaction(async transaction => {
+      await assertWritable(transaction, uid);
       const postRef = db.collection('posts').doc(postId);
       const commentRef = postRef.collection('comments').doc(commentId);
       const [post, comment, deletion] = await Promise.all([transaction.get(postRef), transaction.get(commentRef), transaction.get(db.collection('_forumDeletions').doc(postId))]);

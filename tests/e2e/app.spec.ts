@@ -37,12 +37,15 @@ test('account isolation, quiz, history, notes and preferences', async ({ page })
   await expect(page).toHaveURL(/\/login$/);
   // A new registration must not inherit the previous user's private notes/history.
   await page.goto('/register');
+  await page.getByRole('checkbox', { name: /I confirm that I am at least 16/ }).check();
   const popupReady = page.waitForEvent('popup');
   await page.getByRole('button', { name: /Google/i }).click();
   const popup = await popupReady; await popup.waitForLoadState('load');
   await popup.getByText('Add new account', { exact: true }).click();
   await popup.getByText('Auto-generate user information', { exact: true }).click();
   await popup.getByRole('button', { name: /sign in with google/i }).click();
+  await page.getByRole('checkbox', { name: /^I am at least 16/ }).check();
+  await page.getByRole('button', { name: 'Confirm and continue' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:9002/');
   await page.getByRole('button', { name: 'Personal Notes', exact: true }).click();
   await expect(page.getByPlaceholder('Write your study notes or reminders here...')).toHaveValue('');
@@ -104,7 +107,8 @@ test('Forum comment and Arena submission use real demo APIs', async ({ page, fau
   await page.reload();
   await expect(page.getByText(/An unfinished attempt is available/)).toBeVisible();
   await page.getByRole('button', { name: 'Start Challenge', exact: true }).click();
-  await page.getByRole('button', { name: '4', exact: true }).click();
+  await page.getByRole('button', { name: '4', exact: true }).click({ delay: 350 });
+  await expect(page.getByText('Answer recorded. The server grades your answers after submission.', { exact: true })).toBeVisible();
   expect(starts).toHaveLength(2);
   expect(starts[0]).toBe(starts[1]);
   await page.getByRole('button', { name: /finish|results/i }).click();
@@ -125,6 +129,10 @@ for (const language of ['en', 'vi']) {
     await expect(page.getByRole('button', { name: /Google/i })).toBeVisible();
     await page.goto('/register');
     await expect(page.locator('html')).toHaveAttribute('lang', language);
+    // A held pointer must not lose a small control as its parent card moves.
+    const eligibility = page.getByRole('checkbox');
+    await eligibility.click({ delay: 350 });
+    await expect(eligibility).toBeChecked();
     expect(requested.filter(url => /model\.json|\.bin(?:\?|$)/i.test(url))).toEqual([]);
     // Turbopack dev emits a small async-loader manifest, not the TF runtime.
     for (const url of requested.filter(url => /tensorflow/i.test(url))) {

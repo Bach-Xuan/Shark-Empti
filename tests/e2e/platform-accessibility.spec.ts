@@ -6,10 +6,12 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { translations } from '../../src/lib/translations';
 import { uiMessage } from '../../src/lib/i18n';
 import { SUBJECT_IDS } from '../../src/lib/subjects';
-import { accountMessages } from '../../src/lib/i18n/account';
+import { jobMessages } from '../../src/lib/i18n/jobs';
+import { observeReaderTimeouts } from './reader-timeouts';
 
 test('full accessibility checks cover Setup, community lists and expanded landscape chat in both locales/themes', async ({ page }) => {
   test.setTimeout(240000);
+  const readerTimeouts = await observeReaderTimeouts(page);
   const db = getFirestore(getApps()[0] ?? initializeApp({ projectId: 'demo-shark-empti' }));
   for (const subject of SUBJECT_IDS) {
     await db.doc(`posts/a11y-${test.info().project.name}-${subject}`).set({ title: `Accessible discussion ${subject}`, content: 'A public learning discussion.', subject, authorId: 'fixture', authorName: 'Fixture', authorPhoto: 'http://127.0.0.1:9002/opengraph-image', createdAt: Timestamp.now(), likesCount: 0, commentsCount: 0, likedBy: [] });
@@ -24,7 +26,9 @@ test('full accessibility checks cover Setup, community lists and expanded landsc
     await page.emulateMedia({ reducedMotion: theme === 'dark' ? 'reduce' : 'no-preference' });
     await page.evaluate(({ lang, theme }) => {
       localStorage.setItem('shark_lang', lang); localStorage.setItem('shark_theme', theme);
-      window.dispatchEvent(new Event('storage'));
+      document.cookie = 'shark_preferences=v1.' + lang + '.' + theme + '; Path=/; SameSite=Lax';
+      window.dispatchEvent(new StorageEvent('storage', { key: 'shark_lang', newValue: lang }));
+      window.dispatchEvent(new StorageEvent('storage', { key: 'shark_theme', newValue: theme }));
     }, { lang, theme });
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('/');
@@ -62,7 +66,8 @@ test('full accessibility checks cover Setup, community lists and expanded landsc
     await expect(page.getByText(translations[lang].noArenaExams, { exact: true }).or(page.locator('main a[href^="/arena/"]')).first()).toBeVisible();
     await scan(`Arena ${lang}/${theme}`);
     await page.goto('/profile');
-    await expect(page.getByRole('heading', { name: accountMessages[lang].title, exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: jobMessages[lang].title, exact: true })).toBeVisible();
     await scan(`Profile ${lang}/${theme}`);
   }
+  expect(readerTimeouts).toEqual([]);
 });

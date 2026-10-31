@@ -9,12 +9,26 @@ import { receiptExpiry } from './receipt-retention';
 export class ApiError extends Error {
   constructor(public code: string, public status: number, message: string) { super(message); }
 }
-export async function authenticatedUser(request: Request) {
+export async function authenticatedUser(request: Request, options: { allowLocked?: boolean; allowMaintenance?: boolean } = {}) {
   const authorization = request.headers.get('authorization');
   if (!authorization?.startsWith('Bearer ')) throw new ApiError('AUTH-REQUIRED', 401, 'Authentication is required.');
   const auth = getAdminAuth();
-  try { return (await auth.verifyIdToken(authorization.slice(7))).uid; }
+  let uid: string;
+  try { uid = (await auth.verifyIdToken(authorization.slice(7))).uid; }
   catch { throw new ApiError('AUTH-INVALID', 401, 'Authentication is invalid or expired.'); }
+  await getAdminDb().runTransaction(async transaction => assertWritable(transaction, uid, options));
+  return uid;
+}
+
+/** Read in the SAME transaction as a mutation to close deletion/backup races. */
+export async function assertWritable(transaction: Transaction, uid: string, options: { allowLocked?: boolean; allowMaintenance?: boolean } = {}) {
+  const db = getAdminDb();
+  const [lock, maintenance] = await Promise.all([
+    transaction.get(db.collection('_accountLocks').doc(uid)),
+    transaction.get(db.collection('_serviceState').doc('maintenance')),
+  ]);
+  if (!options.allowLocked && ['deleting', 'deleted'].includes(lock.get('status'))) throw new ApiError('ACCOUNT-DELETING', 409, 'This account is being deleted.');
+  if (!options.allowMaintenance && maintenance.get('active') === true && maintenance.get('expiresAtMs') > Date.now()) throw new ApiError('APP-MAINTENANCE', 503, 'Writes are temporarily paused for a consistent backup.');
 }
 export function apiFailure(error: unknown) {
   if (error instanceof AdminConfigurationError) return NextResponse.json({ error: 'Server configuration is unavailable.', code: 'APP-CONFIG-MISSING', values: {} }, { status: 503 });
@@ -30,6 +44,7 @@ export async function idempotentTransaction<T extends object>(scope: string, uid
   const receipt = requestId ? db.collection('_requestReceipts').doc(hash(JSON.stringify([scope, uid, requestId]))) : null;
   const fingerprint = hash(JSON.stringify(payload));
   return db.runTransaction(async transaction => {
+    await assertWritable(transaction, uid);
     if (receipt) {
       const previous = await transaction.get(receipt);
       if (previous.exists) {
@@ -38,7 +53,7 @@ export async function idempotentTransaction<T extends object>(scope: string, uid
       }
     }
     const result = await operation(transaction);
-    if (receipt) transaction.create(receipt, { fingerprint, result, createdAt: new Date(), expiresAt: receiptExpiry(new Date()) });
+    if (receipt) transaction.create(receipt, { ownerUid: uid, scope, fingerprint, result, createdAt: new Date(), expiresAt: receiptExpiry(new Date()) });
     return result;
   });
 }

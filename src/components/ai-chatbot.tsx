@@ -87,14 +87,7 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
         totalQuestions: results?.quizResults?.length || 0,
         correctAnswers: results?.quizResults?.filter(r => r.isCorrect).length || 0,
         incorrectAnswers: results?.quizResults?.filter(r => !r.isCorrect).length || 0,
-        cognitiveMetrics: analysis?.cognitiveMetrics || {
-          conceptMastery: 50,
-          applicationSkill: 50,
-          problemDecomposition: 50,
-          logicalReasoning: 50,
-          errorAwareness: 50,
-          instructionFollowing: 50
-        },
+        ...(analysis?.cognitiveMetrics ? { cognitiveMetrics: analysis.cognitiveMetrics } : {}),
         errorAnalysis: analysis?.errorCategories || {}
       };
 

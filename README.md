@@ -1,156 +1,64 @@
 # 🦈 Shark Empti · v1.15.1
 
-Shark Empti connects digital learning activities with learners' progress. Static question banks encourage repetition, general-purpose chatbots lack sustained learning context, and conventional assessments often end with a score rather than guidance. The project brings assessment, feedback and practice into a continuous, evidence-informed learning process.
+[![XERJ Corpus Hub contributor](https://hub.xerj.org/contributors/Bach-Xuan/badge.svg)](https://hub.xerj.org/contributors/Bach-Xuan)
 
-This purpose is consistent with Vietnam's wider educational modernization agenda, including **Resolution 57-NQ/TW (2024)** on science, innovation, and digital transformation; **Resolution 71-NQ/TW (2025)** on educational breakthroughs; **Decision 131/QĐ-TTg (2022)** on digital transformation in education; and **Decision 127/QĐ-TTg (2021)** on the national AI strategy. These references establish contextual alignment only; they do not imply governmental endorsement or regulatory compliance.
-
-Shark Empti supports assessment, reflection, focused practice and peer learning through configurable activities, contextual guidance and bilingual access. Learning records, community participation and optional attention support help learners understand their current progress and choose appropriate goals. Together, these features connect evidence of learning with interpretation and practical next steps.
+Shark Empti brings assessment, feedback, focused practice and peer learning into a continuous learning process. Its bilingual interface combines learning history with guidance so learners can reflect on progress and choose their next steps. AI provides educational assistance, not a substitute for independently checking knowledge.
 
 ## 🏆 National Recognition and Continuing Development
 
-Shark Empti earned national recognition at **AI Young Guru 2026** through **"VTS - Cá Mập Laze"**, representing **Võ Thị Sáu High School, Hồ Chí Minh City**. The competition attracted more than **26,000 participants**, over **15,000 teams**, and **1,800 upper-secondary and vocational schools**. The team progressed through the Top 250 and Top 30, reached the **Top 12**, and received the **Promising Award**. This repository directly continues that award-winning Shark Empti product, not a separate successor or reconstruction. Development preserves its educational purpose while improving teaching and learning support, operational reliability, and practical social value.
+At **AI Young Guru 2026**, **VTS - Cá Mập Laze**, representing **Võ Thị Sáu High School, Hồ Chí Minh City**, reached the **Top 12** and received the **Promising Award**. The competition attracted over 26,000 participants, 15,000 teams and 1,800 upper-secondary and vocational schools. This repository continues the same award-winning product, retaining its educational purpose while improving reliability and practical value.
 
-**AI Young Guru** is a nationwide AI creativity competition for upper-secondary and vocational students. **FPT University** organizes it under the patronage of the **Ministry of Education and Training** and professional patronage of the **Ministry of Science and Technology**, with the **Science and Education Programme Department of Vietnam Television**, the **Central Committee of the Ho Chi Minh Communist Youth Union**, the **Department of Cybersecurity and High-Tech Crime Prevention under the Ministry of Public Security**, and units of **FPT Corporation**. Its mission, **“Bình dân học AI”**-making AI learning broadly accessible-promotes innovative thinking and practical AI proficiency to improve quality of life and support sustainable development.
+AI Young Guru is organized by **FPT University** under the patronage of the **Ministry of Education and Training** and professional patronage of the **Ministry of Science and Technology**, with Vietnam Television's Science and Education Programme Department, the Ho Chi Minh Communist Youth Union Central Committee, the Ministry of Public Security's Department of Cybersecurity and High-Tech Crime Prevention, and FPT units. Its “Bình dân học AI” mission promotes accessible, practical AI learning. Official records: [competition](https://www.facebook.com/aiyoungguru1), [regional round](https://www.facebook.com/aiyoungguru1/posts/pfbid0jQvJgADPYpX3ZxuSmLBTrs25xaxLsn7urWU9bNyTQqANqcAFsqi1gXj1Hx9Qv5Hkl), [practical round](https://www.facebook.com/aiyoungguru1/posts/pfbid02bfr57ZqxfWRtY7LYwfaFQ7Bit4x94NHMsmGJBAcWoGN6odB4vApv3L2v64uzxN61l), [invitation](https://www.facebook.com/aiyoungguru1/posts/pfbid0JTEMeq62vQy9evu9SS99cbYHpHofMUbMXbV4vrfGVyxYcYsjLP5Mpl), [school recognition](https://www.facebook.com/permalink.php?story_fbid=pfbid023FaPNEaCvTwEcFmfQ9CrxVHXpY2zKhc9xBpDdiYeVXZcjn8Q9VrEWuCawZWkAwuUl&id=61583508615694&rdid=BipgwzyCQMh6luqG), and [award ceremony](https://www.facebook.com/reel/1516002886825130).
 
-The progression and recognition of "VTS - Cá Mập Laze" may be consulted through the following official records:
+The product's educational purpose aligns with Vietnam's science and education modernization agenda, including Resolutions 57-NQ/TW (2024) and 71-NQ/TW (2025) and Decisions 131/QĐ-TTg (2022) and 127/QĐ-TTg (2021). This contextual alignment does not imply endorsement or regulatory compliance.
 
-- [Official AI Young Guru Fanpage](https://www.facebook.com/aiyoungguru1)
-- ["VTS - Cá Mập Laze" advancing to the Regional round](https://www.facebook.com/aiyoungguru1/posts/pfbid0jQvJgADPYpX3ZxuSmLBTrs25xaxLsn7urWU9bNyTQqANqcAFsqi1gXj1Hx9Qv5Hkl)
-- ["VTS - Cá Mập Laze" advancing to the Practical round](https://www.facebook.com/aiyoungguru1/posts/pfbid02bfr57ZqxfWRtY7LYwfaFQ7Bit4x94NHMsmGJBAcWoGN6odB4vApv3L2v64uzxN61l?rdid=nlLB1dfbhFpVTRG9#)
-- [Invitation to the Practical round](https://www.facebook.com/aiyoungguru1/posts/pfbid0JTEMeq62vQy9evu9SS99cbYHpHofMUbMXbV4vrfGVyxYcYsjLP5MveBnR974B1Mpl?rdid=sc7MoUU3UXosSdm5#)
-- [Recognition published by Võ Thị Sáu High School](https://www.facebook.com/permalink.php?story_fbid=pfbid023FaPNEaCvTwEcFmfQ9CrxVHXpY2zKhc9xBpDdiYeVXZcjn8Q9VrEWuCawZWkAwuUl&id=61583508615694&rdid=BipgwzyCQMh6luqG#)
-- [Promising Award ceremony and recognition](https://www.facebook.com/reel/1516002886825130)
+## 🎯 Learning and technology
 
-## 🎯 Directed Learning with Visible Progress
+- **Quiz and AI feedback:** generate questions and help learners understand mistakes. Shark Guru provides contextual coaching.
+- **Practice, Flashcards and Dashboard:** revisit skills, retain knowledge and review progress.
+- **Arena and Forum:** support community practice, symbolic leaderboards and discussion.
+- **Focus Shield:** offers optional in-browser camera support after explicit permission; its estimates remain experimental.
 
-Every learning activity leaves a meaningful marker: a question indicates the learner's present understanding, feedback explains why an answer was unsuccessful, and the next practice activity provides an opportunity to advance. The Dashboard connects these markers into a broader view of progress, while Shark Guru remains available when a learner needs sufficient explanation to continue independently.
-
-- **AI-generated quizzes and personalized feedback:** transform a learning objective into an appropriate set of questions, then translate mistakes into specific directions for improvement.
-- **Practice, Flashcards, and Dashboard:** revisit the knowledge that must be retained, the skills that require reinforcement, and the evidence that should be reviewed.
-- **Arena and Forum:** support community learning through academic challenges, leaderboards, and constructive discussion.
-- **Focus Shield:** protects a deliberate period of concentration through an in-browser camera feature that operates only when the learner explicitly enables it.
-
-AI inputs and outputs are validated against server-side schemas. Authenticated generation records coordinate a maximum of three server-ordered model attempts, with one OpenRouter request per route invocation and status lookup after response loss. Recovery limitations remain tracked in the audit. AI results remain educational support and do not replace independent verification of academic knowledge.
-
-When an AI operation cannot be completed, the interface returns a safe application error without exposing model names, attempt ordinals, prompts, raw model responses, stack traces, credentials, or provider bodies.
-
-## 🧭 Current Technology
-
-- Next.js 16.4.3, React 19.2.8 and TypeScript 6.
-- Firebase Authentication, Cloud Firestore, Firebase Admin SDK and Firestore Security Rules.
-- OpenRouter Chat Completions through a server-only single-attempt adapter, with a fixed Inkling → Gemma → Nemotron priority coordinated by an authenticated Firestore generation ledger.
-- Tailwind CSS 4, Radix UI, Recharts and KaTeX.
-- TensorFlow.js for Focus Shield; its runtime and model load only when the feature is enabled.
-- Vitest, Testing Library, Firebase Emulator Suite and Playwright.
+Next.js 16, React 19, TypeScript 6, Firebase Auth/Firestore, OpenRouter, Tailwind 4, Radix UI, Recharts, KaTeX and TensorFlow.js form the application. Vitest, Testing Library, Firebase Emulators and Playwright provide local verification. The server validates AI requests/results; an authenticated ledger coordinates up to three attempts, at most one provider request per invocation and recovery after response loss. Safe errors exclude sensitive provider details. See [architecture and AI lifecycle](docs/TECHNICAL_DOCUMENTATION.md#ai-request-lifecycle).
 
 ## 🚀 Quick Start
 
-### 🔧 Prerequisites
-
-- Node.js **24.x** and its bundled npm. `.nvmrc` and `package.json#engines` both select major 24.
-- npm registry access for the first clean installation.
-- A Firebase project with a Web App, Cloud Firestore and Google Authentication.
-- An OpenRouter API key when AI features are required.
-- Firebase Admin service-account credentials for AI, Arena, Forum mutations, reporting/moderation and account-data APIs outside the Emulator.
-- JDK 21 and Playwright Chromium/WebKit/Firefox for integration/E2E tests.
-
-### 📦 Install Dependencies and Create the Environment File
-
-From the repository root, use PowerShell:
+Use Node **24.x** and npm, a Firebase project with a Web App, Firestore and Google Authentication. AI needs an OpenRouter key; server mutations need Firebase Admin credentials. Integration/browser tests require JDK 21 and Playwright browsers.
 
 ```powershell
-node --version
-npm --version
 npm ci
-
 if (-not (Test-Path -LiteralPath .env)) {
   Copy-Item -LiteralPath .env.example -Destination .env
 }
-
-# Fill the required variables in .env; never commit or print this file.
+# Configure .env without committing or printing secrets.
 npm run dev
 ```
 
-Open [http://localhost:9002](http://localhost:9002).
+Open [localhost:9002](http://localhost:9002). `npm ci` may replace `node_modules`; use the existing npm lockfile rather than mixing package managers. The [configuration guide](docs/CONFIGURATION.md) covers Firebase, OpenRouter, environment variables, authorized domains, Rules and deployment. Browser-visible `NEXT_PUBLIC_*` values are not secrets; never put Admin credentials or the OpenRouter key there.
 
-The repository is governed by `package-lock.json`; do not use pnpm or Yarn against the same `node_modules`. `npm ci` performs a clean installation, requires the lockfile to match the manifest and may replace the complete `node_modules` directory.
+## 🧪 Development and validation
 
-### 🔑 Minimum Configuration by Feature
-
-| Feature | Configuration requirement or guidance |
+| Command | Purpose |
 |---|---|
-| Configure the Firebase browser client, sign in and access Firestore | Provide the complete six-field Firebase Web configuration for consistency. The current application initializes Auth and Firestore but not Storage or Messaging; `storageBucket` and `messagingSenderId` are carried as configuration fields rather than independently validated runtime prerequisites. Google provider and the relevant authorized domains remain required for Google sign-in. |
-| Generate quizzes, flashcards, practice, feedback and chatbot responses | `OPENROUTER_API_KEY`, three `FIREBASE_ADMIN_*` values and a signed-in user; production/canary creation additionally requires `AI_GENERATION_PROTOCOL_ENABLED=true` |
-| AI/Arena/Forum mutations, reporting/moderation and account-data APIs outside the Emulator | Three `FIREBASE_ADMIN_*` values; a current trusted `moderator` claim is additionally required for moderation decisions |
-| Local integration/E2E | JDK 21; Firebase CLI in dev dependencies; Playwright Chromium, WebKit and Firefox |
+| `npm run dev` | Local app |
+| `npm run lint`, `npm run typecheck`, `npm run check:maintenance` | Static and repository contracts |
+| `npm test`, `npm run test:coverage` | Unit/component tests and optional V8 coverage |
+| `npm run test:rules`, `npm run test:integration` | Firebase Emulator Rules and API checks |
+| `npm run build:demo`, `npm run test:e2e`, `npm run test:production` | Verified demo build, browser matrix and production HTTP smoke |
+| `npm run report:bundle`, `npm run report:performance`, `npm run report:browser`, `npm run report:queries`, `npm run report:comparison` | Bundle and controlled performance reports |
+| `npm run audit:dependencies` | Registry advisory assessment; sends dependency names/versions to npm |
+| `npm run ai:health`, `npm run ai:smoke` | Live provider checks; smoke may use quota |
+| `npm run clean`, `npm run clean:artifacts`, `npm run clean:cache` | Scoped build, artifact and cache cleanup |
 
-[docs/CONFIGURATION.md](docs/CONFIGURATION.md) contains the complete process for obtaining every Firebase/OpenRouter value, mapping service-account JSON fields, enabling Google sign-in, creating Firestore, deploying Rules and configuring Vercel. Never expose `OPENROUTER_API_KEY` or `FIREBASE_ADMIN_*` through `NEXT_PUBLIC_*` variables.
-
-## 🧪 Development and Validation Commands
-
-| Command | Purpose | Network/external services |
-|---|---|---|
-| `npm run dev` | Run the Next development server on port 9002 | Not required for static pages; Firebase/AI require their respective configuration |
-| `npm run lint` | ESLint, Next and React Hooks | No |
-| `npm run check:maintenance` | Check declared imports, manifest/lock agreement, documented commands/links, TypeScript/ESLint scope and artifact ignores | No; requires local Git metadata |
-| `npm run typecheck` | TypeScript `--noEmit` | No |
-| `npm test` | Unit/component tests | Never calls production services |
-| `npm run test:coverage` | Unit/component tests with V8 coverage | Never calls production services |
-| `npm run test:rules` | Firestore Rules tests through the Emulator | JDK 21 |
-| `npm run test:integration` | Auth/Firestore Emulator, Rules and API integration | JDK 21 |
-| `npm run build` | Next production build | No font download; uses local system fonts |
-| `npm run build:demo` | Isolated demo-configured production artifact for browser verification, not deployment | No font download; Firebase client targets local Emulators |
-| `npm run test:e2e` | Real app, Auth/Firestore Emulator and AI fixture; Chromium desktop/mobile, WebKit and Firefox | JDK 21 and installed Playwright browsers |
-| `npm run test:production` | Start the optimized build and check six routes, script payload budgets and API authentication | No production service; requires a completed build |
-| `npm run report:bundle` | Inventory production entry and deferred JavaScript chunks | No; requires a completed build |
-| `npm run report:performance` | Record synthetic 100/1,000/10,000-record processing baselines | No |
-| `npm run report:browser` | Measure production guest-route cold/warm loads, heap, DOM and Forum input timing | Local Emulators, installed Chromium and production build |
-| `npm run report:queries` | Compare unbounded and 50-record queries at three dataset scales | Local demo Firestore Emulator |
-| `npm run report:comparison` | Compare current and historical production builds | Same as browser report; `PERFORMANCE_BASELINE_ROOT` required |
-| `npm run audit:dependencies` | Query advisories and write a report; fail on high/critical findings or registry errors | npm Registry; transmits dependency names and versions |
-| `node scripts/inspect-firestore.mjs` | Read every declared index group and expiry TTL; write `reports/firestore-metadata.json` | Google API and Admin credentials; read-only |
-| `node --conditions=react-server --env-file=.env --import tsx scripts/receipt-retention.ts` | Inspect receipt expiry metadata; `--apply` backfills missing `expiresAt` values only | Firebase Admin credentials; `--apply` changes receipt documents |
-| `npm run ai:health` | Authenticate the key and check fallback-model presence within 10 seconds | OpenRouter metadata only; does not prove live inference or account/model quota availability |
-| `npm run ai:smoke` | Exercise quiz and chatbot schemas through the live single-attempt OpenRouter adapter; does not exercise auth, ledger or client recovery | OpenRouter key; may consume quota |
-| `npm run clean` | Remove `.next` only; retain `node_modules` | No |
-| `npm run clean:artifacts` | Remove test/coverage/print outputs and Emulator debug logs older than seven days | No; retains reports and recent diagnostics |
-| `npm run clean:cache` | Remove old Next caches/development output and local tool scratch data | No; retains recent caches and installed runtimes |
-
-Install the test browsers after `npm ci`:
-
-```powershell
-npx --no-install playwright install chromium webkit firefox
-```
-
-CI in `.github/workflows/ci.yml` uses Node 24, JDK 21, a demo Firebase project and an AI fixture; it does not require production credentials.
-
-Preview cleanup with `-- --dry-run`. See [artifact maintenance](docs/CONFIGURATION.md#maintenance-and-generated-artifacts) for retention, evidence preservation and the distinction between generated output and installed local tools. Production E2E also requires a build prepared with demo Firebase values; runtime environment overrides cannot replace values already embedded in client JavaScript.
-
-## 🧩 Functional and Data Scope
-
-- The interface supports Vietnamese and English; language/theme preferences persist across pages and tabs.
-- Camera access requires HTTPS or `localhost` and explicit user permission.
-- Firestore Web SDK access is governed by `firestore.rules`; Firebase Admin SDK bypasses Rules, so server APIs must enforce tokens, ownership and payload contracts.
-- `docs/backend.json` is a descriptive data map; Zod schemas, TypeScript readers, Route Handlers and Firestore Rules are the executable contracts.
-- Documented browser targets are Safari 16.4+, Chrome 111+ and Firefox 128+, while E2E configures desktop/mobile Chromium, WebKit and Firefox (current engine versions). Review the audit validation gaps before release.
+Install browser engines with `npx --no-install playwright install chromium webkit firefox`. The [validation guide](docs/VALIDATION.md) explains prerequisites, commands, output, limitations and cleanup. A production E2E run needs the demo-configured build; runtime overrides cannot change public values already embedded in it. CI uses demo Firebase and AI fixtures, not production credentials.
 
 ## 📚 Documentation
 
-- [Configuration](docs/CONFIGURATION.md)
-- [Technical Documentation](docs/TECHNICAL_DOCUMENTATION.md)
-- [Backend](docs/backend.json)
-- [Audit Report](docs/AUDIT_REPORT.md)
+- [Configuration](docs/CONFIGURATION.md): environment, Firebase, OpenRouter, deployment and troubleshooting.
+- [Technical documentation](docs/TECHNICAL_DOCUMENTATION.md): architecture, data ownership and security contracts.
+- [Backend data map](docs/backend.json): descriptive entities, storage paths and interfaces; executable code, schemas and Rules remain authoritative.
+- [Audit register](docs/AUDIT_REPORT.md): finding statuses and unresolved verification boundaries.
+- [Validation](docs/VALIDATION.md): built-in tests, interpretation and evidence limits.
+- [Account operations](docs/ACCOUNT_OPERATIONS.md): background export/deletion, retention and encrypted backup/restore.
 
-### 🧭 Recommended Reading Order
-
-1. Start with [Configuration](docs/CONFIGURATION.md) to install dependencies, create `.env`, and run the local application.
-2. Read [Technical Documentation](docs/TECHNICAL_DOCUMENTATION.md) for the executable architecture, data ownership, and operational boundaries.
-3. Review [Audit Report](docs/AUDIT_REPORT.md) before release work; its unresolved findings and validation gaps define the evidence that is still required.
-
-For unfamiliar terms, use the [technical glossary](docs/TECHNICAL_DOCUMENTATION.md#technical-glossary). The [AI request lifecycle](docs/TECHNICAL_DOCUMENTATION.md#ai-request-lifecycle) explains recovery and retries, while the [release procedure](docs/CONFIGURATION.md#release-procedure) connects local checks, staging verification and canary acceptance. Setup errors are covered in [local troubleshooting](docs/CONFIGURATION.md#local-troubleshooting).
-
-All repository documentation is maintained in English. The application interface itself remains bilingual, and localization behavior is described in the technical documentation.
-
-Never commit `.env`, service-account JSON, private keys, API tokens, Playwright traces containing credentials or production data. `.gitignore` cannot remove a secret that was already committed; exposed credentials require revocation/rotation and a separately approved history-remediation procedure.
-
-Lists use explicit cursor pagination in batches of 50; search, statistics and reports reflect the records loaded in the client. Current implementation status and external validation gaps are tracked in the audit report.
+The interface supports Vietnamese and English; preferences persist between pages and tabs. Camera access requires HTTPS or localhost and explicit permission. Lists load 50 records per page; client-side search/statistics reflect loaded records. Documented browser targets are Safari 16.4+, Chrome 111+ and Firefox 128+; current engine tests do not establish exact-version or physical-device acceptance. See the [audit](docs/AUDIT_REPORT.md) before release.

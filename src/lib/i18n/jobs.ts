@@ -1,0 +1,31 @@
+import type { JobStatus } from '../jobs/types';
+export const jobMessages = {
+  en: {
+    title: 'Your account and data', export: 'Create complete export', deletion: 'Delete account',
+    description: 'Export or delete your account through a background job. It continues when this tab is closed. Export processing can wait for capacity for up to seven days; download every JSON part and the manifest within 24 hours after it becomes ready.',
+    processingExpired: 'This export exceeded its seven-day processing window. You can create a new export; contact support if capacity keeps preventing completion.',
+    warning: 'Deletion removes private learning data and sign-in access. Community contributions remain with the account identity removed. Your own writing may still identify you: review or remove personal details before confirming. This action cannot be undone.',
+    confirm: 'I have reviewed my public contributions and understand permanent account deletion.',
+    unavailable: 'Background account services are not enabled in this environment. Contact bachlxbach@gmail.com for help. Older review requests remain separate and are never executed automatically.',
+    retry: 'Refresh status', part: 'Download part', receipt: 'Read-only deletion receipt',
+    loading: 'Checking your account services…', saveReceipt: 'Save receipt file', loadReceipt: 'Open a receipt file on this device', manifest: 'Manifest and integrity',
+    missingReceipt: 'No receipt is stored in this browser. Open the receipt file you saved to check its status.',
+    receiptInfo: 'Keep this browser receipt to check deletion after signing out. It grants only minimal status access and expires seven days after completion.',
+    reauth: 'Google will ask you to sign in again before this sensitive action.', error: 'Account services could not be reached. Retry to recover the saved status.',
+    status: { queued: 'Queued', running: 'Processing', waiting_quota: 'Waiting for available free-tier capacity', ready: 'Ready to download', completed: 'Completed', failed: 'Needs recovery; contact support' } satisfies Record<JobStatus, string>,
+  },
+  vi: {
+    title: 'Tài khoản và dữ liệu của bạn', export: 'Tạo bản xuất đầy đủ', deletion: 'Xóa tài khoản',
+    description: 'Xuất hoặc xóa tài khoản bằng tác vụ nền. Tác vụ vẫn tiếp tục khi đóng tab. Bản xuất có thể chờ hạn mức xử lý tối đa bảy ngày; hãy tải đủ các phần JSON và manifest trong 24 giờ sau khi sẵn sàng.',
+    processingExpired: 'Bản xuất đã vượt thời hạn xử lý bảy ngày. Bạn có thể tạo bản xuất mới; hãy liên hệ hỗ trợ nếu hạn mức liên tục ngăn tác vụ hoàn tất.',
+    warning: 'Xóa tài khoản sẽ xóa dữ liệu học tập riêng và quyền đăng nhập. Đóng góp cộng đồng được giữ sau khi gỡ liên kết tài khoản. Nội dung bạn tự viết vẫn có thể nhận dạng bạn: hãy xem lại hoặc xóa thông tin cá nhân trước khi xác nhận. Không thể hoàn tác thao tác này.',
+    confirm: 'Tôi đã xem lại đóng góp công khai và hiểu việc xóa tài khoản là vĩnh viễn.',
+    unavailable: 'Dịch vụ tác vụ nền chưa được bật trong môi trường này. Liên hệ bachlxbach@gmail.com để được hỗ trợ. Yêu cầu xem xét cũ được giữ riêng và không bao giờ tự biến thành lệnh xóa.',
+    retry: 'Làm mới trạng thái', part: 'Tải phần', receipt: 'Biên nhận xóa chỉ đọc',
+    loading: 'Đang kiểm tra dịch vụ tài khoản…', saveReceipt: 'Lưu file biên nhận', loadReceipt: 'Mở file biên nhận trên thiết bị này', manifest: 'Mục lục và kiểm tra toàn vẹn',
+    missingReceipt: 'Trình duyệt này chưa lưu biên nhận. Hãy mở file biên nhận đã lưu để kiểm tra trạng thái.',
+    receiptInfo: 'Giữ biên nhận trên trình duyệt này để kiểm tra sau khi đăng xuất. Biên nhận chỉ cho xem trạng thái tối thiểu và hết hạn bảy ngày sau khi hoàn tất.',
+    reauth: 'Google sẽ yêu cầu đăng nhập lại trước thao tác nhạy cảm này.', error: 'Chưa thể kết nối dịch vụ tài khoản. Hãy thử lại để khôi phục trạng thái đã lưu.',
+    status: { queued: 'Đang chờ', running: 'Đang xử lý', waiting_quota: 'Đang chờ dung lượng hoặc hạn mức miễn phí', ready: 'Sẵn sàng tải', completed: 'Hoàn tất', failed: 'Cần khôi phục; hãy liên hệ hỗ trợ' } satisfies Record<JobStatus, string>,
+  },
+} as const;

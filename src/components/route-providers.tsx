@@ -3,9 +3,9 @@ import dynamic from 'next/dynamic';
 import { usePathname } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { ErrorBoundary } from './error-boundary';
-import { PublicIntro } from './public-intro';
+import { RouteSkeleton } from './route-skeleton';
 
-const Firebase = dynamic(() => import('@/firebase/client-provider').then(module => module.FirebaseClientProvider), { loading: PublicIntro });
+const Firebase = dynamic(() => import('@/firebase/client-provider').then(module => module.FirebaseClientProvider), { loading: () => <RouteSkeleton /> });
 const Toaster = dynamic(() => import('./ui/toaster').then(module => module.Toaster));
 const FocusTrackerWidget = dynamic(() => import('./focus-tracker-widget'));
 

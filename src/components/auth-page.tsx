@@ -1,9 +1,9 @@
 'use client';
 import { useLanguageState,useThemeState } from '@/components/app-preferences';
-import { UiText } from "@/components/ui-text";
 import { useGoogleSignIn } from '@/hooks/use-google-sign-in';
 import { uiMessage } from '@/lib/i18n';
-import { ServiceLinks } from './service-links';
+import { useScrollNavigation } from '@/hooks/use-scroll-navigation';
+import { publicMessages } from '@/lib/i18n/public';
 
 import { Logo as LogoComponent } from '@/components/logo';
 import { Button } from '@/components/ui/button';
@@ -21,42 +21,17 @@ import { cn } from '@/lib/utils';
 import { Check,Languages,Loader2,Moon,Sun } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import React,{ useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function AuthPage({ register = false }: { register?: boolean }) {
   const { user, loading } = useUser();
   const router = useRouter();
   const { handleGoogleSignIn, isSigningIn } = useGoogleSignIn();
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [lang, setLang] = useLanguageState();
   const [theme, setTheme] = useThemeState();
 
-  // Auto-hide/reveal logic
-  const [isVisible, setIsVisible] = React.useState(true);
-  const lastScrollY = React.useRef(0);
-
-  React.useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-
-      // Always show at the very top
-      if (currentScrollY < 20) {
-        setIsVisible(true);
-      }
-      // Hide when scrolling down and passed 120px threshold
-      else if (currentScrollY > lastScrollY.current && currentScrollY > 120) {
-        setIsVisible(false);
-      }
-      // Show when scrolling up
-      else if (currentScrollY < lastScrollY.current) {
-        setIsVisible(true);
-      }
-
-      lastScrollY.current = currentScrollY;
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  const { visible: isVisible, navigationRef, reveal } = useScrollNavigation(register ? 'register' : 'login');
 
 
   useEffect(() => {
@@ -69,9 +44,6 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
 
   const changeLang = (newLang: Language) => {
     setLang(newLang);
-
-    // Dispatch custom event for global components like FocusTrackerWidget
-
   };
 
   const toggleTheme = () => {
@@ -84,7 +56,7 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-background transition-colors duration-500">
-      <header className={cn(
+      <header ref={navigationRef} onFocusCapture={reveal} className={cn(
         "fixed top-0 left-0 right-0 z-[100] w-full glass-morphism p-4 md:p-6 shrink-0 border-b-[3px] md:border-b-[5px] border-border/30 transition-all duration-500 transform bg-background/80 backdrop-blur-xl",
         isVisible ? "translate-y-0" : "-translate-y-full"
       )}>
@@ -131,7 +103,7 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
       </header>
 
       <main className="flex-1 flex items-center justify-center p-4 pt-24 md:pt-32 md:pb-24">
-        <Card className="card-duo min-w-0 w-full max-w-md p-8 md:p-12 space-y-8 animate-in fade-in slide-in-from-bottom-8 duration-500 bg-card">
+        <Card className="card-duo hover:translate-y-0 min-w-0 w-full max-w-md p-8 md:p-12 space-y-8 animate-in fade-in duration-500 bg-card">
           <div className="flex flex-col items-center text-center space-y-4">
             <div className="w-20 h-20 md:w-24 md:h-24 bg-primary/10 rounded-[2.5rem] flex items-center justify-center shadow-[0_6px_0_0_var(--duo-shadow)] border-[4px] border-primary/20 animate-bounce-subtle">
               <LogoComponent className="w-12 h-12 md:w-16 md:h-16" />
@@ -144,9 +116,10 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
             </p>
           </div>
 
+          <label className="mb-4 flex items-start gap-3 text-sm leading-relaxed"><input type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-primary" checked={ageConfirmed} onChange={event => setAgeConfirmed(event.target.checked)} /><span>{publicMessages[lang].age}</span></label>
           <Button
             onClick={handleGoogleSignIn}
-            disabled={isSigningIn || loading}
+            disabled={isSigningIn || loading || !ageConfirmed}
             className="w-full h-auto min-h-16 py-4 rounded-[2rem] btn-duo bg-card dark:bg-muted/10 hover:bg-muted text-foreground border-[4px] border-border font-black text-sm sm:text-lg uppercase tracking-wide flex items-center justify-center gap-2 whitespace-normal transition-all"
           >
             {isSigningIn ? (
@@ -171,13 +144,6 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
           </div>
         </Card>
       </main>
-
-      <footer className="p-8 text-center border-t-[5px] border-border/30 bg-card/30">
-        <ServiceLinks />
-        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-          <UiText id="copyright" />
-        </p>
-      </footer>
     </div>
   );
 }

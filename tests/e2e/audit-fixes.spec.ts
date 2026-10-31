@@ -18,12 +18,15 @@ test('guest Arena requires login and publishing a post waits for a real write', 
   expect((await db.doc(`arenaExams/${id}`).get()).get('totalAttempts')).toBe(0);
 
   const popupReady = page.waitForEvent('popup');
+  await page.getByRole('checkbox', { name: /I confirm that I am at least 16/ }).check();
   await page.getByRole('button', { name: /Google/i }).click();
   const popup = await popupReady;
   await popup.waitForLoadState('load');
   await popup.getByText('Add new account', { exact: true }).click();
   await popup.getByText('Auto-generate user information', { exact: true }).click();
   await popup.getByRole('button', { name: /sign in with google/i }).click();
+  await page.getByRole('checkbox', { name: /^I am at least 16/ }).check();
+  await page.getByRole('button', { name: 'Confirm and continue' }).click();
   await expect(page).toHaveURL('http://127.0.0.1:9002/');
   await page.getByRole('button', { name: 'GOT IT', exact: true }).click();
   await page.evaluate(() => localStorage.setItem('shark_help_forum_seen', 'true'));

@@ -1,5 +1,6 @@
 'use client';
 import { uiMessage } from '@/lib/i18n';
+import { useScrollNavigation } from '@/hooks/use-scroll-navigation';
 
 import { Avatar,AvatarFallback,AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -75,33 +76,7 @@ export default function Navigation({ view, setView, lang, changeLang, theme, onT
   const { user, loading } = useUser();
   const router = useRouter();
 
-  // Auto-hide/reveal logic
-  const [isVisible, setIsVisible] = React.useState(true);
-  const lastScrollY = React.useRef(0);
-
-  React.useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-
-      // Always show at the very top
-      if (currentScrollY < 20) {
-        setIsVisible(true);
-      }
-      // Hide when scrolling down and passed a threshold
-      else if (currentScrollY > lastScrollY.current && currentScrollY > 120) {
-        setIsVisible(false);
-      }
-      // Show when scrolling up
-      else if (currentScrollY < lastScrollY.current) {
-        setIsVisible(true);
-      }
-
-      lastScrollY.current = currentScrollY;
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  const { visible: isVisible, navigationRef, reveal } = useScrollNavigation(view);
 
 
   const handleProfileClick = () => {
@@ -121,7 +96,7 @@ export default function Navigation({ view, setView, lang, changeLang, theme, onT
   };
 
   return (
-    <nav aria-label={uiMessage(lang, 'navigation.main')} className={cn(
+    <nav ref={navigationRef} onFocusCapture={reveal} aria-label={uiMessage(lang, 'navigation.main')} className={cn(
       "fixed top-0 left-0 right-0 z-[100] w-full glass-morphism px-3 md:px-6 py-2.5 md:py-4 flex items-center justify-between select-none transition-all duration-500 border-b-[3px] md:border-b-[5px] border-border/30 overflow-hidden transform bg-background/80 backdrop-blur-xl",
       isVisible ? "translate-y-0" : "-translate-y-full"
     )}>

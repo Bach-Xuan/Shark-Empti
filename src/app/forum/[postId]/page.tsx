@@ -4,12 +4,15 @@ import { useLanguageState,useThemeState } from '@/components/app-preferences';
 import { PageControls } from '@/components/page-controls';
 import { UiText } from "@/components/ui-text";
 import { usePagedCollection } from '@/hooks/use-paged-collection';
+import { useDoc } from '@/firebase/firestore/use-doc';
+import { RouteSkeleton } from '@/components/route-skeleton';
 import { formatForumDate } from '@/lib/date-format';
 import { readForumPost, readForumComment } from '@/lib/public-firestore-schema';
 import { deleteForumPost, mutateForum } from '@/lib/forum-client';
 import { ReportContent } from '@/components/report-content';
 import { isDocumentId } from '@/lib/document-id';
 import { uiMessage } from '@/lib/i18n';
+import { publicAuthorName } from '@/lib/i18n/public';
 import { subjectBadgeClassName, subjectOptions } from '@/lib/subjects';
 import { useMemo } from 'react';
 
@@ -63,7 +66,6 @@ import { cn } from '@/lib/utils';
 import {
 collection,
 doc,
-onSnapshot,
 orderBy,
 query,
 } from 'firebase/firestore';
@@ -71,7 +73,6 @@ import {
 ArrowLeft,
 Clock,
 Heart,
-Loader2,
 MessageSquare,
 MoreVertical,
 Pencil,
@@ -81,7 +82,7 @@ Trash2,
 User
 } from 'lucide-react';
 import { useParams,useRouter } from 'next/navigation';
-import { useEffect,useRef,useState } from 'react';
+import { useRef,useState } from 'react';
 
 import { LatexQuickToolbar } from '@/components/latex-toolbar';
 import { useMutation } from '@/hooks/use-mutation';
@@ -98,12 +99,11 @@ export default function PostDetailPage() {
 
   const [lang, setLang] = useLanguageState();
   const [theme, setTheme] = useThemeState();
-  const [post, setPost] = useState<ForumPost | null>(null);
+  const validPostId = isDocumentId(postId);
+  const postRead = useDoc(validPostId ? 'posts/' + postId : null);
+  const post = useMemo(() => postRead.data ? readForumPost(postId, postRead.data) : null, [postId, postRead.data]);
+  const postInvalid = !validPostId || Boolean(postRead.data && !post);
 
-  const [loading, setLoading] = useState(true);
-  const [postError, setPostError] = useState<FirestorePermissionError | null>(null);
-  const [postInvalid, setPostInvalid] = useState(false);
-  const [postRetry, setPostRetry] = useState(0);
   const [newComment, setNewComment] = useState("");
   const commentRequest = useRef<{ content: string; id: string } | null>(null);
   const postingComment = useRef(false);
@@ -120,39 +120,6 @@ export default function PostDetailPage() {
   const { notes: personalNotes, updateNotes: onNotesChange } = useUserNotes();
 
 
-  useEffect(() => {
-    setPost(null);
-    setPostError(null);
-    setPostInvalid(false);
-    setLoading(Boolean(postId && db));
-    if (!isDocumentId(postId) || !db) { setLoading(false); setPostInvalid(!isDocumentId(postId)); return; }
-    let active = true;
-    const postRef = doc(db, 'posts', postId);
-    const unsubPost = onSnapshot(postRef,
-      (docSnap) => {
-        if (!active) return;
-        const parsed = docSnap.exists() ? readForumPost(docSnap.id, docSnap.data()) : null;
-        setPost(parsed);
-        setPostInvalid(docSnap.exists() && !parsed);
-        if (parsed) {
-          setLoading(false);
-        } else {
-          setPostInvalid(docSnap.exists());
-        }
-        setLoading(false);
-      },
-      async cause => {
-        if (!active) return;
-        setPost(null);
-        const error = new FirestorePermissionError({ path: postRef.path, operation: 'get' }, cause);
-        setPostError(error);
-        errorEmitter.emit('permission-error', error);
-        setLoading(false);
-      }
-    );
-
-    return () => { active = false; unsubPost(); };
-  }, [db, postId, postRetry]);
   const commentSource = useMemo(() => db && post?.id === postId ? query(collection(db, 'posts', postId, 'comments'), orderBy('createdAt', 'asc')) : null, [db, postId, post?.id]);
   const commentPage = usePagedCollection<ForumComment>(commentSource, readForumComment);
   const comments = commentPage.items;
@@ -305,8 +272,8 @@ export default function PostDetailPage() {
 
 
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center bg-background"><Loader2 className="w-12 h-12 animate-spin text-primary" /></div>;
-  if (!post) return <main className="min-h-screen grid place-content-center p-4"><DataNotice lang={lang} error={postError} invalid={postInvalid} onRetry={() => setPostRetry(value => value + 1)} back="/forum" /></main>;
+  if (postRead.loading) return <RouteSkeleton view="detail" />;
+  if (!post) return <main className="min-h-screen grid place-content-center p-4"><DataNotice lang={lang} error={postRead.error} invalid={postInvalid} onRetry={postRead.retry} back="/forum" /></main>;
 
   return (
     <div className="min-h-screen flex flex-col bg-background transition-colors duration-500">
@@ -343,11 +310,11 @@ export default function PostDetailPage() {
             <div className="flex items-center gap-3 md:gap-4 flex-1 min-w-0">
               <Avatar className="w-12 h-12 md:w-20 md:h-20 rounded-[1.2rem] md:rounded-[2rem] border-2 md:border-4 border-primary/20 shadow-duo shrink-0">
                 <AvatarImage src={post.authorPhoto} alt="" />
-                <AvatarFallback className="bg-primary/10 text-primary font-black text-lg md:text-2xl">{post.authorName[0]}</AvatarFallback>
+                <AvatarFallback className="bg-primary/10 text-primary font-black text-lg md:text-2xl">{publicAuthorName(lang, post.authorId, post.authorName)[0]}</AvatarFallback>
               </Avatar>
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm md:text-lg font-black text-primary uppercase tracking-wider truncate">{post.authorName}</span>
+                  <span className="text-sm md:text-lg font-black text-primary uppercase tracking-wider truncate">{publicAuthorName(lang, post.authorId, post.authorName)}</span>
                   <Badge variant="outline" className={cn("font-black uppercase text-[7px] md:text-[9px] tracking-widest border-2", subjectBadgeClassName(post.subject))}>
                     {getSubjectLabel(post.subject)}
                   </Badge>
@@ -419,11 +386,11 @@ export default function PostDetailPage() {
             {comments.length === 0 ? <div className="py-8 md:py-12 text-center text-muted-foreground font-black uppercase tracking-widest italic text-xs md:text-base">{uiMessage(lang, "forum.no_comments_yet")}</div> :
               comments.map((comment) => (
                 <Card key={comment.id} className="card-duo p-4 md:p-8 bg-card/50 border-border/30 hover:border-primary/20 transition-all flex gap-3 md:gap-6 relative">
-                  <Avatar className="w-8 h-8 md:w-12 md:h-12 rounded-lg md:rounded-2xl border-2 border-border shrink-0"><AvatarImage src={comment.authorPhoto} alt="" /><AvatarFallback className="bg-primary/10 text-primary font-black text-xs">{comment.authorName[0]}</AvatarFallback></Avatar>
+                  <Avatar className="w-8 h-8 md:w-12 md:h-12 rounded-lg md:rounded-2xl border-2 border-border shrink-0"><AvatarImage src={comment.authorPhoto} alt="" /><AvatarFallback className="bg-primary/10 text-primary font-black text-xs">{publicAuthorName(lang, comment.authorId, comment.authorName)[0]}</AvatarFallback></Avatar>
                   <div className="flex-1 space-y-2 md:space-y-3 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex flex-col">
-                        <span className="text-[10px] md:text-sm font-black text-primary uppercase tracking-widest truncate">{comment.authorName}</span>
+                        <span className="text-[10px] md:text-sm font-black text-primary uppercase tracking-widest truncate">{publicAuthorName(lang, comment.authorId, comment.authorName)}</span>
                         <span className="text-[8px] md:text-[10px] font-black text-muted-foreground uppercase tracking-widest flex items-center gap-1"><Clock className="w-2.5 h-2.5 md:w-3 md:h-3" /> {formatForumDate(comment, lang, t.edited)}</span>
                       </div>
                       <div className="flex items-center gap-2">

@@ -31,22 +31,28 @@ export function useDoc<T extends DocumentData = DocumentData>(path: string | nul
     }
 
     setLoading(true);
-
+    const timer = setTimeout(() => {
+      if (active) { setError(new FirestorePermissionError({ path: path ?? 'document', operation: 'get' }, { code: 'deadline-exceeded' })); setLoading(false); }
+    }, 15000);
     const unsubscribe = onSnapshot(
       docRef,
 
       snapshot => {
+        clearTimeout(timer);
         if (!active) return;
+        setError(null);
         setData(snapshot.exists() ? snapshot.data() : null);
         setLoading(false);
       },
       snapshotError => {
+        clearTimeout(timer);
         if (!active) return;
         setError(new FirestorePermissionError({ path: path ?? 'document', operation: 'get' }, snapshotError));
         setLoading(false);
       }
     );
     return () => {
+      clearTimeout(timer);
       active = false;
       unsubscribe();
     };

@@ -2,7 +2,7 @@ import { ARENA_SESSION_TTL_MS, arenaFingerprint, arenaSessionId } from '@/lib/ar
 import { getAdminDb } from '@/lib/firebase-admin';
 import { requireDocumentId } from '@/lib/forum-deletion';
 import { readArenaExam } from '@/lib/public-firestore-schema';
-import { ApiError, apiFailure, authenticatedUser } from '@/lib/server-api';
+import { ApiError, apiFailure, authenticatedUser, assertWritable } from '@/lib/server-api';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { readLimitedJson } from '@/lib/server-json';
@@ -22,6 +22,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const db = getAdminDb();
     const sessionRef = db.collection('_arenaSessions').doc(arenaSessionId(uid, examId, requestId));
     const prompts = await db.runTransaction(async transaction => {
+      await assertWritable(transaction, uid);
       const exam = await transaction.get(db.collection('arenaExams').doc(examId));
       if (!exam.exists) throw new ApiError('ARENA-NOT-FOUND', 404, 'Arena exam not found.');
       const parsed = readArenaExam(examId, exam.data());

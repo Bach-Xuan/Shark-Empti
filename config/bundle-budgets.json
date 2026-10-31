@@ -1,5 +1,5 @@
 {
-  "basis": "Current production artifact measured 2026-09-13; 10 percent headroom rounded up to 1 KiB. Regression guard, not a user-performance target.",
+  "basis": "Current production artifact measured; 10 percent headroom rounded up to 1 KiB. Regression guard, not a user-performance target.",
   "metric": "Sum of gzip bytes for unique script URLs in server HTML",
   "routes": {
     "/": 719872,

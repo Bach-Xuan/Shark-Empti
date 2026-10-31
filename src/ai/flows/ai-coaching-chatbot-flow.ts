@@ -14,7 +14,7 @@ const QuizSummarySchema = z.object({
   totalQuestions: z.number(),
   correctAnswers: z.number(),
   incorrectAnswers: z.number(),
-  cognitiveMetrics: CognitiveMetricsSchema,
+  cognitiveMetrics: CognitiveMetricsSchema.optional().describe('Absent means unavailable; never infer neutral scores.'),
   errorAnalysis: z.record(z.string(), z.number()),
 });
 
@@ -50,6 +50,7 @@ export type AiCoachingChatbotOutput = z.infer<typeof AiCoachingChatbotOutputSche
 const SYSTEM_PROMPT = `${SHARK_GURU_ROLE}
 
 PRIMARY TASKS:
+- If cognitiveMetrics is absent, say cognitive scores are unavailable. Never invent neutral scores or fill missing measurements with 50.
 - Treat error categories as tentative, not diagnoses. Use observable answer/work evidence; speed alone never establishes carelessness. Say evidence is insufficient rather than guessing a cause.
 - Provide advice based on 6 core skills: Concept Mastery, Application, Problem Decomposition, Logical Reasoning, Error Awareness, and Instruction Following.
 - Highlights (Điểm nổi bật): Stable patterns of 5+ correct answers, >=80% accuracy.

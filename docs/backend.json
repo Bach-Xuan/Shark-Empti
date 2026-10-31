@@ -5,7 +5,8 @@
     "description": "Actual contracts: Firestore Rules, AI/API Zod schemas, history/profile readers and server-api.ts. Updating this file changes no validation, migration or access policy.",
     "documentation": "TECHNICAL_DOCUMENTATION.md",
     "configuration": "CONFIGURATION.md",
-    "audit": "AUDIT_REPORT.md"
+    "audit": "AUDIT_REPORT.md",
+    "validation": "VALIDATION.md"
   },
   "$defs": {
     "FirestoreTimestamp": {
@@ -344,10 +345,20 @@
         "config": {
           "type": "object"
         },
-        "schemaVersion": { "const": 2 },
-        "questionCount": { "type": "integer", "minimum": 1, "maximum": 50 },
-        "practiceOnly": { "type": "boolean" },
-        "firstRewardClaimed": { "type": "boolean" },
+        "schemaVersion": {
+          "const": 2
+        },
+        "questionCount": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "practiceOnly": {
+          "type": "boolean"
+        },
+        "firstRewardClaimed": {
+          "type": "boolean"
+        },
         "authorId": {
           "type": "string"
         },
@@ -368,14 +379,29 @@
     },
     "ArenaAnswerKey": {
       "type": "object",
-      "properties": { "schemaVersion": { "const": 2 }, "authorId": { "type": "string" }, "questions": { "type": "array", "items": { "$ref": "#/$defs/QuizQuestion" } } },
+      "properties": {
+        "schemaVersion": {
+          "const": 2
+        },
+        "authorId": {
+          "type": "string"
+        },
+        "questions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/QuizQuestion"
+          }
+        }
+      },
       "description": "Admin-only full question bank; prompts are released after server start, canonical review after accepted submission."
     },
     "ArenaAttempt": {
       "title": "Arena attempt",
       "type": "object",
       "properties": {
-        "rankingVersion": { "const": 2 },
+        "rankingVersion": {
+          "const": 2
+        },
         "examId": {
           "type": "string"
         },
@@ -409,8 +435,12 @@
       "title": "Private Arena timing session",
       "type": "object",
       "properties": {
-        "protocolVersion": { "const": 2 },
-        "eligibleForRanking": { "type": "boolean" },
+        "protocolVersion": {
+          "const": 2
+        },
+        "eligibleForRanking": {
+          "type": "boolean"
+        },
         "uid": {
           "type": "string"
         },
@@ -456,7 +486,7 @@
           "description": "New receipts expire seven days after creation; legacy records may lack this field pending backfill."
         }
       },
-      "description": "Server hashes scope/UID/requestId to form the document ID. Admin dates are stored as Timestamp. Seven-day TTL and a field index exemption are declared in firestore.indexes.json; retained receipts remain replayable until asynchronous deletion."
+      "description": "Server hashes scope/UID/requestId to form the document ID. Admin dates are stored as Timestamp. A seven-day application retry window and ordinary expiry query index are declared; the signed Spark worker performs bounded deletion; retained receipts remain replayable until asynchronous deletion."
     }
   },
   "serverInterfaces": {
@@ -486,9 +516,17 @@
       "method": "POST",
       "path": "/api/arena/{examId}/start",
       "authentication": "Firebase ID token in Authorization: Bearer header",
-      "request": { "requestId": "required UUID" },
-      "writes": ["/_arenaSessions/{hash}", "/_arenaEligibility/{hash}", "/_requestBudgets/{scope}"],
-      "limits": { "body": "4096 UTF-8 bytes" },
+      "request": {
+        "requestId": "required UUID"
+      },
+      "writes": [
+        "/_arenaSessions/{hash}",
+        "/_arenaEligibility/{hash}",
+        "/_requestBudgets/{scope}"
+      ],
+      "limits": {
+        "body": "4096 UTF-8 bytes"
+      },
       "description": "Returns prompts without keys and server startedAtMs. Replay and distinct IDs preserve the first eligible clock; sessions are user/exam-bound, fingerprinted and logically expire after 24 hours."
     },
     "arenaSubmit": {
@@ -509,12 +547,50 @@
       ],
       "description": "Canonical server grading and duration. Only a first eligible non-author completion is ranked/rewarded; authors, retakes, expired timing and migrated practice are excluded. Atomic compact result/receipt, counter and reward; canonical review follows acceptance. Only timingVersion 1/rankingVersion 2 entries rank with score DESC, duration ASC, ID ASC before limit 10."
     },
-    "forumCreate": { "method": "POST", "path": "/api/forum", "authentication": "Firebase bearer token", "request": "title, content, subject and required UUID", "description": "Admin-authored identity, schema/byte budget, atomic post/receipt." },
-    "learningDataExport": { "method": "POST", "path": "/api/account/export", "authentication": "Owner Firebase bearer token", "description": "Bounded pages of explicitly supported private learning datasets; tagged values and continuation. Auth identity excludes credentials. Not a complete account/community/AI export or atomic snapshot." },
-    "accountRequests": { "methods": ["GET", "POST"], "path": "/api/account/requests", "authentication": "Owner Firebase bearer token", "description": "Private bounded/idempotent export/deletion-review requests and owner-only statuses. No automated deletion, configured operator or fulfilment guarantee." },
-    "forumMutation": { "method": "PATCH", "path": "/api/forum/{postId}", "authentication": "Firebase bearer token", "request": "required UUID and edit-post/edit-comment/desired-state like mutation", "description": "Transactional ownership/live-parent/schema/count/byte budget enforcement." },
-    "communityReport": { "method": "POST", "path": "/api/community/reports", "authentication": "Firebase bearer token", "description": "Validated target, reason, UUID and budget; private report queue." },
-    "moderation": { "methods": ["GET", "POST"], "path": "/api/community/moderation", "authentication": "Current Admin Auth moderator claim", "description": "Bounded private queue; attributable idempotent dismiss/hide/restore, with archive/counter/tombstone safeguards." },
+    "forumCreate": {
+      "method": "POST",
+      "path": "/api/forum",
+      "authentication": "Firebase bearer token",
+      "request": "title, content, subject and required UUID",
+      "description": "Admin-authored identity, schema/byte budget, atomic post/receipt."
+    },
+    "learningDataExport": {
+      "method": "POST",
+      "path": "/api/account/export",
+      "authentication": "Owner Firebase bearer token",
+      "description": "Bounded pages of explicitly supported private learning datasets; tagged values and continuation. Auth identity excludes credentials. Not a complete account/community/AI export or atomic snapshot."
+    },
+    "accountRequests": {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "path": "/api/account/requests",
+      "authentication": "Owner Firebase bearer token",
+      "description": "Legacy bounded/idempotent export/deletion-review requests and owner-only statuses. These records never trigger automated deletion; current self-service uses separately configured account jobs. Public operator contact is configured; no fulfilment SLA is claimed."
+    },
+    "forumMutation": {
+      "method": "PATCH",
+      "path": "/api/forum/{postId}",
+      "authentication": "Firebase bearer token",
+      "request": "required UUID and edit-post/edit-comment/desired-state like mutation",
+      "description": "Transactional ownership/live-parent/schema/count/byte budget enforcement."
+    },
+    "communityReport": {
+      "method": "POST",
+      "path": "/api/community/reports",
+      "authentication": "Firebase bearer token",
+      "description": "Validated target, reason, UUID and budget; private report queue."
+    },
+    "moderation": {
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "path": "/api/community/moderation",
+      "authentication": "Current Admin Auth moderator claim",
+      "description": "Bounded private queue; attributable idempotent dismiss/hide/restore, with archive/counter/tombstone safeguards."
+    },
     "forumCommentCreate": {
       "budget": "Per-user/global comment count and byte token buckets commit with the comment/counter",
       "method": "POST",
@@ -582,6 +658,18 @@
       "state": "At most three server-ordered attempts; one OpenRouter request per attempt-route invocation; idempotent status recovery and explicit cancellation",
       "quota": "Two concurrent generations per user; 30 weighted attempts per 15-minute user window; global ceiling 300",
       "description": "Creation is gated by AI_GENERATION_PROTOCOL_ENABLED; deployment acceptance and operational evidence are tracked in the audit report."
+    },
+    "accountJobs": {
+      "methods": [
+        "POST /api/account/jobs",
+        "GET /api/account/jobs",
+        "GET /api/account/jobs/{id}",
+        "POST /api/internal/jobs"
+      ],
+      "authority": "src/lib/jobs/types.ts, store.ts, queue.ts, worker.ts; owner API or exact raw-body QStash signature; minimal read-only deletion receipt",
+      "documentation": "ACCOUNT_OPERATIONS.md",
+      "artifactIntegrity": "Ciphertext and plaintext SHA-256; manifest JSON filenames match downloads; native private-prefix version cleanup is bounded and includes uncheckpointed uploads.",
+      "communityScope": "Collection-group matches restricted to posts/{id}/comments/{id} and arenaExams/{id}/attempts/{id}; never another owner private tree."
     }
   },
   "auth": {
@@ -632,15 +720,30 @@
     },
     "/_arenaSessions/{hash}": {
       "schema": "ArenaSession",
-      "description": "Admin-only server timing with expiresAt TTL declared in firestore.indexes.json."
+      "description": "Admin-only server timing with a 24-hour logical lifetime and ordinary expiresAt query index for signed bounded Spark cleanup."
     },
-    "/_arenaAnswerKeys/{examId}": { "schema": "ArenaAnswerKey", "description": "Admin-only answer bank; no automatic TTL while the exam exists." },
-    "/_arenaEligibility/{hash}": { "description": "Admin-only uid/examId firstStartedAtMs; persists across UUID/session expiry to prevent timing eligibility reset." },
-    "/_arenaLegacyBackups/{examId}": { "description": "Admin-only pre-migration snapshot and backedUpAt; retained for operator recovery, no automatic TTL." },
-    "/_communityReports/{id}": { "description": "Private reporterId, target, reason, status and decision metadata; budgeted authenticated report API and authorized moderation API only." },
-    "/_accountRequests/{hash}": { "description": "Private uid/kind/pending-operator request and timestamp; owner API only, no client Rules grant. No automatic execution or configured fulfilment/retention policy." },
-    "/_moderationArchives/{hash}": { "description": "Private reversible hidden-content snapshot, actor, reason and time; restore respects live parents and deletion tombstones." },
-    "/_moderationActions/{id}": { "description": "Private attributable moderation action log; server-owned, no browser access or default TTL." },
+    "/_arenaAnswerKeys/{examId}": {
+      "schema": "ArenaAnswerKey",
+      "description": "Admin-only answer bank; no automatic TTL while the exam exists."
+    },
+    "/_arenaEligibility/{hash}": {
+      "description": "Admin-only uid/examId firstStartedAtMs; persists across UUID/session expiry to prevent timing eligibility reset."
+    },
+    "/_arenaLegacyBackups/{examId}": {
+      "description": "Admin-only pre-migration snapshot and backedUpAt; retained for operator recovery, no automatic TTL."
+    },
+    "/_communityReports/{id}": {
+      "description": "Private reporterId, target, reason, status and decision metadata; budgeted authenticated report API and authorized moderation API only."
+    },
+    "/_accountRequests/{hash}": {
+      "description": "Private uid/kind/pending-operator request and timestamp; owner API only, no client Rules grant. No automatic execution or configured fulfilment/retention policy."
+    },
+    "/_moderationArchives/{hash}": {
+      "description": "Private reversible hidden-content snapshot, actor, reason and time; restore respects live parents and deletion tombstones."
+    },
+    "/_moderationActions/{id}": {
+      "description": "Private attributable moderation action log; server-owned, no browser access or default TTL."
+    },
     "/_requestReceipts/{hash}": {
       "schema": "RequestReceipt",
       "description": "Admin-only receipts, no client Rule grant."
@@ -657,7 +760,28 @@
       "description": "Admin-only first-reservation-anchored attempt budget and active-reservation state; browser Rules explicitly deny access."
     },
     "/_requestBudgets/{scope}": {
-      "description": "Admin-only token buckets for request/count/byte admission. Creation budget and generation writes commit atomically. Expiry TTL is declared in firestore.indexes.json."
+      "description": "Admin-only token buckets for request/count/byte admission. Creation budget and generation writes commit atomically. An ordinary expiry query index is declared for bounded signed cleanup; no native TTL is requested on Spark."
+    },
+    "/users/{uid}/preferences/service": {
+      "description": "Owner-only self-declared age 16+ confirmation, policyVersion and acceptedAt; no DOB. Client consent gate precedes learning features."
+    },
+    "/_accountJobs/{uuid}": {
+      "description": "Admin-only durable export/deletion/backup state: kind, environment, status, ownerUid until deletion completion, cursor, artifact metadata, progress, lease, nextRunAtMs and logical expiry."
+    },
+    "/_accountLocks/{uid}": {
+      "description": "Admin-only deletion/deleted write tombstone; Rules/Admin mutations reject new writes. Active deletion retained until completion; deleted tombstone seven days."
+    },
+    "/_deletionJournal/{uid}": {
+      "description": "Admin-only restore-prevention journal, 30 days after completion; active deletion entries cannot expire. Applied with the current source journal before isolated restore."
+    },
+    "/_jobWorkerState/lease": {
+      "description": "Admin-only shared maintenance/job lease with random fencing token and deadline."
+    },
+    "/_jobBudgets/{environment_day}": {
+      "description": "Admin-only conservative daily QStash reservation including initial delivery and retries; private ordinary expiry."
+    },
+    "/_serviceState/{state}": {
+      "description": "Admin-only bounded backup write barrier and rotating retention checkpoint. No browser reads or writes."
     }
   },
   "localStorage": {
@@ -670,12 +794,39 @@
     "shark_help_setup_seen": "One-time setup-view guidance state",
     "shark_help_dashboard_seen": "One-time dashboard guidance state",
     "shark_help_playground_seen": "One-time playground guidance state",
-    "shark_help_forum_seen": "One-time Forum guidance state"
+    "shark_help_forum_seen": "One-time Forum guidance state",
+    "shark.account-deletion-receipt": "Essential minimal read-only deletion receipt; no UID/content in receipt payload; server access expires seven days after completion."
   },
   "sessionStorage": {
     "shark:draft:v1:{uid}:{kind}": "Validated same-tab Quiz/Practice/Flashcard/Arena checkpoints; 24-hour logical inactivity expiry, max 1 MB per key, removed on owner change/sign-out or explicit discard/completion. No cross-device guarantee."
   },
   "x-derived-data": {
-    "description": "Calendar month grouping derives from users/{uid}/activity/main.activeDays. Roadmap checks and language/theme use localStorage, not these collections."
+    "description": "Calendar month grouping derives from users/{uid}/activity/main.activeDays. Roadmap checks and language/theme use localStorage, not these collections. Locale/theme also use the essential validated preference cookie; server and client start from the same valid cookie when present."
+  },
+  "cookies": {
+    "shark_preferences": "Essential version/language/theme preference; v1.en.light or v1.vi.dark; Path=/; SameSite=Lax; up to one year; Secure on HTTPS. Validated SSR/client preference, with legacy localStorage migration."
+  },
+  "x-account-operations": {
+    "operator": {
+      "name": "Lê Xuân Bách",
+      "email": "bachlxbach@gmail.com"
+    },
+    "minimumAge": 16,
+    "ageVerification": "Self-declared eligibility and policy-version confirmation; no date of birth",
+    "documentation": "ACCOUNT_OPERATIONS.md",
+    "privateCollections": [
+      "_accountJobs",
+      "_accountLocks",
+      "_deletionJournal",
+      "_jobWorkerState",
+      "_jobBudgets",
+      "_serviceState"
+    ],
+    "transport": "QStash signed ID/environment messages; durable Firestore outbox, per-job/global leases and checkpoints",
+    "storage": "Private per-environment B2 bucket; gzip plus AES-256-GCM, filename AAD and SHA-256 integrity; 7 GB production / 1 GB staging internal ceilings",
+    "retention": "AI access rejects expired records; bounded signed Firestore cleanup via RETENTION_ENABLED independently of B2/account jobs, with transactional expiry rechecks; no native TTL",
+    "export": "Full attributable catalog plus discovered private descendants; live paged reads; processing at most seven days, owner download access 24 hours after ready, processing object fallback expiry eight days; failed processing remains visible 24 hours; manifest declares lifetime and status gives authoritative deadline; legacy unattributable receipts excluded pending retention",
+    "deletion": "New explicit recent-auth confirmation only; lock writes, cancel AI, remove private data, anonymize public/archive identity/reactions, Auth last; minimal receipt/tombstone seven days and deletion journal 30 days",
+    "backup": "Daily when enabled; seven-day encrypted artifacts, bounded write barrier; isolated empty-target restore applies current deletion journal; RPO/RTO unverified"
   }
 }

@@ -9,7 +9,8 @@ test('responsive utilities and named keyboard controls work in both themes and l
     for (const theme of ['light', 'dark']) {
       await page.evaluate(({ lang, theme }) => {
         localStorage.setItem('shark_lang', lang); localStorage.setItem('shark_theme', theme);
-        window.dispatchEvent(new Event('storage'));
+        window.dispatchEvent(new StorageEvent('storage', { key: 'shark_lang', newValue: lang }));
+      window.dispatchEvent(new StorageEvent('storage', { key: 'shark_theme', newValue: theme }));
       }, { lang, theme });
       await expect(page.locator('html')).toHaveAttribute('lang', lang);
       const language = page.getByRole('button', { name: lang === 'en' ? 'Language' : 'Ngôn ngữ', exact: true });

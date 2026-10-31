@@ -6,7 +6,6 @@ import { Button } from '@/components/ui/button';
 import { useHistory } from '@/hooks/use-history';
 
 import { useHydrated,useLanguageState,useThemeState } from '@/components/app-preferences';
-import { UiText } from "@/components/ui-text";
 
 import ActivityCalendar from '@/components/activity-calendar';
 import AiChatbot from '@/components/ai-chatbot';
@@ -16,8 +15,7 @@ import QuickNotes from '@/components/quick-notes';
 import QuizView from '@/components/quiz-view';
 import ResultView from '@/components/result-view';
 import SetupView from '@/components/setup-view';
-import { PublicIntro } from '@/components/public-intro';
-import { ServiceLinks } from '@/components/service-links';
+import { RouteSkeleton } from '@/components/route-skeleton';
 import { Tooltip,TooltipContent,TooltipProvider,TooltipTrigger } from '@/components/ui/tooltip';
 import { useFirestore,useUser } from '@/firebase';
 import { useUserNotes } from '@/firebase/firestore/use-user-notes';
@@ -29,8 +27,8 @@ import { BarChart3,BrainCircuit,LayoutDashboard,Star,StickyNote } from 'lucide-r
 import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import React,{ Suspense,useCallback,useEffect,useMemo,useState } from 'react';
-const DashboardView = dynamic(() => import('@/components/dashboard-view'));
-const PlaygroundView = dynamic(() => import('@/components/playground-view'));
+const DashboardView = dynamic(() => import('@/components/dashboard-view'), { loading: () => <RouteSkeleton view="dashboard" /> });
+const PlaygroundView = dynamic(() => import('@/components/playground-view'), { loading: () => <RouteSkeleton view="playground" /> });
 
 const SidebarNavItem = ({ icon: Icon, label, onClick }: { icon: React.ElementType, label: string, onClick: () => void }) => (
     <Tooltip>
@@ -111,7 +109,8 @@ function HomeContent() {
     if (element) {
       const offset = window.innerWidth < 1024 ? 100 : 120;
       const elementPosition = element.getBoundingClientRect().top + window.pageYOffset - offset;
-      window.scrollTo({ top: elementPosition, behavior: 'smooth' });
+      const reduceMotion = typeof window.matchMedia !== 'function' || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      window.scrollTo({ top: elementPosition, behavior: reduceMotion ? 'auto' : 'smooth' });
     }
   };
 
@@ -123,7 +122,7 @@ function HomeContent() {
 
   const stats = useMemo(() => calculateDashboardStats(history, t, lang), [history, t, lang]);
 
-  if (!mounted || authLoading || !user) return <PublicIntro />;
+  if (!mounted || authLoading || !user) return <RouteSkeleton view="setup" />;
 
   if (!user) return null;
 
@@ -207,13 +206,6 @@ function HomeContent() {
         )}
       </main>
 
-      <footer className="w-full p-8 md:p-12 text-center mt-auto border-t-[4px] md:border-t-[5px] border-border/30">
-        <ServiceLinks />
-        <p className="text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-          <UiText id="copyright" />
-        </p>
-      </footer>
-
       <AiChatbot t={t} lang={lang} results={lastResults} trigger={chatbotTrigger} />
     </div>
   );
@@ -221,7 +213,7 @@ function HomeContent() {
 
 export default function LearningApp() {
   return (
-    <Suspense fallback={<PublicIntro />}>
+    <Suspense fallback={<RouteSkeleton view="setup" />}>
       <HomeContent />
     </Suspense>
   );
