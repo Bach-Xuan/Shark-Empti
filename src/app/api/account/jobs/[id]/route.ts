@@ -5,13 +5,16 @@ import { apiFailure, ApiError, authenticatedUser } from '@/lib/server-api';
 import { jobView, readJob } from '@/lib/jobs/types';
 import { matchesReceipt } from '@/lib/jobs/crypto';
 import { PrivateJobStorage } from '@/lib/jobs/storage';
+import { enforceReceiptRequestBudget, enforceRequestBudget } from '@/lib/request-budget';
 
 export const runtime = 'nodejs';
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const id = z.string().uuid().parse((await params).id);
     const receipt = request.headers.get('x-deletion-receipt');
-    const uid = receipt ? null : await authenticatedUser(request, { allowLocked: true, allowMaintenance: true });
+    const uid = receipt ? null : await authenticatedUser(request, { allowLocked: true, allowMaintenance: true, allowUnconsented: true });
+    if (receipt) await enforceReceiptRequestBudget(receipt);
+    else await enforceRequestBudget(uid!, 'account-traffic', { allowLocked: true, allowMaintenance: true });
     const snapshot = await getAdminDb().collection('_accountJobs').doc(id).get();
     if (!snapshot.exists) throw new ApiError('APP-NOT-FOUND', 404, 'Job not found.');
     const job = readJob(snapshot.data());

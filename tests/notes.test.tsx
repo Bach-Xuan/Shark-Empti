@@ -10,9 +10,20 @@ vi.mock('firebase/firestore', () => ({
   onSnapshot: (_ref: unknown, callback: (s: unknown) => void) => { mocks.callbacks.push(callback); return mocks.unsubscribe; },
   setDoc: (...args: unknown[]) => mocks.write(...args),
 }));
-beforeEach(() => { mocks.user = { uid: 'first' }; mocks.callbacks = []; mocks.write.mockReset(); });
+beforeEach(() => { mocks.user = { uid: 'first' }; mocks.callbacks = []; mocks.write.mockReset().mockResolvedValue(undefined); mocks.emit.mockReset(); });
 afterEach(cleanup);
 const snapshot = (content?: string) => ({ exists: () => content !== undefined, data: () => ({ content }) });
+it('retains long legacy notes for reading while rejecting oversized edits before contacting Firestore', async () => {
+  const { result } = renderHook(useUserNotes);
+  const legacy = 'x'.repeat(20001);
+  act(() => mocks.callbacks[0](snapshot(legacy)));
+  expect(result.current.notes).toBe(legacy);
+  await act(async () => expect(await result.current.updateNotes(legacy)).toBe(false));
+  expect(mocks.write).not.toHaveBeenCalled();
+  expect(mocks.emit).toHaveBeenCalledOnce();
+  await act(async () => expect(await result.current.updateNotes('x'.repeat(20000))).toBe(true));
+  expect(mocks.write).toHaveBeenCalledOnce();
+});
 it('clears missing documents, switches UID and ignores the old subscription', () => {
   const { result, rerender } = renderHook(() => useUserNotes());
   const first = mocks.callbacks[0];

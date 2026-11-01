@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures';
+import { publishForumFixture } from './community-fixtures';
 import { signInDemo } from './auth';
 import { accessibilityViolations } from './accessibility';
 import { getApps, initializeApp } from 'firebase-admin/app';
@@ -15,6 +16,7 @@ test('full accessibility checks cover Setup, community lists and expanded landsc
   const db = getFirestore(getApps()[0] ?? initializeApp({ projectId: 'demo-shark-empti' }));
   for (const subject of SUBJECT_IDS) {
     await db.doc(`posts/a11y-${test.info().project.name}-${subject}`).set({ title: `Accessible discussion ${subject}`, content: 'A public learning discussion.', subject, authorId: 'fixture', authorName: 'Fixture', authorPhoto: 'http://127.0.0.1:9002/opengraph-image', createdAt: Timestamp.now(), likesCount: 0, commentsCount: 0, likedBy: [] });
+    await publishForumFixture(db.doc(`posts/a11y-${test.info().project.name}-${subject}`));
   }
   await signInDemo(page);
   const scan = async (state: string) => {

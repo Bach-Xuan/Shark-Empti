@@ -1,16 +1,19 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
+import { Timestamp } from 'firebase-admin/firestore';
 import { POST as createExam } from '@/app/api/arena/route';
 import { POST as submitExam } from '@/app/api/arena/[examId]/submit/route';
 import { POST as createComment, DELETE as deleteComment } from '@/app/api/forum/[postId]/comments/route';
 import { DELETE as deletePost } from '@/app/api/forum/[postId]/route';
 import { readLimitedJson } from '@/lib/server-json';
+import { currentServicePolicy } from '@/lib/service-policy';
 
 vi.mock('server-only', () => ({}));
 type Row = Record<string, unknown>;
-const mocks = vi.hoisted(() => ({ getDb: vi.fn(), getAuth: vi.fn(), cascade: vi.fn() }));
+const mocks = vi.hoisted(() => ({ getDb: vi.fn(), getAuth: vi.fn(), descendants: vi.fn() }));
 vi.mock('@/lib/firebase-admin', () => ({ getAdminDb: mocks.getDb, getAdminAuth: mocks.getAuth, AdminConfigurationError: class extends Error {} }));
+vi.mock('@/lib/firestore-descendants', () => ({ readDescendantPage: mocks.descendants }));
 const rows = new Map<string, Row>();
 let generated = 0;
 function reference(path: string) {
@@ -22,7 +25,7 @@ function collection(path: string) { return { doc: (id = `generated-${++generated
 type Ref = ReturnType<typeof reference>;
 const db = {
   collection,
-  recursiveDelete: mocks.cascade,
+  doc: reference,
   runTransaction: async (callback: (tx: unknown) => Promise<unknown>) => {
     const writes: (() => void)[] = [];
     const result = await callback({
@@ -48,11 +51,10 @@ function request(body: unknown, method = 'POST', token = 'owner', path = '/') {
 }
 beforeEach(() => {
   vi.clearAllMocks(); rows.clear(); generated = 0;
+  for (const uid of ['owner', 'other']) rows.set('_serviceConsents/' + uid, { ...currentServicePolicy, acceptedAt: Timestamp.fromMillis(1) });
   mocks.getDb.mockReturnValue(db);
-  mocks.getAuth.mockReturnValue({ verifyIdToken: async (uid: string) => { if (uid === 'invalid') throw Error('private reason'); return { uid }; }, getUser: async () => ({ displayName: 'Learner', photoURL: '' }) });
-  mocks.cascade.mockImplementation(async (ref: Ref) => {
-    for (const key of rows.keys()) if (key === ref.path || key.startsWith(`${ref.path}/`)) rows.delete(key);
-  });
+  mocks.getAuth.mockReturnValue({ verifyIdToken: async (uid: string) => { if (uid === 'invalid') throw { code: 'auth/invalid-id-token', message: 'private reason' }; return { uid }; }, getUser: async () => ({ displayName: 'Learner', photoURL: '' }) });
+  mocks.descendants.mockImplementation(async (_db: unknown, ref: Ref, limit: number) => [...rows.keys()].filter(path => path.startsWith(ref.path + '/')).sort().slice(0, limit));
   rows.set('posts/post', { ...post });
   rows.set('arenaExams/exam', { authorId: 'owner', title: 'Exam', config, questions: [question], totalAttempts: 0 });
 });
@@ -86,7 +88,9 @@ describe('public server boundaries', () => {
   it('rejects corrupt persisted exam before scoring, counter updates, or rewards', async () => {
     rows.set('arenaExams/exam', { authorId: 'owner', questions: [null], totalAttempts: 'bad' });
     expect((await submitExam(request({ answers: ['4'], requestId: crypto.randomUUID() }), examParams)).status).toBe(409);
-    expect([...rows.keys()]).toEqual(['posts/post', 'arenaExams/exam']);
+    expect([...rows.keys()].filter(path => !path.startsWith('_serviceConsents/') && !path.startsWith('_requestBudgets/community-traffic_'))).toEqual(['posts/post', 'arenaExams/exam']);
+    expect(rows.get('_requestBudgets/community-traffic_global')).toBeDefined();
+    expect([...rows.keys()].some(path => path.startsWith('_requestReceipts/'))).toBe(false);
   });
   it('rejects corrupt parents before comment creation or deletion and handles absent parents', async () => {
     rows.set('posts/post', { ...post, commentsCount: NaN });
@@ -125,21 +129,25 @@ describe('recoverable post deletion', () => {
     expect((await deletePost(request(null, 'DELETE', 'other'), postParams)).status).toBe(403);
     expect(rows.has('posts/post')).toBe(true);
     expect(rows.has('_forumDeletions/post')).toBe(false);
-    expect(mocks.cascade).not.toHaveBeenCalled();
+    expect(mocks.descendants).not.toHaveBeenCalled();
   });
   it('deletes more than one batch and nested descendants; completed owner retry is idempotent', async () => {
     for (let i = 0; i < 501; i++) rows.set(`posts/post/comments/${i}`, { content: 'comment' });
+    for (let i = 0; i < 501; i++) rows.set(`forumPosts/post/comments/${i}`, { content: 'published comment' });
     rows.set('posts/post/comments/0/nested/child', { content: 'nested' });
     expect((await deletePost(request(null, 'DELETE'), postParams)).status).toBe(200);
     expect([...rows.keys()].filter(key => key.startsWith('posts/'))).toEqual([]);
+    expect([...rows.keys()].filter(key => key.startsWith('forumPosts/'))).toEqual([]);
     expect(rows.get('_forumDeletions/post')).toMatchObject({ authorId: 'owner', status: 'complete' });
+    const enumerationCalls = mocks.descendants.mock.calls.length;
     expect((await deletePost(request(null, 'DELETE'), postParams)).status).toBe(200);
-    expect(mocks.cascade).toHaveBeenCalledTimes(1);
+    expect(mocks.descendants).toHaveBeenCalledTimes(enumerationCalls);
+    expect(mocks.descendants.mock.calls.every(call => call[2] === 100)).toBe(true);
     expect((await deletePost(request(null, 'DELETE', 'other'), postParams)).status).toBe(403);
   });
   it('retains owner recovery authority on partial failure, blocks new comments, and resumes on retry', async () => {
     rows.set('posts/post/comments/leftover', { content: 'comment' });
-    mocks.cascade.mockRejectedValueOnce(Error('private SDK details'));
+    mocks.descendants.mockRejectedValueOnce(Error('private SDK details'));
     const response = await deletePost(request(null, 'DELETE'), postParams);
     expect(response.status).toBe(500);
     expect(JSON.stringify(await response.json())).not.toContain('private');

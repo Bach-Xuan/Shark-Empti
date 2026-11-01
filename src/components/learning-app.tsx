@@ -17,7 +17,7 @@ import ResultView from '@/components/result-view';
 import SetupView from '@/components/setup-view';
 import { RouteSkeleton } from '@/components/route-skeleton';
 import { Tooltip,TooltipContent,TooltipProvider,TooltipTrigger } from '@/components/ui/tooltip';
-import { useFirestore,useUser } from '@/firebase';
+import { useUser } from '@/firebase';
 import { useUserNotes } from '@/firebase/firestore/use-user-notes';
 import { type QuizQuestion } from '@/lib/learning-session';
 import { calculateDashboardStats } from '@/lib/stats-utils';
@@ -49,13 +49,12 @@ const SidebarNavItem = ({ icon: Icon, label, onClick }: { icon: React.ElementTyp
 
 function HomeContent() {
   const { user, loading: authLoading } = useUser();
-  const db = useFirestore();
   const searchParams = useSearchParams();
   const mounted = useHydrated();
   const [lang, setLang] = useLanguageState();
   const [theme, setTheme] = useThemeState();
   const [section, setSection] = useState<AppView>('setup');
-  const { session, reset, start, ready: questionsReady, finish: finishQuiz, recoverAnalysis, draftId, draftAvailable } = useLearningSession(user, db, lang);
+  const { session, reset, start, ready: questionsReady, finish: finishQuiz, recoverAnalysis, draftId, draftAvailable, restoredCompletion } = useLearningSession(user, lang);
   const view: AppView = section === 'setup' && session.status !== 'setup' ? (session.status === 'result' ? 'result' : 'quiz') : section;
   const setView = useCallback((next: AppView) => {
     const unfinished = session.status === 'quiz' || session.status === 'loading';
@@ -172,7 +171,7 @@ function HomeContent() {
           <QuizView
             t={t} lang={lang} config={quizConfig}
             initialQuestions={activeQuestions}
-            draftOwner={user?.uid} draftId={draftId} draftAvailable={draftAvailable}
+            draftOwner={user?.uid} draftId={draftId} draftAvailable={draftAvailable} restoredCompletion={restoredCompletion}
             onFinish={finishQuiz} onReady={questionsReady} onAskGuru={handleAskGuru}
           />
           </div>

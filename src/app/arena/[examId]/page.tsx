@@ -4,7 +4,10 @@ import { showErrorToast,showUnexpectedErrorToast } from '@/lib/error-toast';
 import { createAppError,type AppError } from '@/lib/app-error';
 import { arenaDetailMessages,arenaResponseError,arenaSubscriptionError } from '@/lib/arena-detail';
 import { errorMessages,translatedError } from '@/lib/i18n/errors';
-import { readArenaExam,readArenaAttempt,readArenaPrompts } from '@/lib/public-firestore-schema';
+import { readArenaExam,readPublicArenaRanking,readArenaPrompts } from '@/lib/public-firestore-schema';
+import { useDoc } from '@/firebase/firestore/use-doc';
+import { OWN_ARENA_RANKINGS_COLLECTION, ownArenaRankingSchema } from '@/lib/community-privacy';
+import { ReactionStatus } from '@/components/reaction-status';
 import { readHistoryItem } from '@/lib/history-schema';
 import { ReportContent } from '@/components/report-content';
 import { isDocumentId } from '@/lib/document-id';
@@ -25,7 +28,7 @@ import { useFirestore,useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { arenaLeaderboardQuery } from '@/lib/arena-leaderboard';
 import { translations,TranslationSet } from '@/lib/translations';
-import { ArenaAttempt,ArenaExam,QuizAnalysis,QuizHistoryItem } from '@/lib/types';
+import { ArenaRanking,ArenaExam,QuizAnalysis,QuizHistoryItem } from '@/lib/types';
 import type { QuizQuestion } from '@/lib/learning-session';
 import { cn } from '@/lib/utils';
 import {
@@ -65,7 +68,10 @@ function ArenaDetailSession({ examId }: { examId: string }) {
   useEffect(() => { currentLanguage.current = lang; }, [lang]);
   const [theme, setTheme] = useThemeState();
   const [exam, setExam] = useState<ArenaExam | null>(null);
-  const [leaderboard, setLeaderboard] = useState<ArenaAttempt[]>([]);
+  const [leaderboard, setLeaderboard] = useState<ArenaRanking[]>([]);
+  const ownRank = useDoc(user && isDocumentId(examId) ? `users/${user.uid}/${OWN_ARENA_RANKINGS_COLLECTION}/${examId}` : null);
+  const ownRankValue = ownRank.data ? ownArenaRankingSchema.safeParse(ownRank.data) : null;
+  const ownRankingId = ownRankValue?.success ? ownRankValue.data.rankingId : null;
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'details' | 'quiz' | 'result'>('details');
   const [activeQuestions, setActiveQuestions] = useState<QuizQuestion[]>([]);
@@ -126,8 +132,8 @@ function ArenaDetailSession({ examId }: { examId: string }) {
     const q = arenaLeaderboardQuery(db, examId);
     const unsubLeaderboard = onSnapshot(q, (snapshot) => {
       if (!active) return;
-      const parsed = snapshot.docs.map(item => readArenaAttempt(item.id, item.data()));
-      const data = parsed.filter((item): item is ArenaAttempt => item !== null);
+      const parsed = snapshot.docs.map(item => readPublicArenaRanking(item.id, item.data()));
+      const data = parsed.filter((item): item is ArenaRanking => item !== null);
       setLeaderboardError(data.length !== parsed.length ? createAppError('ARENA-DATA-INVALID', '') : null);
       setLeaderboard(data);
     }, (error) => {
@@ -357,6 +363,7 @@ function ArenaDetailSession({ examId }: { examId: string }) {
 
               <Card className="card-duo overflow-hidden border-border bg-card">
                  {leaderboardError && <SubscriptionError error={leaderboardError} label={copy.leaderboard} lang={lang} onRetry={() => setLeaderboardRetry(value => value + 1)} />}
+                 {user && <ReactionStatus kind="ranking" lang={lang} loading={ownRank.loading} error={!!ownRank.error || (!!ownRankValue && !ownRankValue.success)} retry={ownRank.retry} />}
                  <div className="p-6 border-b-4 border-border/30 bg-muted/20">
                     <div className="grid grid-cols-12 text-[10px] font-black text-muted-foreground uppercase tracking-widest">
                        <div className="col-span-2">{t.rank}</div>
@@ -369,7 +376,7 @@ function ArenaDetailSession({ examId }: { examId: string }) {
                     {leaderboard.length === 0 && !leaderboardError ? (
                       <div className="p-12 text-center text-muted-foreground italic font-black uppercase text-xs opacity-50">{uiMessage(lang, "arena.no_results_yet")}</div>
                     ) : leaderboard.map((item, idx) => (
-                      <div key={item.id} className={cn("p-4 md:p-6 grid grid-cols-12 items-center gap-2 md:gap-4 transition-all hover:bg-primary/5", item.userId === user?.uid && "bg-primary/10 border-y-2 border-primary/20")}>
+                      <div key={item.id} className={cn("p-4 md:p-6 grid grid-cols-12 items-center gap-2 md:gap-4 transition-all hover:bg-primary/5", item.id === ownRankingId && "bg-primary/10 border-y-2 border-primary/20")}>
                          <div className="col-span-2 flex justify-center">
                             {idx < 3 ? (
                               <div className={cn("w-6 h-6 md:w-10 md:h-10 rounded-lg flex items-center justify-center font-black text-xs md:text-xl",
@@ -386,9 +393,9 @@ function ArenaDetailSession({ examId }: { examId: string }) {
                          <div className="col-span-6 flex items-center gap-2 md:gap-3 min-w-0">
                             <Avatar className="w-8 h-8 md:w-10 md:h-10 border-2 border-border shrink-0">
                                <AvatarImage src={item.userPhoto} alt="" />
-                               <AvatarFallback>{publicAuthorName(lang, item.userId, item.userName)[0]}</AvatarFallback>
+                               <AvatarFallback>{publicAuthorName(lang, item.formerMember ? '__deleted__' : '', item.userName)[0]}</AvatarFallback>
                             </Avatar>
-                            <span className="font-black text-[10px] md:text-sm uppercase tracking-tight truncate">{publicAuthorName(lang, item.userId, item.userName)}</span>
+                            <span className="font-black text-[10px] md:text-sm uppercase tracking-tight truncate">{publicAuthorName(lang, item.formerMember ? '__deleted__' : '', item.userName)}</span>
                          </div>
                          <div className="col-span-2 text-right font-black text-sm md:text-xl text-primary">{item.score}%</div>
                          <div className="col-span-2 text-right font-black text-[9px] md:text-xs text-muted-foreground">{Math.floor(item.duration / 60)}:{ (item.duration % 60).toString().padStart(2, '0') }</div>

@@ -6,8 +6,10 @@ import { POST as comment,DELETE as deleteComment } from '@/app/api/forum/[postId
 import { getAdminDb } from '@/lib/firebase-admin';
 import { ARENA_SESSION_TTL_MS,arenaSessionId } from '@/lib/arena-session';
 import { NextRequest } from 'next/server';
-import { beforeAll,beforeEach,expect,it,vi } from 'vitest';
+import { afterEach,beforeAll,beforeEach,expect,it,vi } from 'vitest';
+import { seedServiceConsent } from '../fixtures/service-consent';
 vi.mock('server-only', () => ({}));
+afterEach(() => vi.restoreAllMocks());
 
 let token: string;
 let uid: string;
@@ -28,6 +30,7 @@ beforeAll(async () => {
 beforeEach(async () => {
   const response = await fetch(`http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/demo-shark-empti/databases/(default)/documents`, { method: 'DELETE' });
   expect(response.ok).toBe(true);
+  await seedServiceConsent(uid);
   const db = getAdminDb();
   await db.doc('arenaExams/exam').set({ schemaVersion: 2, questionCount: 1, title: 'Exam', config: { subject: 'math', grade: '12', topic: 'Math', type: 'Mixed', difficulty: 'Mixed', numQuestions: '1' }, totalAttempts: 0, authorId: 'other-author' });
   await db.doc('_arenaAnswerKeys/exam').set({ schemaVersion: 2, authorId: 'other-author', questions: [question] });
@@ -88,6 +91,7 @@ it('awards the global pioneer bonus once, including another user and a retake', 
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ returnSecureToken: true }),
   });
   const other = await signup.json();
+  await seedServiceConsent(other.localId);
   const bonuses = [];
   for (const bearer of [token, other.idToken, token]) {
     const requestId = crypto.randomUUID();
@@ -119,19 +123,83 @@ it('creates a comment once and decrements the counter on authorized delete', asy
   expect((await db.doc('posts/post').get()).get('commentsCount')).toBe(0);
 });
 
+it.each(['maintenance', 'lock', 'consent'] as const)('rechecks %s after post visibility cutover before deleting descendants', async barrier => {
+  const db = getAdminDb(), child = db.doc('posts/post/comments/keep');
+  await child.set({ content: 'Retain until cleanup is writable' });
+  const original = db.runTransaction.bind(db);
+  let injected = false;
+  vi.spyOn(db, 'runTransaction').mockImplementation(async (callback, options) => {
+    const result = await original(callback, options);
+    if (!injected && (await db.doc('_forumDeletions/post').get()).exists) {
+      injected = true;
+      if (barrier === 'maintenance') await db.doc('_serviceState/maintenance').set({ active: true, expiresAtMs: Date.now() + 60000 });
+      else if (barrier === 'lock') await db.doc('_accountLocks/' + uid).set({ status: 'deleting' });
+      else await db.doc('_serviceConsents/' + uid).delete();
+    }
+    return result;
+  });
+  const response = await deletePost(new NextRequest('http://localhost/api/forum/post', { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } }), postParams);
+  expect(response.status).toBe(barrier === 'maintenance' ? 503 : barrier === 'lock' ? 409 : 403);
+  expect((await child.get()).exists).toBe(true);
+  expect((await db.doc('posts/post').get()).exists).toBe(false);
+  expect((await db.doc('_forumDeletions/post').get()).get('status')).toBe('pending');
+});
 it('recursively deletes more than 500 descendants and keeps owner retries idempotent', async () => {
   const db = getAdminDb();
   const writer = db.bulkWriter();
   for (let i = 0; i < 501; i++) writer.set(db.doc(`posts/post/comments/${i}`), { authorId: uid, content: 'Comment' });
   writer.set(db.doc('posts/post/comments/0/nested/child'), { content: 'Nested descendant' });
+  writer.set(db.doc('posts/post/legacy/missing/nested/orphan'), { content: 'Missing parent descendant' });
+  writer.set(db.doc('posts/post/legacy/' + 'x'.repeat(300)), { content: 'Long legacy ID' });
   await writer.close();
   const deletion = () => new NextRequest('http://localhost/api/forum/post', { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
   expect((await deletePost(deletion(), postParams)).status).toBe(200);
   expect((await db.doc('posts/post').get()).exists).toBe(false);
   expect((await db.collection('posts/post/comments').get()).empty).toBe(true);
   expect((await db.doc('posts/post/comments/0/nested/child').get()).exists).toBe(false);
+  expect((await db.doc('posts/post/legacy/missing/nested/orphan').get()).exists).toBe(false);
+  expect((await db.doc('posts/post/legacy/' + 'x'.repeat(300)).get()).exists).toBe(false);
   expect((await db.doc('_forumDeletions/post').get()).get('status')).toBe('complete');
   expect((await deletePost(deletion(), postParams)).status).toBe(200);
+});
+it('halts between cleanup batches and resumes remaining descendants after maintenance', async () => {
+  const db = getAdminDb(), batch = db.batch();
+  for (let i = 0; i < 105; i++) batch.set(db.doc('posts/post/comments/' + String(i).padStart(3, '0')), { content: 'Comment' });
+  await batch.commit();
+  const original = db.runTransaction.bind(db); let paused = false;
+  vi.spyOn(db, 'runTransaction').mockImplementation(async (callback, options) => {
+    const result = await original(callback, options);
+    if (!paused && (await db.doc('_forumDeletions/post').get()).exists && (await db.collection('posts/post/comments').count().get()).data().count === 5) {
+      paused = true;
+      await db.doc('_serviceState/maintenance').set({ active: true, expiresAtMs: Date.now() + 60000 });
+    }
+    return result;
+  });
+  const deletion = () => new NextRequest('http://localhost/api/forum/post', { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
+  expect((await deletePost(deletion(), postParams)).status).toBe(503);
+  expect((await db.collection('posts/post/comments').get()).size).toBe(5);
+  expect((await db.doc('_forumDeletions/post').get()).get('status')).toBe('pending');
+  await db.doc('_serviceState/maintenance').delete();
+  expect((await deletePost(deletion(), postParams)).status).toBe(200);
+  expect((await db.collection('posts/post/comments').get()).empty).toBe(true);
+  expect((await db.doc('_forumDeletions/post').get()).get('status')).toBe('complete');
+});
+it('guards tombstone completion when the backup barrier starts after the last descendants are deleted', async () => {
+  const db = getAdminDb(); await db.doc('posts/post/comments/last').set({ content: 'Last' });
+  const original = db.runTransaction.bind(db); let paused = false;
+  vi.spyOn(db, 'runTransaction').mockImplementation(async (callback, options) => {
+    const result = await original(callback, options);
+    if (!paused && (await db.doc('_forumDeletions/post').get()).get('status') === 'pending' && (await db.collection('posts/post/comments').get()).empty) {
+      paused = true; await db.doc('_serviceState/maintenance').set({ active: true, expiresAtMs: Date.now() + 60000 });
+    }
+    return result;
+  });
+  const deletion = () => new NextRequest('http://localhost/api/forum/post', { method: 'DELETE', headers: { Authorization: 'Bearer ' + token } });
+  expect((await deletePost(deletion(), postParams)).status).toBe(503);
+  expect((await db.doc('_forumDeletions/post').get()).get('status')).toBe('pending');
+  await db.doc('_serviceState/maintenance').delete();
+  expect((await deletePost(deletion(), postParams)).status).toBe(200);
+  expect((await db.doc('_forumDeletions/post').get()).get('status')).toBe('complete');
 });
 
 it('cannot leave a new comment behind when creation races the parent visibility cutover', async () => {

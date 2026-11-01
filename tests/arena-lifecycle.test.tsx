@@ -10,6 +10,7 @@ vi.mock('@/components/navigation', () => ({ default: () => null }));
 vi.mock('@/components/ui-text', () => ({ UiText: () => null }));
 vi.mock('@/components/app-preferences', () => ({ useLanguageState: () => ['en', vi.fn()], useThemeState: () => ['light', vi.fn()] }));
 vi.mock('@/firebase', () => ({ useUser: () => ({ user: mocks.user, loading: false }), useFirestore: () => 'database' }));
+vi.mock('@/firebase/firestore/use-doc', () => ({ useDoc: () => ({ data: null, loading: false, error: null, retry: vi.fn() }) }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));
 vi.mock('@/lib/error-toast', () => ({ showErrorToast: vi.fn(), showUnexpectedErrorToast: vi.fn() }));
 const router = { push: mocks.push };

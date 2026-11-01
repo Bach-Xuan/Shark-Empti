@@ -2,8 +2,9 @@ import { z } from 'zod';
 import { questionContentSchema } from '@/ai/question-schema';
 import { parseNumericAnswer } from './arena-scoring';
 import { readTimeMillis } from './time';
-import type { ArenaAttempt, ArenaExam, ForumComment, ForumPost } from './types';
+import type { ArenaAttempt, ArenaExam, ArenaRanking } from './types';
 import { QUIZ_LIMITS } from './quiz-config';
+import { COMMUNITY_PRIVACY_VERSION } from './community-privacy';
 
 const text = (max: number) => z.string().trim().min(1).max(max);
 const count = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
@@ -28,6 +29,13 @@ export const forumPostSchema = z.object({
 export const forumCommentSchema = z.object({
   ...author, ...likes, content: text(2000), updatedAt: storedDate.optional(),
 }).refine(value => value.likesCount === value.likedBy.length);
+
+// Public metadata has no membership array. The legacy schemas above remain
+// available to the migration until every server/client/Rules path is switched.
+const { likedBy: _postMembers, ...publicPostFields } = forumPostSchema.shape;
+const { likedBy: _commentMembers, ...publicCommentFields } = forumCommentSchema.shape;
+export const publicForumPostSchema = z.object({ ...publicPostFields, privacyVersion: z.literal(COMMUNITY_PRIVACY_VERSION) });
+export const publicForumCommentSchema = z.object({ ...publicCommentFields, privacyVersion: z.literal(COMMUNITY_PRIVACY_VERSION) });
 
 const numericText = (max: number) => z.union([z.string().regex(/^\d+$/), z.number().int()])
   .transform(String).refine(value => Number(value) >= 1 && Number(value) <= max);
@@ -71,12 +79,31 @@ export const arenaAttemptSchema = z.object({
   duration: z.number().finite().nonnegative(), createdAt: storedDate,
 });
 
+const { userId: _rankOwner, ...publicRankFields } = arenaAttemptSchema.shape;
+export const publicArenaRankingSchema = z.object({
+  ...publicRankFields, formerMember: z.boolean().default(false), privacyVersion: z.literal(COMMUNITY_PRIVACY_VERSION),
+  timingVersion: z.literal(1), rankingVersion: z.literal(2),
+});
+
+export function readPublicForumPost(id: string, value: unknown) {
+  const result = publicForumPostSchema.safeParse(value);
+  return result.success ? { ...result.data, id } : null;
+}
+export function readPublicForumComment(id: string, value: unknown) {
+  const result = publicForumCommentSchema.safeParse(value);
+  return result.success ? { ...result.data, id } : null;
+}
+export function readPublicArenaRanking(id: string, value: unknown): ArenaRanking | null {
+  const result = publicArenaRankingSchema.safeParse(value);
+  return result.success ? { ...result.data, id } : null;
+}
+
 // Unknown keys are stripped; caller-supplied snapshot IDs always win over stored IDs.
-export function readForumPost(id: string, data: unknown): ForumPost | null {
+export function readForumPost(id: string, data: unknown) {
   const result = forumPostSchema.safeParse(data);
   return result.success ? { ...result.data, id } : null;
 }
-export function readForumComment(id: string, data: unknown): ForumComment | null {
+export function readForumComment(id: string, data: unknown) {
   const result = forumCommentSchema.safeParse(data);
   return result.success ? { ...result.data, id } : null;
 }

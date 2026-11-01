@@ -1,6 +1,12 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { deleteForumPost } from '@/lib/forum-client';
+import { communityRequest, deleteForumPost } from '@/lib/forum-client';
 afterEach(() => vi.unstubAllGlobals());
+it('retains safe HTTP status for retry classification without forwarding response details', async () => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 429, json: async () => ({ code: 'APP-RATE-LIMITED', error: 'Private response', values: { secret: 'Never forwarded' } }) }));
+  await expect(communityRequest({ getIdToken: async () => 'token' }, '/api/account/jobs', undefined, 'GET')).rejects.toEqual({
+    code: 'APP-RATE-LIMITED', status: 429, message: 'The community request could not be completed.', values: {},
+  });
+});
 it('retains a safe server error code but never forwards its message or values', async () => {
   const fetchMock = vi.fn().mockResolvedValue({ ok: false, json: async () => ({ code: 'AUTH-FORBIDDEN', error: 'secret', values: { token: 'private' } }) });
   vi.stubGlobal('fetch', fetchMock);

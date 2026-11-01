@@ -1,52 +1,37 @@
 'use client';
 import Link from 'next/link';
-import { RECEIPT_STORAGE_KEY, type DeletionReceipt } from '@/lib/account-receipt';
+import { RECEIPT_STORAGE_KEY, deletionReceiptSchema, type DeletionReceipt } from '@/lib/account-receipt';
 import { useEffect, useRef, useState } from 'react';
 import { GoogleAuthProvider, reauthenticateWithPopup } from 'firebase/auth';
 import { z } from 'zod';
 import { useUser } from '@/firebase';
 import { communityRequest } from '@/lib/forum-client';
 import { jobMessages } from '@/lib/i18n/jobs';
-import { jobStatuses, type JobView } from '@/lib/jobs/types';
+import type { JobView } from '@/lib/jobs/types';
+import { nextAccountPollDelay, startAccountPolling } from '@/lib/account-polling';
+import { accountJobViewSchema, readAccountStatus } from '@/lib/account-status-client';
 import type { Language } from '@/lib/types';
 
-const View = z.object({ id: z.string().uuid(), kind: z.enum(['export', 'deletion']), status: z.enum(jobStatuses), processed: z.number(), parts: z.number().int().nonnegative().max(5000), expiresAtMs: z.number(), errorCode: z.string().optional() });
+const View = accountJobViewSchema;
 export function AccountDataControls({ lang }: { lang: Language }) {
   const { user } = useUser();
   const copy = jobMessages[lang];
   const [jobs, setJobs] = useState<JobView[]>([]), [enabled, setEnabled] = useState<boolean | null>(null);
   const [receipt, setReceipt] = useState<DeletionReceipt | null>(null);
   const [error, setError] = useState(false), [busy, setBusy] = useState(false), [checked, setChecked] = useState(false), [revision, setRevision] = useState(0);
+  const [pollError, setPollError] = useState<'retrying' | 'stopped' | null>(null), [receiptOnly, setReceiptOnly] = useState(false);
   const ids = useRef<Partial<Record<'export' | 'deletion', string>>>({});
   const alive = useRef(true);
   const downloadController = useRef<AbortController | null>(null);
   useEffect(() => { alive.current = true; return () => { alive.current = false; downloadController.current?.abort(); }; }, []);
   useEffect(() => {
     if (!user) return;
-    const controller = new AbortController();
-    let timer: ReturnType<typeof setTimeout>;
-    let deadline: ReturnType<typeof setTimeout>;
-    const refresh = async () => {
-      let nextPoll: number | undefined;
-      deadline = setTimeout(() => { setError(true); controller.abort(); }, 30_000);
-      try {
-        const result = z.object({ enabled: z.boolean(), jobs: z.array(View) }).parse(await communityRequest(user, '/api/account/jobs', undefined, 'GET', controller.signal));
-        if (receipt && !result.jobs.some(job => job.id === receipt.id)) {
-          const response = await fetch('/api/account/jobs/' + receipt.id, { headers: { 'X-Deletion-Receipt': receipt.receipt }, signal: controller.signal });
-          if (response.ok) {
-            const completed = View.pick({ id: true, kind: true, status: true, expiresAtMs: true }).parse(await response.json());
-            result.jobs.push({ ...completed, parts: 0, processed: 0 });
-          }
-        }
-        if (!controller.signal.aborted) { setJobs(result.jobs); setEnabled(result.enabled); setError(false); }
-        if (result.enabled && result.jobs.some(job => ['queued', 'running'].includes(job.status))) nextPoll = 12_000;
-        else if (result.enabled && result.jobs.some(job => job.status === 'waiting_quota')) nextPoll = 15 * 60_000;
-      } catch { if (!controller.signal.aborted) setError(true); }
-      finally { clearTimeout(deadline); }
-      if (!controller.signal.aborted && nextPoll) timer = setTimeout(refresh, nextPoll);
-    };
-    void refresh();
-    return () => { controller.abort(); clearTimeout(timer); clearTimeout(deadline); };
+    return startAccountPolling({
+      read: signal => readAccountStatus(user, receipt, signal),
+      onValue: result => { setJobs(result.jobs); setEnabled(result.enabled); setReceiptOnly(result.receiptOnly); setPollError(null); },
+      onError: (_cause, willRetry) => setPollError(willRetry ? 'retrying' : 'stopped'),
+      nextDelay: result => nextAccountPollDelay(result.jobs),
+    });
   }, [user, revision, receipt]);
   const create = async (kind: 'export' | 'deletion') => {
     if (!user || busy || (kind === 'deletion' && !checked)) return;
@@ -54,7 +39,8 @@ export function AccountDataControls({ lang }: { lang: Language }) {
     const requestId = ids.current[kind] ??= crypto.randomUUID();
     try {
       await reauthenticateWithPopup(user, new GoogleAuthProvider());
-      const result = View.extend({ receipt: z.string().optional() }).parse(await communityRequest(user, '/api/account/jobs', { kind, requestId, ...(kind === 'deletion' ? { confirmDeletion: true } : {}) }));
+      const result = View.extend({ kind: z.literal(kind), receipt: kind === 'deletion' ? deletionReceiptSchema.shape.receipt : deletionReceiptSchema.shape.receipt.optional() })
+        .parse(await communityRequest(user, '/api/account/jobs', { kind, requestId, ...(kind === 'deletion' ? { confirmDeletion: true } : {}) }));
       if (kind === 'deletion' && result.receipt) {
         const value = { id: result.id, receipt: result.receipt };
         if (alive.current) setReceipt(value);
@@ -83,8 +69,10 @@ export function AccountDataControls({ lang }: { lang: Language }) {
     <h2 className="service-heading text-xl">{copy.title}</h2>
     <p className="text-sm leading-relaxed">{copy.description}</p>
     <p className="text-sm text-muted-foreground">{copy.reauth}</p>
-    {enabled === null && !error && <p className="text-sm" role="status">{copy.loading}</p>}
-    {enabled === false && <p className="text-sm" role="status">{copy.unavailable}</p>}
+    {enabled === null && !error && !pollError && <p className="text-sm" role="status">{copy.loading}</p>}
+    {enabled === false && !receiptOnly && <p className="text-sm" role="status">{copy.unavailable}</p>}
+    {receiptOnly && <p className="text-sm" role="status">{copy.receiptOnly}</p>}
+    {pollError && <p role="alert">{pollError === 'retrying' ? copy.recovering : copy.recoveryStopped}</p>}
     {error && <p role="alert">{copy.error}</p>}
     <div className="flex flex-wrap gap-3">
       <button className="btn-duo min-h-11 rounded-2xl border-2 bg-card px-4 font-bold disabled:opacity-60" disabled={busy || !enabled} onClick={() => void create('export')}>{copy.export}</button>

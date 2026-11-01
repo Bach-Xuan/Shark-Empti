@@ -12,7 +12,7 @@ const Input = z.object({ kind: z.enum(['export', 'deletion']), requestId: z.stri
 const id = (uid: string, kind: string) => createHash('sha256').update(JSON.stringify([uid, kind])).digest('hex');
 export async function GET(request: NextRequest) {
   try {
-    const uid = await authenticatedUser(request);
+    const uid = await authenticatedUser(request, { allowUnconsented: true });
     await enforceRequestBudget(uid, 'account-traffic');
     const db = getAdminDb();
     const requests = await Promise.all(['export', 'deletion'].map(async kind => {
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 }
 export async function POST(request: NextRequest) {
   try {
-    const uid = await authenticatedUser(request);
+    const uid = await authenticatedUser(request, { allowUnconsented: true });
     await enforceRequestBudget(uid, 'account-traffic');
     const { kind, requestId } = Input.parse(await readLimitedJson(request, 4096));
     const result = await idempotentTransaction('account-request', uid, requestId, { kind }, async transaction => {
@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
       commitBudget();
       if (!previous.exists) transaction.create(ref, { uid, kind, status: 'pending-operator', createdAt: FieldValue.serverTimestamp() });
       return { kind, status: previous.get('status') ?? 'pending-operator', automatedDeletion: false, operatorConfigured: false };
-    });
+    }, { allowUnconsented: true });
     return NextResponse.json(result, { status: 202 });
   } catch (error) { return apiFailure(error); }
 }

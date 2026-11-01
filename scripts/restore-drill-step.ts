@@ -10,6 +10,9 @@ import { POST as report } from '../src/app/api/community/reports/route';
 import { POST as moderate } from '../src/app/api/community/moderation/route';
 import { deleteForumPostTree } from '../src/lib/forum-deletion';
 import { readHistoryItem } from '../src/lib/history-schema';
+import { POST as acceptConsent } from '../src/app/api/account/consent/route';
+import { currentServicePolicy } from '../src/lib/service-policy';
+import { projectForumMetadata } from '../src/lib/community-projections';
 
 const uid = 'restore-drill-learner', author = 'restore-drill-author';
 const attemptId = '11111111-1111-4111-8111-111111111111';
@@ -37,6 +40,7 @@ async function main() {
     await auth.setCustomUserClaims(author, { moderator: true });
     await db.doc(`users/${uid}`).set({ displayName: 'Synthetic fixture', sharkCoins: 0, createdAt: Timestamp.fromMillis(1_700_000_000_000) });
     const token = await tokenFor(uid), moderator = await tokenFor(author);
+    for (const bearer of [token, moderator]) assert.equal((await acceptConsent(request(bearer, { ...currentServicePolicy, accept: true }))).status, 200);
     const config = { topic: 'Addition', subject: 'math', grade: 'none', type: 'Mixed', difficulty: 'Easy', numQuestions: '1' };
     const questions = [{ question: '2+2?', correct: '4', explanation: 'Addition', type: 'Short Answer', difficulty: 'Easy' }];
     const created = await createExam(request(moderator, { title: 'Restore fixture', config, questions, requestId: crypto.randomUUID() }));
@@ -49,6 +53,7 @@ async function main() {
     await db.doc(`users/${uid}/history/session`).set({ schemaVersion: 2, config, date: Timestamp.fromDate(new Date('2026-01-01T00:00:00.000Z')), lang: 'en', totalTime: 3, quizResults: [{ ...questions[0], userAnswer: '4', isCorrect: true, timeTakenSeconds: 3 }] });
     const post = { title: 'Synthetic post', content: 'Synthetic content', subject: 'math', authorId: uid, authorName: 'Synthetic fixture', authorPhoto: '', createdAt: Timestamp.now(), likedBy: [], likesCount: 0, commentsCount: 0 };
     await db.doc('posts/restore-hidden').set(post);
+    await db.doc('forumPosts/restore-hidden').set(projectForumMetadata(post, 'post')!);
     const reported = await report(request(token, { target: { kind: 'post', id: 'restore-hidden' }, reason: 'Synthetic drill review', requestId: crypto.randomUUID() }));
     assert.equal(reported.status, 201);
     const { id: reportId } = await reported.json();

@@ -6,12 +6,14 @@ import { jobRequestSchema, jobView, readJob } from '@/lib/jobs/types';
 import { createAccountJob } from '@/lib/jobs/store';
 import { enqueueJob } from '@/lib/jobs/queue';
 import { jobsConfigured } from '@/lib/jobs/config';
+import { enforceRequestBudget } from '@/lib/request-budget';
 
 export const runtime = 'nodejs';
 const headers = { 'Cache-Control': 'no-store' };
 export async function POST(request: Request) {
   try {
-    const uid = await authenticatedUser(request, { allowLocked: true });
+    const uid = await authenticatedUser(request, { allowLocked: true, allowUnconsented: true });
+    await enforceRequestBudget(uid, 'account-traffic', { allowLocked: true });
     const token = await getAdminAuth().verifyIdToken(request.headers.get('authorization')!.slice(7), true)
       .catch(() => { throw new ApiError('AUTH-REAUTHENTICATE', 401, 'Sign in again to confirm this sensitive action.'); });
     const age = Date.now() / 1000 - token.auth_time;
@@ -25,7 +27,8 @@ export async function POST(request: Request) {
 }
 export async function GET(request: Request) {
   try {
-    const uid = await authenticatedUser(request, { allowLocked: true, allowMaintenance: true });
+    const uid = await authenticatedUser(request, { allowLocked: true, allowMaintenance: true, allowUnconsented: true });
+    await enforceRequestBudget(uid, 'account-traffic', { allowLocked: true, allowMaintenance: true });
     const enabled = jobsConfigured();
     if (!enabled) return NextResponse.json({ enabled, jobs: [] }, { headers });
     const jobs = await getAdminDb().collection('_accountJobs').where('ownerUid', '==', uid).orderBy('createdAtMs', 'desc').limit(20).get();

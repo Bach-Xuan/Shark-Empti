@@ -1,4 +1,5 @@
 import { expect, test } from './fixtures';
+import { publishForumFixture } from './community-fixtures';
 import { signInDemo as signIn } from './auth';
 import { randomUUID } from 'node:crypto';
 import { getApps,initializeApp } from 'firebase-admin/app';
@@ -77,6 +78,7 @@ test('Forum comment and Arena submission use real demo APIs', async ({ page, fau
   const db = getFirestore(getApps()[0] ?? initializeApp({ projectId: 'demo-shark-empti' }));
   const id = `browser-${test.info().project.name}-${randomUUID()}`;
   await db.doc(`posts/${id}`).set({ title: 'Browser discussion', content: 'Addition practice', subject: 'math', authorId: 'fixture', authorName: 'Fixture', authorPhoto: '', createdAt: Timestamp.now(), likesCount: 0, likedBy: [], commentsCount: 0 });
+  await publishForumFixture(db.doc('posts/' + id));
   await db.doc(`arenaExams/${id}`).set({ schemaVersion: 2, questionCount: 1, title: 'Browser exam', authorId: 'fixture', authorName: 'Fixture', authorPhoto: '', createdAt: Timestamp.now(), totalAttempts: 0, config: { topic: 'Addition', subject: 'math', grade: 'none', numQuestions: '1', difficulty: 'Easy', type: 'Multiple Choice', timeLimit: '' } });
   await db.doc(`_arenaAnswerKeys/${id}`).set({ schemaVersion: 2, authorId: 'fixture', questions: [{ question: '2 + 2 = ?', correct: '4', options: ['4', '3', '2', '1'], type: 'Multiple Choice', difficulty: 'Easy', explanation: 'Addition', section: 'Addition' }] });
   let failOnce = true;
@@ -153,6 +155,7 @@ test('Forum comment reaches the subscription without injected failures', async (
   const db = getFirestore(getApps()[0] ?? initializeApp({ projectId: 'demo-shark-empti' }));
   const id = 'subscription-' + test.info().project.name + '-' + randomUUID();
   await db.doc('posts/' + id).set({ title: 'Direct subscription', content: 'Addition', subject: 'math', authorId: 'fixture', authorName: 'Fixture', authorPhoto: '', createdAt: Timestamp.now(), likesCount: 0, likedBy: [], commentsCount: 0 });
+  await publishForumFixture(db.doc('posts/' + id));
   await signIn(page);
   await page.goto('/forum/' + id);
   await page.getByPlaceholder('Add a comment...').fill('Unintercepted comment');

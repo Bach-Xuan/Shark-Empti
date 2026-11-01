@@ -7,6 +7,8 @@ import { ApiError } from '../server-api';
 import { digest } from './crypto';
 import { isCommunityRecordPath, OWNED_RECORDS, userBudgetPaths } from './catalog';
 import type { Artifact } from './types';
+import { SERVICE_CONSENT_COLLECTION } from '../service-policy';
+import { isCommunityProjectionPath, isManagedCommunityProjection, rebuildRestoredCommunity } from '../community-privacy-migration';
 
 export function importValue(value: unknown, db: Firestore): unknown {
   if (Array.isArray(value)) return value.map(item => importValue(item, db));
@@ -51,7 +53,12 @@ export async function restoreBackup(options: {
   // First pass merges the historical and CURRENT journal before restoring any data.
   for (const artifact of parts) {
     const data = JSON.parse((await read(artifact)).toString());
-    if (data.kind === 'firestore') for (const document of data.documents) if (document.path.startsWith('_deletionJournal/')) deleted.add(document.path.split('/')[1]);
+    if (data.kind === 'firestore') for (const document of data.documents) {
+      if (document.path.startsWith('_deletionJournal/')) deleted.add(document.path.split('/')[1]);
+      if (isCommunityProjectionPath(document.path) && !isManagedCommunityProjection(document.path, importValue(document.data, db) as Record<string, unknown>)) {
+        throw new ApiError('APP-DATA-INVALID', 409, 'Unrecognized data in a public projection namespace requires review before restore.');
+      }
+    }
   }
   const excluded = new Set(['_accountJobs', '_jobWorkerState', '_jobBudgets', '_serviceState']);
   const deletedBudgetPaths = new Set([...deleted].flatMap(userBudgetPaths));
@@ -62,7 +69,8 @@ export async function restoreBackup(options: {
       const batch = db.batch(); let count = 0;
       for (const item of z.array(z.object({ path: z.string().min(1), data: z.record(z.string(), z.unknown()) })).max(100).parse(data.documents)) {
         const [collection, id] = item.path.split('/');
-        if (excluded.has(collection) || (collection === 'users' && deleted.has(id)) || deletedBudgetPaths.has(item.path)
+        if (isCommunityProjectionPath(item.path)) continue;
+        if (excluded.has(collection) || (['users', SERVICE_CONSENT_COLLECTION].includes(collection) && deleted.has(id)) || deletedBudgetPaths.has(item.path)
           || (collection === '_aiQuota' && [...deleted].some(uid => id === 'user_' + uid))) continue;
         const rule = OWNED_RECORDS.find(source => source.collection === collection);
         const owner = rule?.field.split('.').reduce<unknown>((value, field) => value && typeof value === 'object' ? (value as Record<string, unknown>)[field] : undefined, item.data);
@@ -92,5 +100,6 @@ export async function restoreBackup(options: {
   }
   // Fresh minimal tombstones continue protecting the isolated restored dataset.
   for (const uid of deleted) await db.collection('_deletionJournal').doc(uid).set({ uid, restoredDeletion: true, expiresAt: new Date(Date.now() + 30 * 86_400_000) });
-  return { documents, users, appliedDeletions: deleted.size };
+  const community = await rebuildRestoredCommunity(db);
+  return { documents, users, appliedDeletions: deleted.size, community };
 }

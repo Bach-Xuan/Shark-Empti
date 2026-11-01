@@ -6,7 +6,10 @@ import { ReportContent } from '@/components/report-content';
 import { UiText } from "@/components/ui-text";
 import { usePagedCollection } from '@/hooks/use-paged-collection';
 import { formatForumDate } from '@/lib/date-format';
-import { readForumPost } from '@/lib/public-firestore-schema';
+import { readPublicForumPost } from '@/lib/public-firestore-schema';
+import { COMMUNITY_PRIVACY_VERSION, PUBLIC_FORUM_COLLECTION } from '@/lib/community-privacy';
+import { useForumReactions } from '@/hooks/use-forum-reactions';
+import { ReactionStatus } from '@/components/reaction-status';
 import { deleteForumPost, communityRequest, mutateForum } from '@/lib/forum-client';
 import { isDocumentId } from '@/lib/document-id';
 import { uiMessage } from '@/lib/i18n';
@@ -119,9 +122,10 @@ export default function ForumPage() {
   const { notes: personalNotes, updateNotes: onNotesChange } = useUserNotes();
 
 
-  const source = usePageMemo(() => db ? query(collection(db, 'posts'), ...(sortType === 'mostLiked' ? [orderBy('likesCount', 'desc'), orderBy('createdAt', 'desc')] : [orderBy('createdAt', sortType === 'oldest' ? 'asc' : 'desc')])) : null, [db, sortType]);
-  const page = usePagedCollection<ForumPost>(source, readForumPost);
+  const source = usePageMemo(() => db ? query(collection(db, PUBLIC_FORUM_COLLECTION), where('privacyVersion', '==', COMMUNITY_PRIVACY_VERSION), ...(sortType === 'mostLiked' ? [orderBy('likesCount', 'desc'), orderBy('createdAt', 'desc')] : [orderBy('createdAt', sortType === 'oldest' ? 'asc' : 'desc')])) : null, [db, sortType]);
+  const page = usePagedCollection<ForumPost>(source, readPublicForumPost);
   const { items: posts, loading } = page;
+  const reactions = useForumReactions(db, user?.uid, posts.map(post => ({ postId: post.id })));
   const deletionSource = usePageMemo(() => db && user ? query(collection(db, '_forumDeletions'), where('authorId', '==', user.uid), where('status', '==', 'pending')) : null, [db, user]);
   const deletions = usePagedCollection(deletionSource, (id, data) => data.authorId === user?.uid && data.status === 'pending' ? id : null);
   const resumeDeletion = async (id: string) => {
@@ -259,7 +263,8 @@ export default function ForumPage() {
     }
 
     const postRef = doc(db, 'posts', post.id);
-    const hasLiked = post.likedBy?.includes(user.uid);
+    if (reactions.loading || reactions.error) return;
+    const hasLiked = reactions.isLiked({ postId: post.id });
 
     mutateForum(user, post.id, { action: 'like', liked: !hasLiked }).catch(async cause => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'update', requestResourceData: { userId: user.uid } }, cause));
@@ -307,6 +312,7 @@ export default function ForumPage() {
 
       <main className="flex-1 main-container pt-24 md:pt-36 space-y-6 md:space-y-10 pb-20 px-2 sm:px-4">
       <PageControls lang={lang} {...page} />
+      <ReactionStatus lang={lang} {...reactions} />
       {deletions.items.length > 0 && <Card className="p-4 space-y-3" role="status">
         <p>{lang === 'vi' ? 'Bài viết đã được ẩn. Hãy thử lại để hoàn tất xóa dữ liệu còn lại.' : 'Your posts are hidden. Retry to finish deleting the remaining data.'}</p>
         {deletions.items.map(id => <Button key={id} disabled={mutation.pending} onClick={() => void resumeDeletion(id)}>
@@ -554,14 +560,15 @@ export default function ForumPage() {
                       <div className="flex items-center gap-2 md:gap-6">
                         <ReportContent target={{ kind: 'post', id: post.id }} lang={lang} />
                         <button
-                          aria-label={lang === 'vi' ? 'Thích bài viết' : 'Like post'} aria-pressed={post.likedBy?.includes(user?.uid || '') ?? false}
+                          aria-label={lang === 'vi' ? 'Thích bài viết' : 'Like post'} aria-pressed={reactions.isLiked({ postId: post.id })}
+                          disabled={!!user && (reactions.loading || reactions.error)} aria-busy={reactions.loading}
                           onClick={(e) => toggleLike(e, post)}
                           className={cn(
                             "flex items-center gap-1 md:gap-2 group/heart transition-all active:scale-90",
-                            post.likedBy?.includes(user?.uid || '') ? "text-red-500" : "text-muted-foreground hover:text-red-500"
+                            reactions.isLiked({ postId: post.id }) ? "text-red-500" : "text-muted-foreground hover:text-red-500"
                           )}
                         >
-                          <Heart className={cn("w-3.5 h-3.5 md:w-5 md:h-5", post.likedBy?.includes(user?.uid || '') && "fill-current")} />
+                          <Heart className={cn("w-3.5 h-3.5 md:w-5 md:h-5", reactions.isLiked({ postId: post.id }) && "fill-current")} />
                           <span className="text-[9px] md:text-xs font-black">{post.likesCount}</span>
                         </button>
                         <div className="flex items-center gap-1 md:gap-2 text-muted-foreground">

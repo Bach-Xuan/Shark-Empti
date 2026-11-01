@@ -4,11 +4,10 @@ import { act,cleanup,fireEvent,render,screen,waitFor } from '@testing-library/re
 import { afterEach,expect,it,vi } from 'vitest';
 import userEvent from '@testing-library/user-event';
 import { uiMessage } from '@/lib/i18n';
-import { serverTimestamp } from 'firebase/firestore';
 const mocks = vi.hoisted(() => ({ validate: vi.fn(), flashcards: vi.fn(), practice: vi.fn(), grade: vi.fn(), write: vi.fn() }));
 vi.mock('@/ai/client-flows', () => ({ validateAcademicTopic: mocks.validate, generateFlashcards: mocks.flashcards, generatePractice: mocks.practice, shortAnswerAnalysis: mocks.grade }));
 vi.mock('@/firebase', () => ({ useUser: () => ({ user: { uid: 'first' } }), useFirestore: () => ({}) }));
-vi.mock('firebase/firestore', async importOriginal => ({ ...await importOriginal<typeof import('firebase/firestore')>(), collection: () => ({ path: 'demo' }), doc: () => ({ path: 'demo' }), setDoc: mocks.write, addDoc: mocks.write }));
+vi.mock('@/lib/learning-client', () => ({ writeLearningRecord: mocks.write }));
 vi.mock('@/lib/error-toast', () => ({ showErrorToast: vi.fn(), showUnexpectedErrorToast: vi.fn() }));
 vi.mock('@/components/feature-help', () => ({ default: () => null }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
@@ -21,7 +20,8 @@ it('flips a flashcard with Enter and Space, hiding the inactive face from assist
   fireEvent.click(screen.getByRole('button', { name: translations.en.startLearning }));
   const card = await screen.findByRole('button', { name: uiMessage('en', 'playgroundview.tap_to_reveal') });
   await waitFor(() => expect(mocks.write).toHaveBeenCalledTimes(1));
-  expect(mocks.write.mock.calls[0][1].createdAt.isEqual(serverTimestamp())).toBe(true);
+  expect(mocks.write.mock.calls[0][1]).toBe('flashcards');
+  expect(mocks.write.mock.calls[0][3]).not.toHaveProperty('createdAt');
   const keyboard = userEvent.setup();
   card.focus();
   await keyboard.keyboard('{Enter}');
@@ -72,8 +72,9 @@ it.each(['en', 'vi'] as const)('semantically grades a supported free-text equiva
   await waitFor(() => expect(mocks.grade).toHaveBeenCalledTimes(1));
   fireEvent.click(await screen.findByRole('button', { name: /finish|results|hoàn|kết/i }));
   await waitFor(() => expect(mocks.write).toHaveBeenCalledTimes(1));
-  expect(mocks.write.mock.calls[0][1].userAnswers[0].isCorrect).toBe(true);
-  expect(mocks.write.mock.calls[0][1].createdAt.isEqual(serverTimestamp())).toBe(true);
+  expect(mocks.write.mock.calls[0][1]).toBe('practice');
+  expect(mocks.write.mock.calls[0][3].userAnswers[0].isCorrect).toBe(true);
+  expect(mocks.write.mock.calls[0][3]).not.toHaveProperty('createdAt');
   expect(mocks.grade.mock.calls[0][0].language).toBe(lang);
 });
 it('preserves uncertain answers without saving a false mistake, then permits retry', async () => {

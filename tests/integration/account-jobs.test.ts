@@ -11,10 +11,12 @@ import { enqueueJob } from '@/lib/jobs/queue';
 import { exportStep, deletionStep } from '@/lib/jobs/account-worker';
 import { restoreBackup } from '@/lib/jobs/restore';
 import { backupStep } from '@/lib/jobs/backup';
+import { forumReactionId } from '@/lib/community-privacy';
+import { projectForumMetadata } from '@/lib/community-projections';
 import { initializeApp, deleteApp } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
-import { POST as requestJob } from '@/app/api/account/jobs/route';
+import { GET as listJobs, POST as requestJob } from '@/app/api/account/jobs/route';
 import { GET as jobStatus } from '@/app/api/account/jobs/[id]/route';
 vi.mock('server-only', () => ({}));
 type File = { fileId: string; fileName: string; contentLength: number; fileInfo: Record<string, string>; action: string; data: Buffer };
@@ -62,9 +64,60 @@ async function complete(id: string) {
   }
   throw Error('Job did not finish within its bounded fixture inventory');
 }
+it('admits account job creation/list/status before parsing or private job lookups', async () => {
+  await getAdminDb().doc('_requestBudgets/account-traffic_global').set({ tokens: 0, updatedAtMs: Date.now() + 60000 });
+  const headers = { Authorization: 'Bearer ' + token };
+  const address = 'https://fixture.example.invalid/api/account/jobs';
+  expect((await listJobs(new Request(address, { headers }))).status).toBe(429);
+  expect((await requestJob(new Request(address, { method: 'POST', headers, body: '{}' }))).status).toBe(429);
+  const id = randomUUID();
+  const status = await jobStatus(new Request(address + '/' + id, { headers }), { params: Promise.resolve({ id }) });
+  expect(status.status).toBe(429);
+});
+it('admits a bounded receipt credential before looking up an unknown private job', async () => {
+  await getAdminDb().doc('_requestBudgets/account-receipt_global').set({ tokens: 0, updatedAtMs: Date.now() + 60000 });
+  const id = randomUUID();
+  const response = await jobStatus(new Request('https://fixture.example.invalid/api/account/jobs/' + id, { headers: { 'X-Deletion-Receipt': 'a'.repeat(43) } }), { params: Promise.resolve({ id }) });
+  expect(response.status).toBe(429);
+});
+it('rejects malformed receipt syntax before budget or private-job database access', async () => {
+  const db = getAdminDb(), access = vi.spyOn(db, 'collection');
+  for (const receipt of ['wrong', 'a'.repeat(129), 'a'.repeat(42) + '+']) {
+    const id = randomUUID();
+    const response = await jobStatus(new Request('https://fixture.example.invalid/api/account/jobs/' + id, { headers: { 'X-Deletion-Receipt': receipt } }), { params: Promise.resolve({ id }) });
+    expect(response.status).toBe(404);
+  }
+  expect(access).not.toHaveBeenCalled();
+});
+it('admits only the final global receipt token without persisting receipt identifiers', async () => {
+  const db = getAdminDb();
+  await db.doc('_requestBudgets/account-receipt_global').set({ tokens: 1, updatedAtMs: Date.now() + 60000 });
+  const responses = await Promise.all(['a', 'b'].map(async value => {
+    const id = randomUUID();
+    return jobStatus(new Request('https://fixture.example.invalid/api/account/jobs/' + id, { headers: { 'X-Deletion-Receipt': value.repeat(43) } }), { params: Promise.resolve({ id }) });
+  }));
+  expect(responses.map(response => response.status).sort()).toEqual([404, 429]);
+  const budgets = await db.collection('_requestBudgets').get();
+  expect(budgets.docs.map(doc => doc.id)).toEqual(['account-receipt_global']);
+  expect((await budgets.docs[0].ref.get()).get('tokens')).toBe(0);
+});
+it('keeps admitted account reads available without consent under locks and maintenance while denying new jobs', async () => {
+  const db = getAdminDb(), created = await createAccountJob(uid, 'deletion', randomUUID());
+  await db.doc('_serviceState/maintenance').set({ active: true, expiresAtMs: Date.now() + 60000 });
+  const address = 'https://fixture.example.invalid/api/account/jobs', headers = { Authorization: 'Bearer ' + token };
+  expect((await listJobs(new Request(address, { headers }))).status).toBe(200);
+  const status = await jobStatus(new Request(address + '/' + created.id, { headers }), { params: Promise.resolve({ id: created.id }) });
+  expect(status.status).toBe(200);
+  const receipt = await jobStatus(new Request(address + '/' + created.id, { headers: { 'X-Deletion-Receipt': created.receipt! } }), { params: Promise.resolve({ id: created.id }) });
+  expect(receipt.status).toBe(200);
+  expect((await requestJob(new Request(address, { method: 'POST', headers, body: JSON.stringify({ kind: 'export', requestId: randomUUID() }) }))).status).toBe(503);
+});
 it('exports private, community and server records through durable parts; duplicate requests and deliveries are safe', async () => {
   const db = getAdminDb();
+  await db.doc('_serviceConsents/' + uid).set({ policyVersion: '2', minimumAge: 16, acceptedAt: Timestamp.fromMillis(1) });
   await db.doc('users/' + uid + '/notes/main').set({ text: 'Owned private note' });
+  const ownReaction = 'users/' + uid + '/forumReactions/' + await forumReactionId({ postId: 'reacted-post' });
+  await db.doc(ownReaction).set({ postId: 'reacted-post', liked: true, privacyVersion: 1 });
   await db.doc('users/' + uid + '/notes/missing/deep/one').set({ text: 'Owned orphan note' });
   await db.doc('users/foreign/notes/main').set({ text: 'Foreign secret' });
   await db.doc('users/foreign/comments/private').set({ authorId: uid, content: 'Foreign private comment', likedBy: [uid] });
@@ -77,9 +130,11 @@ it('exports private, community and server records through durable parts; duplica
   const job = await complete(created.id);
   expect(job.status).toBe('ready');
   const output = (await Promise.all(job.artifacts.map(artifact => new PrivateJobStorage().get(artifact)))).map(buffer => buffer.toString());
+  expect(JSON.parse(output[0]).serviceConsent).toMatchObject({ policyVersion: '2', minimumAge: 16, acceptedAt: { $type: 'timestamp' } });
   expect(output.join()).toContain('Owned private note'); expect(output.join()).toContain('Own contribution'); expect(output.join()).toContain('Own AI feedback');
   expect(output.join()).not.toContain('Foreign secret'); expect(output.join()).not.toContain('"likedBy":["foreign"]');
   expect(output.join()).toContain('Owned orphan note');
+  expect(output.join()).toContain(ownReaction);
   expect(output.join()).not.toContain('Foreign private comment');
   expect(output.join()).not.toContain('Foreign private attempt');
   const manifest = JSON.parse(output.at(-1)!);
@@ -92,14 +147,19 @@ it('exports private, community and server records through durable parts; duplica
 });
 it('locks writes, removes private/Auth records and reactions, and anonymizes retained contributions and ranking identity', async () => {
   const db = getAdminDb();
+  await db.doc('_serviceConsents/' + uid).set({ policyVersion: '2', minimumAge: 16, acceptedAt: Timestamp.fromMillis(1) });
   await db.doc('_aiGenerations/expired-owned').set({ ownerUid: uid, expiresAt: new Date(0), status: 'ready' });
   await db.doc('users/' + uid + '/history/one').set({ private: 'Owned history' });
+  const ownReaction = 'users/' + uid + '/forumReactions/' + await forumReactionId({ postId: 'own' });
+  await db.doc(ownReaction).set({ postId: 'own', liked: true, privacyVersion: 1 });
   await db.doc('users/' + uid + '/notes/missing/deep/one').set({ private: 'Orphan private record' });
   const foreignComment = { authorId: uid, authorName: 'Private copy', likedBy: [uid], likesCount: 1 };
   const foreignAttempt = { userId: uid, userName: 'Private copy' };
   await db.doc('users/foreign/comments/private').set(foreignComment);
   await db.doc('users/foreign/attempts/private').set(foreignAttempt);
-  await db.doc('posts/own').set({ authorId: uid, authorName: 'Learner', authorPhoto: 'https://example.invalid/avatar', likedBy: [uid, 'other'], likesCount: 2 });
+  const contribution = { title: 'Retained contribution', content: 'Body', subject: 'math', authorId: uid, authorName: 'Learner', authorPhoto: 'https://example.invalid/avatar', likedBy: [uid, 'other'], likesCount: 2, commentsCount: 0, createdAt: Timestamp.now() };
+  await db.doc('posts/own').set(contribution);
+  await db.doc('forumPosts/own').set(projectForumMetadata(contribution, 'post')!);
   await db.doc('posts/foreign/comments/own').set({ authorId: uid, authorName: 'Learner', authorPhoto: '', likedBy: [] });
   await db.doc('arenaExams/exam/attempts/old-linked-id').set({ userId: uid, userName: 'Learner', score: 80 });
   await db.doc('arenaExams/owned').set({ authorId: uid, authorName: 'Learner', authorPhoto: '' });
@@ -111,10 +171,14 @@ it('locks writes, removes private/Auth records and reactions, and anonymizes ret
   await expect(createAccountJob(uid, 'export', randomUUID())).rejects.toMatchObject({ code: 'ACCOUNT-DELETING' });
   expect((await complete(created.id)).status).toBe('completed');
   expect((await db.doc('users/' + uid + '/history/one').get()).exists).toBe(false);
+  expect((await db.doc(ownReaction).get()).exists).toBe(false);
   expect((await db.doc('users/' + uid + '/notes/missing/deep/one').get()).exists).toBe(false);
   expect((await db.doc('users/' + uid).get()).exists).toBe(false);
+  expect((await db.doc('_serviceConsents/' + uid).get()).exists).toBe(false);
   await expect(getAdminAuth().getUser(uid)).rejects.toMatchObject({ code: 'auth/user-not-found' });
   expect((await db.doc('posts/own').get()).data()).toMatchObject({ authorId: '__deleted__', authorName: 'Former member', authorPhoto: '', likedBy: ['other'], likesCount: 1 });
+  expect((await db.doc('forumPosts/own').get()).data()).toMatchObject({ authorId: '__deleted__', authorName: 'Former member', likesCount: 1, privacyVersion: 1 });
+  expect((await db.doc('forumPosts/own').get()).get('likedBy')).toBeUndefined();
   expect(JSON.stringify((await db.doc('_moderationArchives/foreign').get()).data())).not.toContain(uid);
   expect((await db.collection('arenaExams/exam/attempts').where('userId', '==', uid).get()).empty).toBe(true);
   expect((await db.doc('users/foreign/comments/private').get()).data()).toEqual(foreignComment);
@@ -145,7 +209,7 @@ it('sweeps expired server records with Spark queries rather than native TTL', as
   expect((await getAdminDb().doc('_arenaSessions/expired').get()).exists).toBe(false);
   expect((await getAdminDb().doc('_arenaSessions/live').get()).exists).toBe(true);
 });
-it('keeps quota-delayed export processing separate from ready download expiry', async () => {
+it('bounds download traffic while keeping quota-delayed export processing separate from ready expiry', async () => {
   const db = getAdminDb(), day = 86_400_000;
   const created = await createAccountJob(uid, 'export', randomUUID());
   expect(created.job.expiresAtMs - created.job.createdAtMs).toBe(7 * day);
@@ -163,6 +227,12 @@ it('keeps quota-delayed export processing separate from ready download expiry', 
     headers: { Authorization: 'Bearer ' + token },
   }), { params: Promise.resolve({ id: created.id }) });
   expect((await download()).status).toBe(200);
+  const storage = vi.spyOn(PrivateJobStorage.prototype, 'get');
+  const traffic = db.doc('_requestBudgets/account-traffic_global');
+  await traffic.set({ tokens: 0, updatedAtMs: Date.now() + 60000 });
+  expect((await download()).status).toBe(429);
+  expect(storage).not.toHaveBeenCalled();
+  await traffic.delete();
   await db.doc('_accountJobs/' + created.id).update({ expiresAtMs: Date.now() - 1 });
   expect((await download()).status).toBe(404);
   expect(files.size).toBeGreaterThan(0); // Physical retention cannot extend download authorization.
@@ -226,10 +296,14 @@ it('exposes provider quota waiting while retaining the durable cursor', async ()
 });
 it('restores encrypted Firestore/Auth parts into an empty isolated target and applies a newer deletion journal', async () => {
   const db = getAdminDb(), removedUid = 'removed-after-backup';
+  await db.doc('_serviceConsents/' + uid).set({ policyVersion: '2', minimumAge: 16, acceptedAt: Timestamp.fromMillis(1) });
+  await db.doc('_serviceConsents/' + removedUid).set({ policyVersion: '2', minimumAge: 16, acceptedAt: Timestamp.fromMillis(1) });
   await getAdminAuth().createUser({ uid: removedUid, displayName: 'Removed later' });
   await db.doc('users/' + removedUid + '/notes/one').set({ text: 'Must not resurrect' });
   await db.doc('users/' + uid + '/notes/missing/deep/one').set({ text: 'Restore an owned orphan' });
-  await db.doc('posts/retained').set({ constructor: 'legacy', authorId: removedUid, authorName: 'Removed later', authorPhoto: '', likedBy: [removedUid, uid], likesCount: 2 });
+  const retained = { constructor: 'legacy', title: 'Retained post', content: 'Body', subject: 'math', commentsCount: 0, createdAt: Timestamp.now(), authorId: removedUid, authorName: 'Removed later', authorPhoto: '', likedBy: [removedUid, uid], likesCount: 2 };
+  await db.doc('posts/retained').set(retained);
+  await db.doc('forumPosts/retained').set(projectForumMetadata(retained, 'post')!);
   await getAdminAuth().setCustomUserClaims(uid, { moderator: true });
   vi.stubEnv('ACCOUNT_BACKUPS_ENABLED', 'true'); await maintenanceSweep();
   const jobs = await db.collection('_accountJobs').where('kind', '==', 'backup').get();
@@ -241,6 +315,12 @@ it('restores encrypted Firestore/Auth parts into an empty isolated target and ap
     const targetDb = getFirestore(app), targetAuth = getAuth(app), storage = new PrivateJobStorage();
     const result = await restoreBackup({ db: targetDb, auth: targetAuth, artifacts: job.artifacts, read: artifact => storage.get(artifact), currentDeletedUids: new Set([removedUid]) });
     expect(result.appliedDeletions).toBe(1);
+    expect(result.community.blocked).toBe(0);
+    expect((await targetDb.doc('forumPosts/retained').get()).data()).toMatchObject({ authorId: '__deleted__', authorName: 'Former member', likesCount: 1, privacyVersion: 1 });
+    expect((await targetDb.doc('forumPosts/retained').get()).get('likedBy')).toBeUndefined();
+    expect((await targetDb.doc('posts/retained').get()).get('constructor')).toBe('legacy');
+    expect((await targetDb.doc('_serviceConsents/' + removedUid).get()).exists).toBe(false);
+    expect((await targetDb.doc('_serviceConsents/' + uid).get()).get('policyVersion')).toBe('2');
     expect((await targetDb.doc('users/' + uid + '/notes/missing/deep/one').get()).get('text')).toBe('Restore an owned orphan');
     expect((await targetDb.doc('users/' + removedUid + '/notes/one').get()).exists).toBe(false);
     await expect(targetAuth.getUser(removedUid)).rejects.toMatchObject({ code: 'auth/user-not-found' });

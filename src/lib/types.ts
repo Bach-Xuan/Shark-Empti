@@ -119,7 +119,6 @@ export interface ForumPost {
   updatedAt?: StoredDate;
   likesCount: number;
   commentsCount: number;
-  likedBy?: string[];
 }
 
 export interface ForumComment {
@@ -131,7 +130,6 @@ export interface ForumComment {
   createdAt: StoredDate;
   updatedAt?: StoredDate;
   likesCount: number;
-  likedBy?: string[];
 }
 
 export interface ArenaAttempt {
@@ -143,4 +141,7 @@ export interface ArenaAttempt {
   score: number;
   duration: number;
   createdAt: StoredDate;
+}
+export interface ArenaRanking extends Omit<ArenaAttempt, 'userId'> {
+  formerMember: boolean;
 }

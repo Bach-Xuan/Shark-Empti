@@ -42,6 +42,7 @@ Open [localhost:9002](http://localhost:9002). `npm ci` may replace `node_modules
 |---|---|
 | `npm run dev` | Local app |
 | `npm run lint`, `npm run typecheck`, `npm run check:maintenance` | Static and repository contracts |
+| `npm run check:configuration` | Offline Firebase Web/Admin configuration preflight; no credential output or service-readiness claim |
 | `npm test`, `npm run test:coverage` | Unit/component tests and optional V8 coverage |
 | `npm run test:rules`, `npm run test:integration` | Firebase Emulator Rules and API checks |
 | `npm run build:demo`, `npm run test:e2e`, `npm run test:production` | Verified demo build, browser matrix and production HTTP smoke |
@@ -60,5 +61,11 @@ Install browser engines with `npx --no-install playwright install chromium webki
 - [Audit register](docs/AUDIT_REPORT.md): finding statuses and unresolved verification boundaries.
 - [Validation](docs/VALIDATION.md): built-in tests, interpretation and evidence limits.
 - [Account operations](docs/ACCOUNT_OPERATIONS.md): background export/deletion, retention and encrypted backup/restore.
+
+CI action versions and runner requirements follow the [reviewed governance contract](docs/CONFIGURATION.md#ci-action-governance); local application checks and hosted workflow acceptance have separate evidence boundaries.
+
+Authenticated account-data controls at `/account/data` remain accessible without renewed learning-policy acceptance or profile provisioning. Learning and community operations require explicit current acknowledgement through the server; age eligibility remains self-declared. Export/deletion services must be configured separately.
+
+Quiz, Flashcard and Practice saves use authenticated, schema-validated APIs with stable retry identity and count/byte admission. Profile, notes and activity SDK writes have bounded Rules; owner legacy reads and explicit record deletion remain available. Client/server/Rules changes require a coordinated rollout; see [configuration](docs/CONFIGURATION.md#learning-write-validation-rollout).
 
 The interface supports Vietnamese and English; preferences persist between pages and tabs. Camera access requires HTTPS or localhost and explicit permission. Lists expose 50 records per page; client-side search/statistics reflect exposed records. During timestamp migration, history merges two bounded candidate streams as described in the [data contract](docs/TECHNICAL_DOCUMENTATION.md). Documented browser targets are Safari 16.4+, Chrome 111+ and Firefox 128+; current engine tests do not establish exact-version or physical-device acceptance. See the [audit](docs/AUDIT_REPORT.md) before release.

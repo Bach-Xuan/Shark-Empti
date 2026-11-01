@@ -12,6 +12,8 @@ npx --no-install playwright install chromium firefox webkit
 
 Use [validation](VALIDATION.md) to select tests and interpret results. Package versions and peer requirements belong to the manifest/lockfile. Dependency assessment queries npm and applies `config/dependency-audit-policy.json`; maintenance checks declarations/lock agreement but does not assess advisories.
 
+The Firebase CLI development dependency has a `^15.34.2` floor for its supported patched CSV/streaming JSON stack. Keep the npm lockfile and use its installed CLI for Emulators; do not restore the removed get-uri/basic-ftp override. The separate Firestore/gRPC override remains intentional. Compatible-parent upgrades and unresolved advisory paths are recorded in the [audit register](AUDIT_REPORT.md#v04-dependency-risk-assessment-is-not-current).
+
 ## 🔐 Environment file and variable matrix
 
 Create `.env` only when absent; Next reads it for development/build. Existing process variables take precedence for Node scripts. Rebuild after changing `NEXT_PUBLIC_*`: those values are embedded in the browser bundle. Never commit or print secrets. `.env.example` is the complete template.
@@ -35,6 +37,8 @@ if (-not (Test-Path -LiteralPath .env)) {
 
 `NODE_ENV` is managed by Next/scripts, not `.env`. `API_KEYS`, `GEMINI_API_KEY` and `GOOGLE_GENAI_API_KEY` are not used by current source/scripts. Public Web configuration identifies the client; Rules/API authorization protect data. Do not put Admin/OpenRouter/QStash/B2/encryption credentials in `NEXT_PUBLIC_*`, source, logs, reports or screenshots.
 
+Run `npm run check:configuration` before starting or releasing a configured environment. This explicit preflight checks all six Web values, the three Admin values, RSA PEM structure and matching Web/Admin project IDs without initializing Firebase or sending network requests; it never prints credentials. Application Firebase initialization also rejects missing Web fields before calling the SDK. Admin initialization remains lazy so public pages and builds do not require server credentials; missing or malformed Admin configuration receives the safe configuration-error classification. Structural success does not prove the service account is authorized or the target services are ready.
+
 ## 🔥 Firebase setup
 
 1. In [Firebase Console](https://console.firebase.google.com/), create/select the intended project and register a Web app under **Project settings → General → Your apps**. Copy `apiKey`, `authDomain`, `projectId`, `storageBucket`, `messagingSenderId`, `appId` to the matching `NEXT_PUBLIC_FIREBASE_*` names in `.env.example`.
@@ -55,12 +59,20 @@ npx --no-install firebase deploy --project YOUR_FIREBASE_PROJECT_ID --only 'fire
 
 Review the target and changes before executing the deployment; confirm index readiness afterwards. The CLI login identity and Admin runtime service account have separate permissions. Preserve Forum tombstones and private Arena keys/eligibility when planning deployment or recovery.
 
+Drain in-flight background workers and deploy the consent API, updated client and export/deletion/restore code together, then the matching Rules. Users with only a legacy owner-written acknowledgement must explicitly confirm again; do not copy legacy records into `_serviceConsents` or pre-seed an acceptance. Existing tabs may require refresh. Keep the policy version/minimum age in `src/lib/site-info.ts` synchronized with the Rules constants; a regression checks this contract. Verify `/account/data` while consent is absent or outdated, and verify that learning writes and business APIs refuse access until server acknowledgement. No new composite index is needed for the UID-addressed consent collection.
+
 Do not infer a missing private key or assume local credentials point to a staging project. If a key is exposed, revoke/rotate it and update the deployment; `.gitignore` alone does not remove committed history.
 
 <a id="timestamp-migration"></a>
+## Learning write validation rollout
+
+Deploy the learning PUT/PATCH API and updated Quiz/Flashcard/Practice clients together before applying the matching restrictive Rules. Older tabs that still write complex records through the SDK require refresh; do not temporarily reopen arbitrary private writes. Verify authenticated creation, response-loss replay, feedback recovery, notes/profile edits, activity leaf merging and owner legacy read/delete access. The new API uses document lookups and requires no additional composite index. This is a coordinated client/server/Rules rollout, not a remote data migration.
+
+Bounds in `src/lib/data-limits.ts`, producer schemas, persistence schemas, UI inputs and Rules must remain synchronized. The `learning-traffic` and `learning-write` token buckets use provisional ceilings in `src/lib/request-budget.ts`; calibrate them against the intended environment before release. New budget scopes are automatically included in attributable export/deletion without renumbering durable job phases. API fingerprints are preserved with learning records through backup/restore; do not remove them to bypass changed-payload conflicts.
+
 ## Timestamp migration
 
-New learning writes store Firestore Timestamp values, and matching Rules reject new ISO/numeric date fields. Deploy the compatible readers/writers before tightening Rules; older clients that still write ISO require refresh. History remains correctly paged while Timestamp values coexist with fixed-width UTC ISO strings produced by the original writer. Other ISO representations, including offsets and date-only strings, must be migrated before they appear in the history feed; until then they count as invalid records. Inventory and migrate these records before rollout to avoid temporarily hiding them.
+New learning APIs persist Firestore Timestamp values; direct SDK creation/update of history, Flashcards and Practice is denied. History accepts bounded epoch milliseconds at the API boundary, preserving the completion instant across retries, while Flashcard/Practice timestamps are server-derived. History remains correctly paged while Timestamp values coexist with fixed-width UTC ISO strings produced by the original writer. Other ISO representations, including offsets and date-only strings, must be migrated before they appear in the history feed; until then they count as invalid records. Inventory and migrate these records before rollout to avoid temporarily hiding them.
 
 Inventory the exact target before converting existing `users/{uid}/history.date`, `flashcards.createdAt` and `practice.createdAt`:
 
@@ -74,7 +86,7 @@ This command reads existing records but makes no writes by default. Its output c
 npm run migrate:timestamps -- --project=YOUR_FIREBASE_PROJECT_ID --apply --confirm-timestamp-migration
 ```
 
-The configured Admin project must match the explicit project. The bounded, transactional conversion preserves original instants and unrelated fields, skips invalid dates, includes records below missing user profiles and refuses deletion locks or an active backup barrier. It can be repeated after interruption. Rerun the inventory to verify zero convertible records; invalid dates require separate review. Do not run conversion concurrently with a legacy restore or older ISO-writing clients. No new index definition is needed for the type-specific single-field history queries; confirm the target has not disabled the normal `date` index. Application epoch milliseconds, numeric `*Ms` protocol/lease fields, durations, local calendar-day keys and external JSON metadata have distinct purposes and are not converted by this command.
+The configured Admin project must match the explicit project. The conversion scans pages of 100 and commits at most 20 candidates per transaction, sharing maintenance and distinct-owner lock reads while rereading every record. It preserves original instants and unrelated fields, skips invalid/concurrently removed or already canonical dates, includes records below missing user profiles and refuses deletion locks or an active backup barrier. A protected owner aborts the entire current chunk; previous chunks may already be committed. It can be repeated after interruption. Rerun the inventory to verify zero convertible records; invalid dates require separate review. Do not run conversion concurrently with a legacy restore or older ISO-writing clients. No new index definition is needed for the type-specific single-field history queries; confirm the target has not disabled the normal `date` index. Application epoch milliseconds, numeric `*Ms` protocol/lease fields, durations, local calendar-day keys and external JSON metadata have distinct purposes and are not converted by this command. Emulator operation counts do not establish remote duration or cost.
 
 ## 🤖 OpenRouter setup
 
@@ -106,6 +118,25 @@ Open [localhost:9002](http://localhost:9002). Client and Admin Firebase project 
 
 The app normally uses port 9002; Firestore, Auth and AI fixture use 8080, 9099 and 9098. `npm run test:rules`, `npm run test:integration` and `npm run test:e2e` use demo Firebase/Emulators; do not run concurrent suites on the same ports. E2E uses a fake AI provider and blocks external requests. Production browser checks require the verified `npm run build:demo` artifact and `E2E_PRODUCTION=true`; source/assets/lock/config changes invalidate its fingerprint. The [validation guide](VALIDATION.md) provides the complete commands, browser/print checks and interpretation.
 
+Community, moderator and account APIs have separate pre-query traffic admission and transactional business quotas. Policies in `src/lib/request-budget.ts` define token capacities and refill durations. New UID scopes are covered by attributable export/deletion automatically; receipt-only status uses a global bucket and persists no credential identifier. These document-addressed controls need no additional composite index. Calibrate normal polling, retry bursts, moderation preview reads, storage downloads and authentication/admission overhead in staging; no hosting WAF or daily spending bound is assumed. Deploy matching APIs before relying on the limits.
+
+Account polling recovery is defined in `src/lib/account-polling.ts`: four transient retries, distinct per-request deadlines and throttled online/visible-focus recovery. No additional flag enables automatic mutations. Forum cleanup uses the configured default Firestore database and existing Admin query/delete permissions; parent-scoped name-only descendant queries need no new application index. Every cleanup batch and tombstone finalization honor write guards transactionally. Verify runtime duration, Admin REST authorization and interruption/resumption in the intended staging project before deployed acceptance.
+
+## CI action governance
+
+[The validation workflow](../.github/workflows/ci.yml) pins every external action to a full commit SHA with its reviewed release in a comment, following [GitHub's immutable-reference guidance](https://docs.github.com/en/actions/reference/security/secure-use#using-third-party-actions). Its token has `contents: read` and checkout does not persist credentials for later build/test steps. The reviewed action manifests are:
+
+| Action | Release | Pinned manifest |
+|---|---|---|
+| `actions/checkout` | `v7.0.1` | [Node 24 manifest](https://github.com/actions/checkout/blob/3d3c42e5aac5ba805825da76410c181273ba90b1/action.yml) |
+| `actions/setup-node` | `v7.1.0` | [Node 24 manifest](https://github.com/actions/setup-node/blob/949feb2413d6458794dcd2491c4babbbce0c15c1/action.yml) |
+| `actions/setup-java` | `v6.1.0` | [Node 24 manifest](https://github.com/actions/setup-java/blob/b843ebf9b913146b38da2eaa7aeddf76074ae1ad/action.yml) |
+| `actions/upload-artifact` | `v7.0.2` | [Node 24 manifest](https://github.com/actions/upload-artifact/blob/cf430e030ddbb5b0abf93d22962f4752f3646cd9/action.yml) |
+
+The action runtime is independent of `setup-node`'s application Node 24 selection. These manifests require a Node-24-capable runner; [upstream compatibility guidance](https://github.com/actions/checkout/blob/3d3c42e5aac5ba805825da76410c181273ba90b1/README.md#checkout-v5) sets the minimum runner to `2.327.1`. This job uses `ubuntu-latest`, npm caching, Temurin 21 and zipped multi-file artifacts. Checkout's newer restriction concerns `pull_request_target`/`workflow_run`; this workflow uses `push`/`pull_request` and does not opt into unsafe checkout. No registry publishing or authenticated Git/Docker step depends on the removed credential defaults.
+
+For an action update, resolve the exact release tag in its official repository, compare the resulting full SHA, read that release's manifest and compatibility notes, then update the workflow SHA/comment and this table together. Revalidate YAML, used inputs, token needs, application commands and runner requirements. The minimum runner is a compatibility requirement, not a measurement of the current hosted image. Local inspection does not execute an action, its post step or hosted cache/artifact service; hosted validation remains a release gate.
+
 ## ☁️ Vercel and deployment
 
 1. Import the repository into Vercel with the Next.js preset and Node 24. Set the six public Web variables, three Admin variables and OpenRouter key in the appropriate Development, Preview and Production scopes; mark secrets sensitive where supported. Separate test/production credentials.
@@ -124,7 +155,7 @@ There is no `vercel.json`; dashboard settings govern hosting. Never assume Previ
 
 Identify the candidate revision, dependency lock, target, configuration and owner. Run the relevant local checks in [validation](VALIDATION.md). Confirm expected live origin, Rules/indexes, signed retention, hosting runtime and access; compare deployed assets with the candidate. Before AI canary, establish account scope, duration and measurable error/latency/quota stop criteria; test response loss, cancellation, lease expiry and all seven operations with non-sensitive correlation IDs. Stop on incorrect authorization, data loss/duplication or breached attempt limits. Disabling creation does not cancel already dispatched requests or reverse persisted writes.
 
-Account jobs/backups remain disabled until their provider and recovery gates in [account operations](ACCOUNT_OPERATIONS.md) are satisfied. The audit records 74 findings, including 11 outstanding findings and five owner-accepted local closures with deployment verification deferred. Actual production/camera/hosted CI/provider validation remains distinct from local tests.
+Account jobs/backups remain disabled until their provider and recovery gates in [account operations](ACCOUNT_OPERATIONS.md) are satisfied. The [audit register](AUDIT_REPORT.md) records the current finding counts, the item-by-item reference-report reconciliation and each acceptance boundary. Actual production/camera/hosted CI/provider validation remains distinct from local tests.
 
 <a id="retention-operations"></a>
 ## 🧾 Retention and index operations

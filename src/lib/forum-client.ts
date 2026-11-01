@@ -17,7 +17,7 @@ export async function communityRequest(user: Pick<User, 'getIdToken'>, path: str
     const payload: unknown = await response.json().catch(() => null);
     if (!response.ok) {
       const code = payload && typeof payload === 'object' && 'code' in payload && typeof payload.code === 'string' && /^(?:APP|AUTH|FORUM|COMMUNITY)-[A-Z0-9-]{1,60}$/.test(payload.code) ? payload.code : 'APP-REQUEST-FAILED';
-      throw { code, message: 'The community request could not be completed.', values: {} };
+      throw { code, status: response.status, message: 'The community request could not be completed.', values: {} };
     }
     if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw { code: 'APP-DATA-INVALID', values: {} };
     return payload;

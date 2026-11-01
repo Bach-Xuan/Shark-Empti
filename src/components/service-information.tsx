@@ -35,6 +35,8 @@ export function ServiceInformation({ section }: { section: ServicePage }) {
             <h2 className="service-heading text-xl">{copy.contact}</h2>
             <p className="font-semibold">{SITE_INFO.operator}</p>
             <a href={'mailto:' + SITE_INFO.supportEmail} className="service-link -ml-3 break-all text-primary"><Mail className="mr-2 h-4 w-4 shrink-0" aria-hidden="true" />{SITE_INFO.supportEmail}</a>
+            <p><Link className="service-link -ml-3" href="/account/data">{copy.dataControls}</Link></p>
+            <p className="text-sm">{lang === 'vi' ? 'Bạn có thể truy cập chức năng này mà không cần xác nhận lại chính sách học tập.' : 'These controls remain available without renewed learning-policy acceptance.'}</p>
             {section === 'community' && <p><Link className="service-link -ml-3" href="/moderation">{copy.moderation}</Link></p>}
           </aside>
         </div>

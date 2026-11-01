@@ -7,7 +7,10 @@ import { usePagedCollection } from '@/hooks/use-paged-collection';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import { RouteSkeleton } from '@/components/route-skeleton';
 import { formatForumDate } from '@/lib/date-format';
-import { readForumPost, readForumComment } from '@/lib/public-firestore-schema';
+import { readPublicForumPost, readPublicForumComment } from '@/lib/public-firestore-schema';
+import { COMMUNITY_PRIVACY_VERSION, PUBLIC_FORUM_COLLECTION } from '@/lib/community-privacy';
+import { useForumReactions } from '@/hooks/use-forum-reactions';
+import { ReactionStatus } from '@/components/reaction-status';
 import { deleteForumPost, mutateForum } from '@/lib/forum-client';
 import { ReportContent } from '@/components/report-content';
 import { isDocumentId } from '@/lib/document-id';
@@ -68,6 +71,7 @@ collection,
 doc,
 orderBy,
 query,
+where,
 } from 'firebase/firestore';
 import {
 ArrowLeft,
@@ -100,8 +104,8 @@ export default function PostDetailPage() {
   const [lang, setLang] = useLanguageState();
   const [theme, setTheme] = useThemeState();
   const validPostId = isDocumentId(postId);
-  const postRead = useDoc(validPostId ? 'posts/' + postId : null);
-  const post = useMemo(() => postRead.data ? readForumPost(postId, postRead.data) : null, [postId, postRead.data]);
+  const postRead = useDoc(validPostId ? PUBLIC_FORUM_COLLECTION + '/' + postId : null);
+  const post = useMemo(() => postRead.data ? readPublicForumPost(postId, postRead.data) : null, [postId, postRead.data]);
   const postInvalid = !validPostId || Boolean(postRead.data && !post);
 
   const [newComment, setNewComment] = useState("");
@@ -120,9 +124,10 @@ export default function PostDetailPage() {
   const { notes: personalNotes, updateNotes: onNotesChange } = useUserNotes();
 
 
-  const commentSource = useMemo(() => db && post?.id === postId ? query(collection(db, 'posts', postId, 'comments'), orderBy('createdAt', 'asc')) : null, [db, postId, post?.id]);
-  const commentPage = usePagedCollection<ForumComment>(commentSource, readForumComment);
+  const commentSource = useMemo(() => db && post?.id === postId ? query(collection(db, PUBLIC_FORUM_COLLECTION, postId, 'comments'), where('privacyVersion', '==', COMMUNITY_PRIVACY_VERSION), orderBy('createdAt', 'asc')) : null, [db, postId, post?.id]);
+  const commentPage = usePagedCollection<ForumComment>(commentSource, readPublicForumComment);
   const comments = commentPage.items;
+  const reactions = useForumReactions(db, user?.uid, post ? [{ postId }, ...comments.map(comment => ({ postId, commentId: comment.id }))] : []);
 
   const t: TranslationSet = translations[lang];
 
@@ -233,7 +238,8 @@ export default function PostDetailPage() {
       return;
     }
     const postRef = doc(db, 'posts', post.id);
-    const hasLiked = post.likedBy?.includes(user.uid);
+    if (reactions.loading || reactions.error) return;
+    const hasLiked = reactions.isLiked({ postId });
     mutateForum(user, post.id, { action: 'like', liked: !hasLiked }).catch(async cause => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({ path: postRef.path, operation: 'update', requestResourceData: { likedBy: user.uid } }, cause));
     });
@@ -245,7 +251,8 @@ export default function PostDetailPage() {
       return;
     }
     const commRef = doc(db, 'posts', postId, 'comments', comment.id);
-    const hasLiked = comment.likedBy?.includes(user.uid);
+    if (reactions.loading || reactions.error) return;
+    const hasLiked = reactions.isLiked({ postId, commentId: comment.id });
     mutateForum(user, postId, { action: 'like', commentId: comment.id, liked: !hasLiked }).catch(async cause => {
       errorEmitter.emit('permission-error', new FirestorePermissionError({ path: commRef.path, operation: 'update', requestResourceData: { likedBy: user.uid } }, cause));
     });
@@ -301,6 +308,7 @@ export default function PostDetailPage() {
 
       <main className="flex-1 w-full max-w-4xl mx-auto p-3 md:p-8 pt-24 md:pt-36 space-y-6 md:space-y-10 animate-in fade-in duration-700">
       <PageControls lang={lang} {...commentPage} />
+      <ReactionStatus lang={lang} {...reactions} />
         <Button variant="ghost" onClick={() => router.push('/forum')} className="btn-duo h-9 md:h-12 rounded-xl md:rounded-2xl border-[3px] border-transparent hover:border-border font-black uppercase text-[10px] md:text-xs tracking-widest gap-2">
           <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" /> {t.back}
         </Button>
@@ -360,8 +368,8 @@ export default function PostDetailPage() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
-              <button aria-label={lang === 'vi' ? 'Thích bài viết' : 'Like post'} aria-pressed={post.likedBy?.includes(user?.uid || '') ?? false} onClick={togglePostLike} className={cn("flex items-center gap-1.5 md:gap-3 group transition-all active:scale-90", post.likedBy?.includes(user?.uid || '') ? "text-red-500" : "text-muted-foreground hover:text-red-500")}>
-                <Heart className={cn("w-5 h-5 md:w-8 md:h-8", post.likedBy?.includes(user?.uid || '') && "fill-current")} />
+              <button aria-label={lang === 'vi' ? 'Thích bài viết' : 'Like post'} aria-pressed={reactions.isLiked({ postId })} disabled={!!user && (reactions.loading || reactions.error)} aria-busy={reactions.loading} onClick={togglePostLike} className={cn("flex items-center gap-1.5 md:gap-3 group transition-all active:scale-90", reactions.isLiked({ postId }) ? "text-red-500" : "text-muted-foreground hover:text-red-500")}>
+                <Heart className={cn("w-5 h-5 md:w-8 md:h-8", reactions.isLiked({ postId }) && "fill-current")} />
                 <span className="text-base md:text-xl font-black">{post.likesCount}</span>
               </button>
               <div className="flex items-center gap-1.5 md:gap-3 text-muted-foreground"><MessageSquare className="w-5 h-5 md:w-8 md:h-8" /><span className="text-base md:text-xl font-black">{post.commentsCount}</span></div>
@@ -426,8 +434,8 @@ export default function PostDetailPage() {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         )}
-                        <button aria-label={lang === 'vi' ? 'Thích bình luận' : 'Like comment'} aria-pressed={comment.likedBy?.includes(user?.uid || '') ?? false} onClick={() => toggleCommentLike(comment)} className={cn("flex items-center gap-1.5 md:gap-2 group transition-all active:scale-90", comment.likedBy?.includes(user?.uid || '') ? "text-red-500" : "text-muted-foreground hover:text-red-500")}>
-                          <Heart className={cn("w-3.5 h-3.5 md:w-4 md:h-4", comment.likedBy?.includes(user?.uid || '') && "fill-current")} /><span className="text-[10px] md:text-xs font-black">{comment.likesCount}</span>
+                        <button aria-label={lang === 'vi' ? 'Thích bình luận' : 'Like comment'} aria-pressed={reactions.isLiked({ postId, commentId: comment.id })} disabled={!!user && (reactions.loading || reactions.error)} aria-busy={reactions.loading} onClick={() => toggleCommentLike(comment)} className={cn("flex items-center gap-1.5 md:gap-2 group transition-all active:scale-90", reactions.isLiked({ postId, commentId: comment.id }) ? "text-red-500" : "text-muted-foreground hover:text-red-500")}>
+                          <Heart className={cn("w-3.5 h-3.5 md:w-4 md:h-4", reactions.isLiked({ postId, commentId: comment.id }) && "fill-current")} /><span className="text-[10px] md:text-xs font-black">{comment.likesCount}</span>
                         </button>
                       </div>
                     </div>

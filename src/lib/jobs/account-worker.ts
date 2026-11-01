@@ -11,6 +11,9 @@ import { PrivateJobStorage } from './storage';
 import { readJob, type JobRecord, type JobCursor, type StepResult } from './types';
 import { assertJobLease } from './store';
 import { inventoryPage } from './inventory';
+import { SERVICE_CONSENT_COLLECTION } from '../service-policy';
+import { prepareForumPublication } from '../forum-publication';
+import { prepareArenaPublication } from '../arena-publication';
 
 const DELETED_AUTHOR = { authorId: '__deleted__', authorName: 'Former member', authorPhoto: '' };
 function anonymousArchive(value: unknown, uid: string): unknown {
@@ -88,10 +91,11 @@ export async function exportStep(id: string, job: JobRecord): Promise<StepResult
   const uid = job.ownerUid!;
   const db = getAdminDb();
   if (job.cursor.phase === 0) {
-    const [profile, auth] = await Promise.all([db.doc('users/' + uid).get(), getAdminAuth().getUser(uid)]);
+    const [profile, auth, consent] = await Promise.all([db.doc('users/' + uid).get(), getAdminAuth().getUser(uid), db.collection(SERVICE_CONSENT_COLLECTION).doc(uid).get()]);
     const identity = { uid, email: auth.email ?? null, emailVerified: auth.emailVerified, displayName: auth.displayName ?? null,
       photoURL: auth.photoURL ?? null, disabled: auth.disabled, metadata: auth.metadata.toJSON(), providers: auth.providerData.map(provider => provider.toJSON()), customClaims: auth.customClaims ?? {} };
-    const artifact = await writePart(id, job, { kind: 'identity', identity, profile: profile.exists ? exportValue(profile.data()) : null }, profile.exists ? 2 : 1, 'identity');
+    const artifact = await writePart(id, job, { kind: 'identity', identity, profile: profile.exists ? exportValue(profile.data()) : null,
+      serviceConsent: consent.exists ? exportValue(consent.data()) : null }, 1 + Number(profile.exists) + Number(consent.exists), 'identity');
     return { cursor: { phase: 1 }, processed: artifact.records, artifact };
   }
   if (job.cursor.phase === 1) {
@@ -147,20 +151,26 @@ async function deleteOrAnonymize(id: string, job: JobRecord, snapshot: DocumentS
     await assertJobLease(transaction, id, job);
     const current = await transaction.get(snapshot.ref);
     if (!current.exists) return;
+    const publication = await prepareForumPublication(transaction, db, snapshot.ref.path);
+    const publishArena = action === 'attempt' ? await prepareArenaPublication(transaction, db, snapshot.ref.path, current.data()!) : null;
     if (action === 'author') {
       const key = snapshot.ref.parent.id === 'arenaExams' ? await transaction.get(db.collection('_arenaAnswerKeys').doc(snapshot.id)) : null;
       // Keep metadata/key ownership atomic; private schemas do not accept display fields.
       if (key?.exists) transaction.update(key.ref, { authorId: '__deleted__' });
-      transaction.update(snapshot.ref, { authorId: '__deleted__',
+      const patch = { authorId: '__deleted__',
         ...(current.get('authorName') !== undefined ? { authorName: DELETED_AUTHOR.authorName } : {}),
-        ...(current.get('authorPhoto') !== undefined ? { authorPhoto: '' } : {}) });
+        ...(current.get('authorPhoto') !== undefined ? { authorPhoto: '' } : {}) };
+      transaction.update(snapshot.ref, patch);
+      publication.write({ ...current.data(), ...patch });
     }
     else if (action === 'archive') transaction.set(snapshot.ref, anonymousArchive(current.data(), uid) as Record<string, unknown>);
     else if (action === 'actor') transaction.update(snapshot.ref, { actorId: '__deleted__' });
     else if (action === 'moderator') transaction.update(snapshot.ref, { hiddenBy: '__deleted__' });
     else if (action === 'attempt') {
       const anonymousRef = snapshot.ref.parent.doc(digest(id + ':' + snapshot.ref.path));
-      transaction.set(anonymousRef, { ...current.data(), userId: '__deleted__', userName: 'Former member', userPhoto: '' });
+      const anonymous = { ...current.data(), userId: '__deleted__', userName: 'Former member', userPhoto: '' };
+      transaction.set(anonymousRef, anonymous);
+      publishArena?.(anonymous);
       transaction.delete(snapshot.ref);
     } else transaction.delete(snapshot.ref);
   });
@@ -201,8 +211,10 @@ export async function deletionStep(id: string, job: JobRecord): Promise<StepResu
         await assertJobLease(transaction, id, job);
         const current = await transaction.get(document.ref);
         if (!current.exists || !Array.isArray(current.get('likedBy'))) return;
+        const publication = await prepareForumPublication(transaction, db, document.ref.path);
         const likedBy = current.get('likedBy').filter((member: unknown) => member !== uid);
         transaction.update(document.ref, { likedBy, likesCount: likedBy.length });
+        publication.write({ ...current.data(), likedBy, likesCount: likedBy.length });
       });
     }
     return { cursor: advanced(job, documents.more ? { after: documents.at(-1)!.ref.path } : { phase: job.cursor.phase + 1 }), processed: documents.length };
@@ -222,6 +234,7 @@ export async function deletionStep(id: string, job: JobRecord): Promise<StepResu
     await assertJobLease(transaction, id, job);
     for (const path of userBudgetPaths(uid)) transaction.delete(db.doc(path));
     transaction.delete(db.doc('_aiQuota/user_' + uid));
+    transaction.delete(db.collection(SERVICE_CONSENT_COLLECTION).doc(uid));
     transaction.delete(db.doc('users/' + uid));
   });
   // Auth is deliberately last; a replay of a successful delete is harmless.

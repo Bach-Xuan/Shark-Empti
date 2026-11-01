@@ -12,6 +12,15 @@ vi.mock('firebase/firestore', () => ({
 }));
 beforeEach(() => { mocks.uid = 'first'; mocks.listeners = []; mocks.write.mockReset().mockResolvedValue(undefined); });
 afterEach(cleanup);
+it('filters malformed legacy date leaves for presentation without changing stored content', () => {
+  const view = renderHook(useUserActivity);
+  act(() => mocks.listeners[0]({ exists: () => true, data: () => ({ activeDays: {
+    '2024-02-29': true, '2000-02-29': true, '1900-02-29': true, '2026-02-29': true,
+    '2026-04-31': true, '2026-11-01': 'true', secret: { nested: true },
+  } }) }));
+  expect(view.result.current.activity).toEqual({ '2024-02-29': true, '2000-02-29': true });
+  expect(mocks.write).not.toHaveBeenCalled();
+});
 it('writes only one date leaf and never copies stale activity into a new account', () => {
   const view = renderHook(useUserActivity);
   act(() => mocks.listeners[0]({ exists: () => true, data: () => ({ activeDays: { '2020-01-01': true } }) }));

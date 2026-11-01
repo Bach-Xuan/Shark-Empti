@@ -5,7 +5,7 @@ import { readLimitedJson } from '@/lib/server-json';
 import { FieldValue } from 'firebase-admin/firestore';
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { prepareRequestBudget } from '@/lib/request-budget';
+import { enforceRequestBudget, prepareRequestBudget } from '@/lib/request-budget';
 
 export const runtime = 'nodejs';
 const createSchema = z.object({
@@ -17,6 +17,7 @@ const createSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const uid = await authenticatedUser(request);
+    await enforceRequestBudget(uid, 'community-traffic');
     const { requestId, ...input } = createSchema.parse(await readLimitedJson(request, 900_000));
     const user = await getAdminAuth().getUser(uid);
     const exam = arenaExamSchema.parse({ ...input, authorId: uid,

@@ -1,5 +1,6 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { beforeAll, beforeEach, expect, it, vi } from 'vitest';
+import { seedServiceConsent } from '../fixtures/service-consent';
 vi.mock('server-only', () => ({}));
 const provider = vi.hoisted(() => vi.fn());
 vi.mock('@/ai/openrouter', () => ({ requestStructuredOnce: provider }));
@@ -28,6 +29,7 @@ beforeEach(async () => {
   provider.mockReset().mockResolvedValue({ ok: true, data: { isAcademic: true } });
   const cleared = await fetch(`http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/demo-shark-empti/databases/(default)/documents`, { method: 'DELETE' });
   expect(cleared.ok).toBe(true);
+  await seedServiceConsent(uid, 'user-0', 'user-1', 'creator-0', 'creator-1', 'another-user');
 });
 it.each(['missing', 'invalid', 'tampered-expiry'])('rejects %s credentials on every AI route before upstream work', async kind => {
   const parts = token.split('.');

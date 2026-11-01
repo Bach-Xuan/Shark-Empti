@@ -27,3 +27,9 @@ export const firebaseConfig = {
     process.env.NEXT_PUBLIC_FIREBASE_APP_ID
   )
 };
+
+/** Validate at application initialization, without forcing Firebase onto public pages. */
+export function assertFirebaseConfig(config: typeof firebaseConfig = firebaseConfig): void {
+  const missing = Object.entries(config).filter(([, value]) => typeof value !== 'string' || !value.trim()).map(([name]) => name);
+  if (missing.length) throw new Error('Firebase Web configuration is missing required fields: ' + missing.join(', '));
+}

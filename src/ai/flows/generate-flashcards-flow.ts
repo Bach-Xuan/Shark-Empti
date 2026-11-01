@@ -7,6 +7,7 @@ import 'server-only';
 import { LATEX_RULE,SHARK_GURU_ROLE } from '@/ai/config/prompts';
 import { generationCount } from '@/ai/question-schema';
 import { z } from 'zod';
+import { LEARNING_LIMITS } from '@/lib/data-limits';
 
 export const GenerateFlashcardsInputSchema = z.object({
   topic: z.string().trim().min(1),
@@ -16,12 +17,12 @@ export const GenerateFlashcardsInputSchema = z.object({
 export type GenerateFlashcardsInput = z.infer<typeof GenerateFlashcardsInputSchema>;
 
 const FlashcardSchema = z.object({
-  front: z.string().trim().min(1).describe('Short question, cue, or concept prompt. Use LaTeX for math/science.'),
-  back: z.string().trim().min(1).describe('Concise explanation or answer. Use LaTeX for math/science.'),
+  front: z.string().trim().min(1).max(LEARNING_LIMITS.text).describe('Short question, cue, or concept prompt. Use LaTeX for math/science.'),
+  back: z.string().trim().min(1).max(LEARNING_LIMITS.text).describe('Concise explanation or answer. Use LaTeX for math/science.'),
 });
 
 export const GenerateFlashcardsOutputSchema = z.object({
-  cards: z.array(FlashcardSchema),
+  cards: z.array(FlashcardSchema).min(1).max(LEARNING_LIMITS.items),
 });
 export type GenerateFlashcardsOutput = z.infer<typeof GenerateFlashcardsOutputSchema>;
 

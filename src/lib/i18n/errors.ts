@@ -3,21 +3,24 @@ export const errorMessages = {
     data: 'Some saved data could not be read. Please contact the administrator.',
     generic: 'Something went wrong. Please try again.', configuration: 'This service is not configured. Please contact the administrator.',
     network: 'Connection interrupted. Check your network and try again.', permission: 'You do not have permission to perform this action.',
-    rate: 'The AI service is busy. Please try again shortly.', timeout: 'The request timed out. Please try again.',
+    rate: 'Too many requests. Please try again shortly.', timeout: 'The request timed out. Please try again.',
     response: 'The AI response could not be read. Please try again.', fallback: 'The AI service could not complete the request after trying its available models. Please try again shortly.', authentication: 'Please sign in again to continue.',
     input: 'Please check the information you entered.', render: 'Unable to display this content.', retry: 'Retry', home: 'Home',
+    consent: 'Confirm the current service policy to continue. Your account-data controls remain available.',
   },
   vi: {
     data: 'Không thể đọc một phần dữ liệu đã lưu. Vui lòng liên hệ quản trị viên.',
     generic: 'Đã xảy ra lỗi. Vui lòng thử lại.', configuration: 'Dịch vụ chưa được cấu hình. Vui lòng liên hệ quản trị viên.',
     network: 'Kết nối bị gián đoạn. Kiểm tra mạng và thử lại.', permission: 'Bạn không có quyền thực hiện thao tác này.',
-    rate: 'Dịch vụ AI đang bận. Vui lòng thử lại sau ít phút.', timeout: 'Yêu cầu đã hết thời gian chờ. Vui lòng thử lại.',
+    rate: 'Tạm thời có quá nhiều yêu cầu. Vui lòng thử lại sau.', timeout: 'Yêu cầu đã hết thời gian chờ. Vui lòng thử lại.',
     response: 'Không thể đọc phản hồi AI. Vui lòng thử lại.', fallback: 'Dịch vụ AI không thể hoàn tất yêu cầu sau khi đã thử các model hiện có. Vui lòng thử lại sau ít phút.', authentication: 'Vui lòng đăng nhập lại để tiếp tục.',
     input: 'Vui lòng kiểm tra thông tin đã nhập.', render: 'Không thể hiển thị nội dung.', retry: 'Thử lại', home: 'Trang chủ',
+    consent: 'Hãy xác nhận chính sách sử dụng hiện tại để tiếp tục. Bạn vẫn có thể truy cập chức năng quản lý dữ liệu tài khoản.',
   },
 } satisfies Record<'en' | 'vi', Record<string, string>>;
 export function translatedError(code: string, language: 'en' | 'vi') {
   const t = errorMessages[language];
+  if (code === 'APP-CONSENT-REQUIRED') return t.consent;
   if (/DATA-INVALID/.test(code)) return t.data;
   if (/CONFIG/.test(code)) return t.configuration;
   if (/PERMISSION|FORBIDDEN/.test(code)) return t.permission;

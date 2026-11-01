@@ -7,10 +7,12 @@ import { ApiError,apiFailure,authenticatedUser,idempotentTransaction } from '@/l
 import { FieldValue } from 'firebase-admin/firestore';
 import { NextRequest,NextResponse } from 'next/server';
 import { z } from 'zod';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
+import { projectArenaRanking } from '@/lib/community-projections';
+import { ARENA_RANKINGS_COLLECTION, OWN_ARENA_RANKINGS_COLLECTION, COMMUNITY_PRIVACY_VERSION } from '@/lib/community-privacy';
 import { readLimitedJson } from '@/lib/server-json';
 import { readArenaKey } from '@/lib/arena-keys';
-import { prepareRequestBudget } from '@/lib/request-budget';
+import { enforceRequestBudget, prepareRequestBudget } from '@/lib/request-budget';
 
 export const runtime = 'nodejs';
 
@@ -19,10 +21,12 @@ const SubmitSchema = z.object({ answers: z.array(z.string().max(2000)).max(50), 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ examId: string }> }) {
   try {
     const uid = await authenticatedUser(request);
+    await enforceRequestBudget(uid, 'community-traffic');
     const adminAuth = getAdminAuth();
     const adminDb = getAdminDb();
     const payload = SubmitSchema.parse(await readLimitedJson(request, 128_000));
     const receivedAt = Date.now();
+    const publicId = randomUUID();
     const { examId } = await params;
     requireDocumentId(examId);
     const decoded = await adminAuth.getUser(uid);
@@ -60,9 +64,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const ranked = timing.eligibleForRanking === true && !parsed.practiceOnly && parsed.authorId !== uid && !previousRank.exists && receivedAt - timing.startedAtMs <= limitMs;
       const isFirstAttempt = ranked && exam.get('firstRewardClaimed') !== true;
       const coinsAwarded = ranked ? score + (isFirstAttempt ? 50 : 0) : 0;
+      const ownerRankRef = adminDb.collection('users').doc(uid).collection(OWN_ARENA_RANKINGS_COLLECTION).doc(examId);
+      if (ranked && (await transaction.get(ownerRankRef)).exists) throw new ApiError('APP-REQUEST-CONFLICT', 409, 'This ranking requires a data compatibility review.');
       const commitBudget = await prepareRequestBudget(transaction, uid, 'arena-submit');
       commitBudget();
-      if (ranked) transaction.create(rankedRef, {
+      if (ranked) {
+      const privateRank = {
         examId,
         userId: uid,
         userName: decoded.displayName || 'Learner',
@@ -71,8 +78,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         duration,
         timingVersion: 1,
         rankingVersion: 2,
-        createdAt: FieldValue.serverTimestamp(),
-      });
+        publicId,
+        createdAt: null,
+      };
+      transaction.create(rankedRef, { ...privateRank, createdAt: FieldValue.serverTimestamp() });
+      transaction.create(examRef.collection(ARENA_RANKINGS_COLLECTION).doc(publicId), { ...projectArenaRanking(privateRank)!, createdAt: FieldValue.serverTimestamp() });
+      transaction.create(ownerRankRef, { rankingId: publicId, privacyVersion: COMMUNITY_PRIVACY_VERSION });
+      }
       transaction.update(examRef, { totalAttempts: parsed.totalAttempts + 1, ...(isFirstAttempt ? { firstRewardClaimed: true } : {}) });
       if (coinsAwarded) transaction.set(adminDb.collection('users').doc(uid), { sharkCoins: FieldValue.increment(coinsAwarded) }, { merge: true });
       const result = { score, coinsAwarded, isFirstAttempt, duration, ranked };

@@ -3,6 +3,7 @@ import { signInDemo } from './auth';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { translations } from '../../src/lib/translations';
+import { uiMessage } from '../../src/lib/i18n';
 
 test('999-minute quiz restores its original history ID, answers and clock without regenerating', async ({ page }) => {
   test.setTimeout(180000);
@@ -56,4 +57,50 @@ test('999-minute quiz restores its original history ID, answers and clock withou
   expect(history.docs[0].get('config.timeLimit')).toBe('999');
   expect(history.docs[0].get('quizResults')).toHaveLength(2);
   expect(await progress()).toBeNull();
+});
+test('a committed save with two lost responses replays after locale change and reload without regeneration', async ({ page, faultRoutes }) => {
+  test.setTimeout(180000);
+  const db = getFirestore(getApps()[0] ?? initializeApp({ projectId: 'demo-shark-empti' }));
+  const before = new Set((await db.collection('users').get()).docs.map(row => row.id));
+  await signInDemo(page);
+  const owners = (await db.collection('users').get()).docs.filter(row => !before.has(row.id));
+  expect(owners).toHaveLength(1);
+  const uid = owners[0].id;
+  const creations: string[] = [];
+  page.on('request', request => { if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/ai/generations') creations.push(request.url()); });
+  await page.getByLabel(translations.en.topic).fill('Addition');
+  await page.getByLabel(translations.en.numQuestions, { exact: true }).fill('1');
+  await page.getByRole('button', { name: /start learning/i }).click();
+  await expect(page.getByText('2 + 2 = ?', { exact: true })).toBeVisible();
+  const id = await page.evaluate(() => {
+    const key = Object.keys(sessionStorage).find(name => name.endsWith(':quiz-session'))!;
+    return JSON.parse(sessionStorage.getItem(key)!).data.id as string;
+  });
+  const path = '/api/learning/history/' + id;
+  const statuses: number[] = [];
+  faultRoutes.set(path, async route => {
+    const response = await route.fetch();
+    statuses.push(response.status());
+    await route.abort('failed');
+  });
+  await page.getByRole('button', { name: '4', exact: true }).click();
+  await page.getByRole('button', { name: /finish|results/i }).click();
+  await expect(page.getByRole('button', { name: uiMessage('en', 'quizview.retry'), exact: true })).toBeVisible();
+  expect(statuses).toEqual([201, 200]);
+  const ref = db.doc(`users/${uid}/history/${id}`), committed = (await ref.get()).data()!;
+  const paidCreates = creations.length;
+  await page.getByRole('button', { name: 'Language', exact: true }).click();
+  await page.getByRole('menuitem', { name: 'Tiếng Việt', exact: true }).click();
+  faultRoutes.delete(path);
+  page.once('dialog', dialog => dialog.accept());
+  await page.reload();
+  await page.getByRole('button', { name: uiMessage('vi', 'quizview.retry'), exact: true }).click();
+  await expect(page.getByRole('heading', { name: /100%/ })).toBeVisible();
+  const saved = (await ref.get()).data()!;
+  expect(saved.date.isEqual(committed.date)).toBe(true);
+  expect(saved.writeFingerprint).toBe(committed.writeFingerprint);
+  expect(saved.analysis).toEqual(committed.analysis);
+  expect(saved.lang).toBe('en');
+  expect((await ref.parent.get()).size).toBe(1);
+  expect(creations).toHaveLength(paidCreates);
 });

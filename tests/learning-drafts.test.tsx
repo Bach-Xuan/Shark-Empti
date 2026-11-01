@@ -6,12 +6,11 @@ import { DRAFT_TTL_MS, readDraft, writeDraft, pruneDraftsForOwner } from '@/lib/
 import { parseWith, quizDraftSchema, sessionDraftSchema } from '@/lib/learning-drafts';
 import { translations } from '@/lib/translations';
 import { history, question, analysis } from './fixtures/quiz';
-import type { Firestore } from 'firebase/firestore';
 const mocks = vi.hoisted(() => ({ feedback: vi.fn(), write: vi.fn() }));
 vi.mock('@/ai/client-flows', () => ({ personalizedQuizPerformanceFeedback: mocks.feedback, generateQuestions: vi.fn(), shortAnswerAnalysis: vi.fn() }));
 vi.mock('@/lib/error-toast', () => ({ showErrorToast: vi.fn() }));
 vi.mock('@/firebase/error-emitter', () => ({ errorEmitter: { emit: vi.fn() } }));
-vi.mock('firebase/firestore', async importOriginal => ({ ...await importOriginal<typeof import('firebase/firestore')>(), doc: (...parts: string[]) => ({ path: parts.slice(1).join('/') }), setDoc: mocks.write }));
+vi.mock('@/lib/learning-client', () => ({ writeLearningRecord: mocks.write, saveHistoryFeedback: vi.fn() }));
 afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.clearAllMocks(); });
 
 it('isolates accounts, removes previous-owner drafts at Auth boundaries, and never touches unrelated browser preferences', () => {
@@ -46,11 +45,11 @@ it('restores generated questions and the original stable history identity withou
   expect(sessionDraftSchema.safeParse(draft).success).toBe(true);
   writeDraft('learner', 'quiz-session', draft);
   mocks.write.mockResolvedValue(undefined);
-  const { result } = renderHook(() => useLearningSession({ uid: 'learner' }, {} as Firestore, 'en'));
+  const { result } = renderHook(() => useLearningSession({ uid: 'learner', getIdToken: vi.fn() }, 'en'));
   expect(result.current.session.status).toBe('quiz');
   expect(result.current.draftId).toBe(id);
   await act(async () => { expect(await result.current.finish(history)).toBe(true); });
-  expect(mocks.write.mock.calls[0][0].path).toBe(`users/learner/history/${id}`);
+  expect(mocks.write.mock.calls[0].slice(1, 3)).toEqual(['history', id]);
   expect(readDraft('learner', 'quiz-session', parseWith(sessionDraftSchema))).toBeNull();
 });
 it('resumes the current question and failed completion, preserving feedback without another paid analysis', async () => {
@@ -77,4 +76,14 @@ it('resumes the current question and failed completion, preserving feedback with
   expect(mocks.feedback).toHaveBeenCalledTimes(1);
   expect(finish.mock.calls[1][0].quizResults.map((item: { userAnswer: string }) => item.userAnswer)).toEqual(['4', '6']);
   expect(finish.mock.calls[1][1]).toMatchObject(analysis);
+});
+it('prefers a frozen completion over older progress without generating another analysis', async () => {
+ const id = crypto.randomUUID();
+ writeDraft('learner', 'quiz-progress', { id, index: 0, answers: [], feedback: null, input: '', startedAtMs: Date.now(), questionStartedAtMs: Date.now() });
+ const finish = vi.fn().mockResolvedValue(true);
+ render(<QuizView t={translations.vi} lang="vi" config={history.config} initialQuestions={history.quizResults} restoredCompletion={history} draftOwner="learner" draftId={id} onFinish={finish} onAskGuru={vi.fn()} />);
+ fireEvent.click(await screen.findByRole('button', { name: 'Thử lại' }));
+ await waitFor(() => expect(finish).toHaveBeenCalledOnce());
+ expect(finish.mock.calls[0][0]).toEqual(history);
+ expect(mocks.feedback).not.toHaveBeenCalled();
 });

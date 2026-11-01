@@ -1,0 +1,61 @@
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+vi.mock('@/components/app-preferences', () => ({ useAppPreferences: () => ({ lang: 'en' }) }));
+vi.mock('@/components/public-header', () => ({ PublicHeader: () => null }));
+import { AccountReceipt } from '@/components/account-receipt';
+import { RECEIPT_STORAGE_KEY } from '@/lib/account-receipt';
+import { jobMessages } from '@/lib/i18n/jobs';
+const receipt = { id: 'ed259772-c4b5-4dbb-9787-4311d5a4a736', receipt: 'a'.repeat(43) };
+const response = (id = receipt.id, status = 'completed') => Response.json({ id, kind: 'deletion', status, expiresAtMs: 9_000_000_000_000 });
+beforeEach(() => { vi.useFakeTimers(); localStorage.clear(); localStorage.setItem(RECEIPT_STORAGE_KEY, JSON.stringify(receipt)); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers(); });
+
+it('recovers receipt reads automatically, follows active deletion and stops after completion', async () => {
+  const fetcher = vi.fn().mockResolvedValueOnce(new Response(null, { status: 503 })).mockResolvedValueOnce(response(receipt.id, 'running')).mockImplementation(async () => response());
+  vi.stubGlobal('fetch', fetcher);
+  await act(async () => { render(<AccountReceipt />); });
+  expect(screen.getByText(jobMessages.en.recovering)).toBeTruthy();
+  await act(async () => { await vi.advanceTimersByTimeAsync(5000); });
+  expect(screen.getByText('Processing')).toBeTruthy();
+  await act(async () => { await vi.advanceTimersByTimeAsync(12000); });
+  expect(screen.getByText('Completed')).toBeTruthy();
+  window.dispatchEvent(new Event('online'));
+  await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+  expect(fetcher).toHaveBeenCalledTimes(3);
+  for (const call of fetcher.mock.calls) expect(call[1].method).toBeUndefined();
+});
+it('stops on an unavailable receipt and allows an explicit refresh', async () => {
+  const fetcher = vi.fn().mockResolvedValueOnce(new Response(null, { status: 404 })).mockImplementation(async () => response());
+  vi.stubGlobal('fetch', fetcher);
+  await act(async () => { render(<AccountReceipt />); });
+  expect(screen.getByText(jobMessages.en.receiptUnavailable)).toBeTruthy();
+  await act(async () => { window.dispatchEvent(new Event('focus')); await vi.advanceTimersByTimeAsync(60_000); });
+  expect(fetcher).toHaveBeenCalledOnce();
+  await act(async () => { fireEvent.click(screen.getByRole('button', { name: jobMessages.en.retry })); });
+  expect(screen.getByText('Completed')).toBeTruthy();
+});
+it('replaces a receipt without displaying a late status from the old credential', async () => {
+  let old!: (value: Response) => void;
+  const next = { id: crypto.randomUUID(), receipt: 'b'.repeat(43) };
+  const fetcher = vi.fn().mockImplementationOnce(() => new Promise<Response>(resolve => { old = resolve; })).mockImplementation(async () => response(next.id));
+  vi.stubGlobal('fetch', fetcher);
+  await act(async () => { render(<AccountReceipt />); });
+  await act(async () => { fireEvent.change(screen.getByLabelText(jobMessages.en.loadReceipt), { target: { files: [{ size: 100, text: async () => JSON.stringify(next) }] } }); });
+  expect((fetcher.mock.calls[0][1].signal as AbortSignal).aborted).toBe(true);
+  await act(async () => old(response(receipt.id, 'running')));
+  expect(screen.getByText('Completed')).toBeTruthy(); expect(screen.queryByText('Processing')).toBeNull();
+  expect(JSON.parse(localStorage.getItem(RECEIPT_STORAGE_KEY)!)).toEqual(next);
+});
+it('does not let a slower prior file overwrite a newer selection', async () => {
+  let first!: (value: string) => void;
+  const next = { id: crypto.randomUUID(), receipt: 'b'.repeat(43) };
+  vi.stubGlobal('fetch', vi.fn().mockImplementation(async (path: string) => response(path.split('/').at(-1))));
+  await act(async () => { render(<AccountReceipt />); });
+  const input = screen.getByLabelText(jobMessages.en.loadReceipt);
+  await act(async () => { fireEvent.change(input, { target: { files: [{ size: 100, text: () => new Promise<string>(resolve => { first = resolve; }) }] } }); });
+  await act(async () => { fireEvent.change(input, { target: { files: [{ size: 100, text: async () => JSON.stringify(next) }] } }); });
+  await act(async () => first(JSON.stringify(receipt)));
+  expect(JSON.parse(localStorage.getItem(RECEIPT_STORAGE_KEY)!)).toEqual(next);
+  await act(async () => { fireEvent.change(input, { target: { files: [{ size: 5000, text: vi.fn() }] } }); });
+  expect(screen.getByText(jobMessages.en.invalidReceiptFile)).toBeTruthy(); expect(screen.getByText('Completed')).toBeTruthy();
+});

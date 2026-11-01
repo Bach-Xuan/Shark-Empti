@@ -5,13 +5,14 @@ import { getAdminDb } from '@/lib/firebase-admin';
 import { ApiError, apiFailure, authenticatedUser, idempotentTransaction } from '@/lib/server-api';
 import { readLimitedJson } from '@/lib/server-json';
 import { reportTargetSchema, targetReference } from '@/lib/community-moderation';
-import { prepareRequestBudget } from '@/lib/request-budget';
+import { enforceRequestBudget, prepareRequestBudget } from '@/lib/request-budget';
 
 export const runtime = 'nodejs';
 const Input = z.object({ target: reportTargetSchema, reason: z.string().trim().min(5).max(2000), requestId: z.string().uuid() }).strict();
 export async function POST(request: NextRequest) {
   try {
     const uid = await authenticatedUser(request);
+    await enforceRequestBudget(uid, 'community-traffic');
     const { requestId, ...input } = Input.parse(await readLimitedJson(request, 16_384));
     const db = getAdminDb();
     const target = targetReference(db, input.target);

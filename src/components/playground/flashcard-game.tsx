@@ -13,7 +13,9 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useFirestore,useUser } from '@/firebase';
+import { useUser } from '@/firebase';
+import { useRequestScope } from '@/hooks/use-request-scope';
+import { writeLearningRecord } from '@/lib/learning-client';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useToast } from '@/hooks/use-toast';
@@ -22,7 +24,6 @@ import { showErrorToast,showUnexpectedErrorToast } from '@/lib/error-toast';
 import { TranslationSet } from '@/lib/translations';
 import { Flashcard,Language } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { addDoc,collection,serverTimestamp } from 'firebase/firestore';
 import {
 ArrowLeft,
 ArrowRight,
@@ -38,7 +39,7 @@ import React,{ useEffect,useId,useRef,useState,useMemo } from 'react';
 
 export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: { t: TranslationSet, lang: Language, weakPoints: DashboardStats['processedGroupedInsights'], totalAttempts: number, initialConcept?: string }) {
   const { user } = useUser();
-  const db = useFirestore();
+  const archiveRequest = useRequestScope();
   const aiRequest = useAiRequestScope();
   const { toast } = useToast();
   const [topic, setTopic] = useState(initialConcept || (weakPoints[0]?.topic || ""));
@@ -103,16 +104,14 @@ export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, init
       setCurrentIndex(0);
       setIsFlipped(false);
 
-      if (user && db) {
-        const sessionRef = collection(db, 'users', user.uid, 'flashcards');
-        await addDoc(sessionRef, {
-          userId: user.uid,
+      if (user) {
+        const recordId = crypto.randomUUID();
+        await writeLearningRecord(user, 'flashcards', recordId, {
           sourceType: initialConcept ? 'weak_point' : 'manual',
           sourceValue: topic,
           cards: result.data.cards,
-          createdAt: serverTimestamp()
-        }).catch(error => {
-          errorEmitter.emit('permission-error', new FirestorePermissionError({ path: sessionRef.path, operation: 'create' }, error));
+        }, archiveRequest.start()).catch(error => {
+          if (mounted.current) errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `users/${user.uid}/flashcards/${recordId}`, operation: 'create' }, error));
         });
       }
     } catch (e) {

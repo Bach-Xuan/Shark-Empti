@@ -2,12 +2,13 @@
 import { FirebaseApp,getApp,getApps,initializeApp } from 'firebase/app';
 import { Auth,connectAuthEmulator,getAuth } from 'firebase/auth';
 import { Firestore,connectFirestoreEmulator,initializeFirestore } from 'firebase/firestore';
-import { firebaseConfig } from './config';
+import { assertFirebaseConfig, firebaseConfig } from './config';
 import { firestoreTransportSettings } from './firestore-transport';
 type FirebaseServices = { firebaseApp: FirebaseApp; firestore: Firestore; auth: Auth };
 const initializedServices = new WeakMap<FirebaseApp, FirebaseServices>();
 
 export function initializeFirebase(): FirebaseServices {
+  assertFirebaseConfig();
   const firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
   const existing = initializedServices.get(firebaseApp);
   if (existing) return existing;

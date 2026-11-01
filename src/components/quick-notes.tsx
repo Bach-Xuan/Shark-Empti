@@ -14,6 +14,7 @@ DialogTitle,
 DialogTrigger,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { NOTES_MAX_LENGTH } from '@/lib/data-limits';
 import { useToast } from '@/hooks/use-toast';
 import { TranslationSet } from '@/lib/translations';
 import { cn } from '@/lib/utils';
@@ -127,7 +128,7 @@ export default function QuickNotes({ t, lang, isSticky, notes: externalNotes, on
             disabled={isSaving}
             className="min-h-[200px] md:min-h-[300px] bg-muted/20 border-[3px] border-border rounded-3xl font-bold p-6 md:p-8 text-sm md:text-lg focus:ring-[6px] focus:ring-primary/10 focus:border-primary transition-all shadow-inner"
             placeholder={t.notesPlaceholder}
-            value={localNotes}
+            value={localNotes} maxLength={NOTES_MAX_LENGTH}
             onChange={(e) => { setIsDirty(true); setLocalNotes(e.target.value); }}
           />
 

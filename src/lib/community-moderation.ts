@@ -5,6 +5,7 @@ import type { Firestore } from 'firebase-admin/firestore';
 import { getAdminAuth } from './firebase-admin';
 import { ApiError, authenticatedUser } from './server-api';
 import { requireDocumentId } from './forum-deletion';
+import { enforceRequestBudget } from './request-budget';
 
 export const reportTargetSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('post'), id: z.string().min(1).max(1500) }).strict(),
@@ -21,6 +22,7 @@ export const archiveId = (path: string) => createHash('sha256').update(path).dig
 
 export async function authenticatedModerator(request: Request) {
   const uid = await authenticatedUser(request);
+  await enforceRequestBudget(uid, 'moderation-traffic');
   // Use current server claims, so removing a role takes effect without waiting
   // for a previously issued browser token to expire.
   const user = await getAdminAuth().getUser(uid);

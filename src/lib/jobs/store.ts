@@ -27,7 +27,7 @@ export async function createAccountJob(uid: string, kind: 'export' | 'deletion',
       if (old.ownerUid !== uid || old.kind !== kind) throw new ApiError('APP-REQUEST-CONFLICT', 409, 'The request identifier has already been used.');
       return old;
     }
-    await assertWritable(transaction, uid);
+    await assertWritable(transaction, uid, { allowUnconsented: true });
     const commitBudget = await prepareRequestBudget(transaction, uid, 'account-request');
     const record: JobRecord = { kind, ownerUid: uid, environment: config.environment, status: 'queued', cursor: { phase: 0 }, artifacts: [], processed: 0,
       createdAtMs: now, updatedAtMs: now, expiresAtMs: now + (kind === 'export' ? JOB_LIMITS.exportProcessingMs : JOB_LIMITS.backupLifetimeMs), nextRunAtMs: now,

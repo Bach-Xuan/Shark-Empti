@@ -39,10 +39,11 @@ interface QuizViewProps {
   draftOwner?: string;
   draftId?: string | null;
   draftAvailable?: boolean;
+  restoredCompletion?: QuizHistoryItem | null;
   startedAtMs?: number;
 }
 
-export default function QuizView({ t, lang, config, initialQuestions, onFinish, onReady, onAskGuru, askGuruDisabledReason, numericShortAnswers = false, blindAnswers = false, draftOwner, draftId, draftAvailable = true, startedAtMs }: QuizViewProps) {
+export default function QuizView({ t, lang, config, initialQuestions, onFinish, onReady, onAskGuru, askGuruDisabledReason, numericShortAnswers = false, blindAnswers = false, draftOwner, draftId, draftAvailable = true, restoredCompletion, startedAtMs }: QuizViewProps) {
   useLayoutEffect(() => {
     // Stop any outstanding explicit scroll before the answer controls are painted.
     const root = document.documentElement;
@@ -51,13 +52,13 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
     scroller.scrollLeft = window.scrollX;
   }, []);
   const aiRequest = useAiRequestScope();
-  const [currentIdx, setCurrentIdx] = useState(0);
+  const [currentIdx, setCurrentIdx] = useState(restoredCompletion ? restoredCompletion.quizResults.length - 1 : 0);
   const [questions, setQuestions] = useState<QuizQuestion[]>(initialQuestions || []);
-  const [answers, setAnswers] = useState<QuizResultItem[]>([]);
+  const [answers, setAnswers] = useState<QuizResultItem[]>(restoredCompletion?.quizResults ?? []);
   const [currentFeedback, setCurrentFeedback] = useState<QuizResultItem | null>(null);
   const [shortAnswerInput, setShortAnswerInput] = useState("");
   const [answerError, setAnswerError] = useState<string | null>(null);
-  const [overallTimer, setOverallTimer] = useState(0);
+  const [overallTimer, setOverallTimer] = useState(restoredCompletion?.totalTime ?? 0);
   const [remainingTime, setRemainingTime] = useState<number | null>(null);
   const [questionStartTime, setQuestionStartTime] = useState(() => Date.now());
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -65,11 +66,12 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
   const [isFinishing, setIsFinishing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef(true);
-  const finishingRef = useRef(false);
+  const finishingRef = useRef(!!restoredCompletion);
   const answerPending = useRef(false);
-  const pendingResult = useRef<{ results: Omit<QuizHistoryItem, 'date' | 'lang'>; analysis?: QuizAnalysis } | null>(null);
-  const [failedCompletion, setFailedCompletion] = useState<typeof pendingResult.current>(null);
-  const [saveFailed, setSaveFailed] = useState(false);
+  const restoredResult = restoredCompletion ? { results: restoredCompletion, analysis: restoredCompletion.analysis } : null;
+  const pendingResult = useRef<{ results: Omit<QuizHistoryItem, 'date' | 'lang'>; analysis?: QuizAnalysis } | null>(restoredResult);
+  const [failedCompletion, setFailedCompletion] = useState<typeof pendingResult.current>(restoredResult);
+  const [saveFailed, setSaveFailed] = useState(!!restoredCompletion);
   const [questionLanguage] = useState(lang);
   useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
   const hasCountdown = remainingTime !== null;
@@ -139,6 +141,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
       || (parsed.data.feedback && parsed.data.feedback.question !== questions[parsed.data.index]?.question)) return null;
     return parsed.data;
   }, value => {
+    if (restoredCompletion) return; // The immutable session checkpoint supersedes older progress.
     setClockStartedAt(value.startedAtMs);
     const elapsed = Math.max(0, Math.floor((Date.now() - value.startedAtMs) / 1000));
     setOverallTimer(elapsed);
@@ -179,8 +182,9 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
       const result = await personalizedQuizPerformanceFeedback({ quizResults: finalAnswers, originalTopic: config.topic }, { signal: aiRequest.start() });
       if (!mountedRef.current) return;
       if (result.ok) {
-        analysis = result.data;
-        finalConfig = { ...config, topicEn: result.data.topicEn, topicVi: result.data.topicVi };
+        const { topicEn, topicVi, ...savedAnalysis } = result.data;
+        analysis = savedAnalysis;
+        finalConfig = { ...config, topicEn, topicVi };
       } else showErrorToast(result.error, lang as 'en' | 'vi');
     } catch {
       if (!mountedRef.current) return;

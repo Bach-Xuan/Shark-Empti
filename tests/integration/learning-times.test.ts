@@ -1,9 +1,10 @@
 import { Timestamp } from 'firebase-admin/firestore';
-import { beforeEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { migrateLearningTimes } from '@/lib/learning-time-migration';
 import { readHistoryItem } from '@/lib/history-schema';
 vi.mock('server-only', () => ({}));
+afterEach(() => vi.restoreAllMocks());
 beforeEach(async () => {
   await fetch(`http://${process.env.FIRESTORE_EMULATOR_HOST}/emulator/v1/projects/demo-shark-empti/databases/(default)/documents`, { method: 'DELETE' });
 });
@@ -61,6 +62,54 @@ it('continues beyond a full migration page without skipping records whose indexe
   const db = getAdminDb(), batch = db.batch();
   for (let index = 0; index < 105; index++) batch.set(db.doc('users/missing/history/' + String(index).padStart(3, '0')), { date: '2026-09-03' });
   await batch.commit();
+  const transactions = vi.spyOn(db, 'runTransaction');
   expect((await migrateLearningTimes(db, true)).converted).toBe(105);
+  expect(transactions).toHaveBeenCalledTimes(6);
   expect((await migrateLearningTimes(db)).canonical).toBe(105);
+});
+it('shares each bounded transaction across owners and aborts the whole batch when one owner is locked', async () => {
+  const db = getAdminDb();
+  const first = db.doc('users/first/history/legacy'), second = db.doc('users/second/history/legacy');
+  await first.set({ date: '2026-09-03', content: 'First' });
+  await second.set({ date: '2026-09-03', content: 'Second' });
+  await db.doc('_accountLocks/second').set({ status: 'deleting' });
+  const transactions = vi.spyOn(db, 'runTransaction');
+  expect((await migrateLearningTimes(db)).convertible).toBe(2);
+  expect(transactions).not.toHaveBeenCalled();
+  await expect(migrateLearningTimes(db, true)).rejects.toThrow('write barrier');
+  expect((await first.get()).get('date')).toBe('2026-09-03');
+  expect((await second.get()).get('date')).toBe('2026-09-03');
+  await db.doc('_accountLocks/second').delete();
+  expect((await migrateLearningTimes(db, true)).converted).toBe(2);
+  expect((await first.get()).get('content')).toBe('First');
+  expect((await second.get()).get('content')).toBe('Second');
+});
+it('rereads candidates after scanning and preserves concurrent canonicalization, deletion and invalidation', async () => {
+  const db = getAdminDb(), refs = ['canonical', 'deleted', 'invalid'].map(id => db.doc('users/learner/history/' + id));
+  await Promise.all(refs.map(ref => ref.set({ date: '2026-09-03' })));
+  const original = db.runTransaction.bind(db);
+  vi.spyOn(db, 'runTransaction').mockImplementationOnce(async (callback, options) => {
+    await refs[0].update({ date: Timestamp.fromMillis(123456789) });
+    await refs[1].delete(); await refs[2].update({ date: 'Invalid after scan' });
+    return original(callback, options);
+  });
+  expect(await migrateLearningTimes(db, true)).toMatchObject({ scanned: 3, convertible: 3, converted: 0 });
+  expect((await refs[0].get()).get('date').toMillis()).toBe(123456789);
+  expect((await refs[1].get()).exists).toBe(false);
+  expect((await refs[2].get()).get('date')).toBe('Invalid after scan');
+});
+it('stops later chunks on a newly active barrier and safely resumes already committed pages', async () => {
+  const db = getAdminDb(), batch = db.batch();
+  for (let index = 0; index < 25; index++) batch.set(db.doc('users/learner/history/' + String(index).padStart(2, '0')), { date: '2026-09-03' });
+  await batch.commit();
+  const original = db.runTransaction.bind(db);
+  vi.spyOn(db, 'runTransaction').mockImplementationOnce(async (callback, options) => {
+    const result = await original(callback, options);
+    await db.doc('_serviceState/maintenance').set({ active: true, expiresAtMs: Date.now() + 60000 });
+    return result;
+  });
+  await expect(migrateLearningTimes(db, true)).rejects.toThrow('write barrier');
+  expect(await migrateLearningTimes(db)).toMatchObject({ canonical: 20, convertible: 5 });
+  await db.doc('_serviceState/maintenance').delete();
+  expect((await migrateLearningTimes(db, true)).converted).toBe(5);
 });

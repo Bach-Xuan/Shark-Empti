@@ -15,7 +15,9 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useFirestore,useUser } from '@/firebase';
+import { useUser } from '@/firebase';
+import { useRequestScope } from '@/hooks/use-request-scope';
+import { writeLearningRecord } from '@/lib/learning-client';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { useToast } from '@/hooks/use-toast';
@@ -24,7 +26,6 @@ import { showErrorToast,showUnexpectedErrorToast } from '@/lib/error-toast';
 import { TranslationSet } from '@/lib/translations';
 import { Language,PracticeQuestion } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { doc,setDoc,serverTimestamp } from 'firebase/firestore';
 import {
 ArrowRight,
 BrainCircuit,
@@ -42,7 +43,7 @@ import React,{ useEffect,useMemo,useRef,useState } from 'react';
 
 export default function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initialConcept, onAskGuru }: { t: TranslationSet, lang: Language, weakPoints: DashboardStats['processedGroupedInsights'], totalAttempts: number, totalErrors: number, initialConcept?: string, onAskGuru: (msg: string) => void }) {
   const { user } = useUser();
-  const db = useFirestore();
+  const archiveRequest = useRequestScope();
   const aiRequest = useAiRequestScope();
   const { toast } = useToast();
 
@@ -182,13 +183,13 @@ export default function PracticeMode({ t, lang, weakPoints, totalAttempts, total
     advancing.current = true;
     const updated = [...answers, currentFeedback];
     const last = currentIndex + 1 === questions.length;
-    if (last && user && db) {
-      const sessionRef = doc(db, 'users', user.uid, 'practice', sessionId.current ??= crypto.randomUUID());
+    if (last && user) {
+      const recordId = sessionId.current ??= crypto.randomUUID();
       try {
-        await setDoc(sessionRef, { userId: user.uid, concept, questions, userAnswers: updated,
-          score: Math.round(updated.filter(a => a.isCorrect).length / questions.length * 100), createdAt: serverTimestamp() });
+        await writeLearningRecord(user, 'practice', recordId, { concept, questions, userAnswers: updated,
+          score: Math.round(updated.filter(a => a.isCorrect).length / questions.length * 100) }, archiveRequest.start());
       } catch (cause) {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({ path: sessionRef.path, operation: 'create' }, cause));
+        if (mounted.current) errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `users/${user.uid}/practice/${recordId}`, operation: 'create' }, cause));
         advancing.current = false;
         return false;
       }

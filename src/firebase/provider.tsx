@@ -29,7 +29,8 @@ export const FirebaseProvider: React.FC<{
   firestore: Firestore;
   auth: Auth;
   children: React.ReactNode;
-}> = ({ firebaseApp, firestore, auth, children }) => {
+  requireServiceConsent?: boolean;
+}> = ({ firebaseApp, firestore, auth, children, requireServiceConsent = true }) => {
   const [state, setState] = useState<{ user: User | null; loading: boolean; profileError: boolean }>({ user: null, loading: true, profileError: false });
   const [repair, setRepair] = useState(0);
   const [authStalled, setAuthStalled] = useState(false);
@@ -47,6 +48,7 @@ export const FirebaseProvider: React.FC<{
       const current = ++epoch.current;
       setState({ user, loading: Boolean(user), profileError: false });
       if (!user) return;
+      if (!requireServiceConsent) { setState({ user, loading: false, profileError: false }); return; }
       const timer = setTimeout(() => { if (current === epoch.current) setState({ user, loading: false, profileError: true }); }, 15000);
       profileTimer = timer;
       void ensureLearnerProfile(firestore, user).finally(() => clearTimeout(timer)).then(
@@ -55,7 +57,7 @@ export const FirebaseProvider: React.FC<{
       );
     }, () => { clearTimeout(authTimer); setAuthStalled(true); epoch.current++; setState({ user: null, loading: false, profileError: false }); });
     return () => { clearTimeout(authTimer); clearTimeout(profileTimer); lifecycle.current++; unsubscribe(); };
-  }, [auth, firestore, repair]);
+  }, [auth, firestore, repair, requireServiceConsent]);
   const services = useMemo(() => ({ firebaseApp, firestore, auth }), [firebaseApp, firestore, auth]);
   return (
     <FirebaseContext.Provider value={services}>
@@ -71,8 +73,9 @@ export const FirebaseProvider: React.FC<{
             {state.profileError && <button type="button" className="rounded-xl border-2 p-3 font-bold" onClick={() => setRepair(value => value + 1)}>{lang === 'vi' ? 'Thử lại' : 'Retry'}</button>}
             <button type="button" className="service-link border-2" onClick={() => { void signOut(auth).catch(() => setRepair(value => value + 1)); }}>{publicMessages[lang].signOut}</button>
             <Link className="service-link border-2" href="/account/status">{publicMessages[lang].receipt}</Link>
+            <Link className="service-link border-2" href="/account/data">{publicMessages[lang].dataControls}</Link>
           </main>
-        ) : state.user ? <ServiceConsent uid={state.user.uid} firestore={firestore}>{children}</ServiceConsent> : children}
+        ) : state.user && requireServiceConsent ? <ServiceConsent user={state.user}>{children}</ServiceConsent> : children}
       </React.Fragment>
       </AuthStateContext.Provider>
     </FirebaseContext.Provider>

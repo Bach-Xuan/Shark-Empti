@@ -8,12 +8,13 @@ import { readLimitedJson } from '@/lib/server-json';
 import { enforceRequestBudget } from '@/lib/request-budget';
 import { requireDocumentId } from '@/lib/forum-deletion';
 import { exportValue } from '@/lib/export-value';
+import { SERVICE_CONSENT_COLLECTION } from '@/lib/service-policy';
 
 export const runtime = 'nodejs';
 const Input = z.object({ dataset: z.enum(ACCOUNT_EXPORT_DATASETS), cursor: z.string().max(128).optional() }).strict();
 export async function POST(request: NextRequest) {
   try {
-    const uid = await authenticatedUser(request);
+    const uid = await authenticatedUser(request, { allowUnconsented: true });
     await enforceRequestBudget(uid, 'account-traffic');
     const { dataset, cursor } = Input.parse(await readLimitedJson(request, 4096));
     if (cursor) requireDocumentId(cursor);
@@ -22,8 +23,9 @@ export async function POST(request: NextRequest) {
     const db = getAdminDb();
     const owner = db.collection('users').doc(uid);
     if (dataset === 'profile') {
-      const [snapshot, auth] = await Promise.all([owner.get(), getAdminAuth().getUser(uid)]);
+      const [snapshot, auth, consent] = await Promise.all([owner.get(), getAdminAuth().getUser(uid), db.collection(SERVICE_CONSENT_COLLECTION).doc(uid).get()]);
       return NextResponse.json({ dataset, uid, documents: snapshot.exists ? [{ path: snapshot.ref.path, data: exportValue(snapshot.data()) }] : [],
+        serviceConsent: consent.exists ? exportValue(consent.data()) : null,
         identity: { uid, displayName: auth.displayName ?? null, email: auth.email ?? null, photoURL: auth.photoURL ?? null, providers: auth.providerData.map(provider => ({ providerId: provider.providerId, uid: provider.uid, email: provider.email ?? null })) }, nextCursor: null }, { headers: { 'Cache-Control': 'no-store' } });
     }
     let query = owner.collection(dataset).orderBy(FieldPath.documentId()).limit(11);

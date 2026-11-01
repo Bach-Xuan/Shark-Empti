@@ -1,25 +1,35 @@
 'use client';
-import { useEffect, useState, type ReactNode } from 'react';
-import { doc, getDoc, setDoc, serverTimestamp, type Firestore } from 'firebase/firestore';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import type { User } from 'firebase/auth';
+import { z } from 'zod';
 import Link from 'next/link';
 import { SITE_INFO } from '@/lib/site-info';
 import { publicMessages } from '@/lib/i18n/public';
 import { useAppPreferences } from './app-preferences';
 import { RouteSkeleton } from './route-skeleton';
+import { communityRequest } from '@/lib/forum-client';
+import { currentServicePolicy } from '@/lib/service-policy';
+import { useRequestScope } from '@/hooks/use-request-scope';
+
+const ConsentStatus = z.object({ accepted: z.boolean(), policyVersion: z.literal(SITE_INFO.policyVersion), minimumAge: z.literal(SITE_INFO.minimumAge) });
 
 /** Self-declared eligibility; this does not verify a person's age or collect DOB. */
-export function ServiceConsent({ uid, firestore, children }: { uid: string; firestore: Firestore; children: ReactNode }) {
+export function ServiceConsent({ user, children }: { user: Pick<User, 'uid' | 'getIdToken'>; children: ReactNode }) {
   const { lang } = useAppPreferences();
   const [state, setState] = useState<'loading' | 'required' | 'accepted' | 'error'>('loading');
   const [checked, setChecked] = useState(false), [busy, setBusy] = useState(false), [retry, setRetry] = useState(0);
+  const requestScope = useRequestScope();
+  const pending = useRef(false), mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => {
     let alive = true;
-    const timer = setTimeout(() => { if (alive) setState('error'); }, 15_000);
-    void getDoc(doc(firestore, 'users', uid, 'preferences', 'service')).then(snapshot => {
-      if (alive) setState(snapshot.get('policyVersion') === SITE_INFO.policyVersion && snapshot.get('minimumAge') === 16 ? 'accepted' : 'required');
+    const signal = requestScope.start();
+    const timer = setTimeout(() => { if (alive) { requestScope.cancel(); setState('error'); } }, 15_000);
+    void communityRequest(user, '/api/account/consent', undefined, 'GET', signal).then(value => {
+      if (alive && !signal.aborted) setState(ConsentStatus.parse(value).accepted ? 'accepted' : 'required');
     }).catch(() => { if (alive) setState('error'); }).finally(() => clearTimeout(timer));
     return () => { alive = false; clearTimeout(timer); };
-  }, [uid, firestore, retry]);
+  }, [user, retry, requestScope]);
   if (state === 'accepted') return children;
   if (state === 'loading') return <RouteSkeleton view="setup" />;
   const copy = publicMessages[lang];
@@ -34,14 +44,19 @@ export function ServiceConsent({ uid, firestore, children }: { uid: string; fire
       </>}
       <button type="button" disabled={busy || (state !== 'error' && !checked)} className="btn-duo min-h-12 rounded-2xl border-2 bg-primary px-5 font-bold text-primary-foreground disabled:opacity-60" onClick={async () => {
         if (state === 'error') { setState('loading'); setRetry(value => value + 1); return; }
+        if (pending.current) return;
+        pending.current = true;
         setBusy(true);
-        let timer: ReturnType<typeof setTimeout> | undefined;
+        const signal = requestScope.start();
+        const timer = setTimeout(requestScope.cancel, 15_000);
         try {
-          await Promise.race([setDoc(doc(firestore, 'users', uid, 'preferences', 'service'), { policyVersion: SITE_INFO.policyVersion, minimumAge: 16, acceptedAt: serverTimestamp() }),
-            new Promise<never>((_, reject) => { timer = setTimeout(() => reject(Error('Confirmation deadline')), 15000); })]);
-          setState('accepted');
-        } catch { setState('error'); } finally { clearTimeout(timer); setBusy(false); }
+          const result = ConsentStatus.parse(await communityRequest(user, '/api/account/consent', { ...currentServicePolicy, accept: true }, 'POST', signal));
+          if (!result.accepted) throw Error('Confirmation unavailable');
+          if (!signal.aborted) setState('accepted');
+        } catch { if (mounted.current) setState('error'); } finally { clearTimeout(timer); pending.current = false; if (mounted.current) setBusy(false); }
       }}>{state === 'error' ? copy.retry : lang === 'vi' ? 'Xác nhận và tiếp tục' : 'Confirm and continue'}</button>
+      <Link className="service-link" href="/account/data">{copy.dataControls}</Link>
+      <Link className="service-link" href="/account/status">{copy.receipt}</Link>
     </section>
   </main>;
 }

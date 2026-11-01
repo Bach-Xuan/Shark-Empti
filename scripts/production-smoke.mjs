@@ -39,7 +39,7 @@ try {
   }
   metadataEvidence[route] = { meaningfulMain: true, description: true, canonicalPath: route, socialPng: true, structuredData: route === '/about' };
  }
- for (const route of ['/login','/register','/forum','/arena','/profile','/moderation','/privacy','/terms','/community']) {
+ for (const route of ['/login','/register','/forum','/arena','/profile','/moderation','/privacy','/terms','/community','/account/data']) {
   const html = await (await fetch(origin + route)).text();
   if (!/\bnoindex\b/.test(meta(html, 'robots'))) throw new Error('Private/UGC noindex missing: '+route);
  }
@@ -56,10 +56,27 @@ try {
  const maps = fs.readdirSync('.next/static', { recursive: true }).filter(file => file.endsWith('.map'));
  if (maps.length) throw new Error('Unexpected public production source map artifacts.');
  const unauthenticatedApis={};
- for(const api of ['/api/arena/smoke/submit','/api/ai/generations','/api/forum','/api/account/export','/api/account/requests','/api/community/reports','/api/community/moderation']) {
+ for(const api of ['/api/arena/smoke/submit','/api/ai/generations','/api/forum','/api/account/export','/api/account/requests','/api/account/consent','/api/account/jobs','/api/community/reports','/api/community/moderation']) {
   const response=await fetch(origin+api,{method:'POST',headers:{'content-type':'application/json'},body:'{}'});
   if(response.status!==401)throw new Error('Unauthenticated API expected 401 for '+api+', got '+response.status);
   unauthenticatedApis[api]=response.status;
+ }
+ const consentStatus = await fetch(origin + '/api/account/consent');
+ if (consentStatus.status !== 401) throw new Error('Unauthenticated consent status expected 401.');
+ unauthenticatedApis['GET /api/account/consent'] = consentStatus.status;
+ for (const api of ['/api/account/jobs', '/api/account/jobs/00000000-0000-4000-8000-000000000001', '/api/community/moderation']) {
+  const response = await fetch(origin + api);
+  if (response.status !== 401) throw new Error('Unauthenticated GET expected 401: ' + api);
+  unauthenticatedApis['GET ' + api] = response.status;
+ }
+ const malformedReceipt = await fetch(origin + '/api/account/jobs/00000000-0000-4000-8000-000000000001', { headers: { 'X-Deletion-Receipt': 'invalid' } });
+ if (malformedReceipt.status !== 404) throw new Error('Malformed receipt must fail before server data access.');
+ unauthenticatedApis['GET malformed receipt'] = malformedReceipt.status;
+ for (const method of ['PUT', 'PATCH']) {
+  const path = '/api/learning/history/00000000-0000-4000-8000-000000000001';
+  const response = await fetch(origin + path, { method, headers: { 'content-type': 'application/json' }, body: '{}' });
+  if (response.status !== 401) throw new Error('Unauthenticated learning write expected 401: ' + method);
+  unauthenticatedApis[method + ' ' + path] = response.status;
  }
  fs.mkdirSync('reports',{recursive:true});fs.writeFileSync('reports/production-smoke.json',JSON.stringify({measuredAt:new Date().toISOString(),node:process.version,routes,metadataEvidence,publicSourceMaps:maps.length,crawlerPolicy:true,safe404:true,unauthenticatedApis},null,2));
  if(fs.existsSync('config/bundle-budgets.json')) {

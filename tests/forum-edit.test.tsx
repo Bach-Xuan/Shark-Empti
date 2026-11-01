@@ -18,6 +18,7 @@ vi.mock('@/components/route-skeleton', () => ({ RouteSkeleton: () => <div role="
 vi.mock('@/firebase/firestore/use-user-notes', () => ({ useUserNotes: () => ({ notes: '', updateNotes: vi.fn() }) }));
 vi.mock('@/firebase/error-emitter', () => ({ errorEmitter: { emit: mocks.emit } }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));
+vi.mock('@/hooks/use-forum-reactions', () => ({ useForumReactions: () => ({ loading: false, error: false, isLiked: () => false, retry: vi.fn() }) }));
 vi.mock('next/navigation', () => ({ useRouter: () => mocks.router, useParams: () => ({ postId: 'post' }) }));
 vi.mock('@/hooks/use-paged-collection', () => ({ usePagedCollection: (source: string) => ({ items: source?.includes('comments') ? [mocks.comment] : source?.includes('_forumDeletions') ? [] : [mocks.post], loading: false, hasMore: false, loadMore: vi.fn() }) }));
 // Menu presentation is outside this regression; exercise the real page edit handlers.
@@ -33,7 +34,7 @@ vi.mock('firebase/firestore', () => ({
   orderBy: vi.fn(), where: vi.fn(), serverTimestamp: () => 1, updateDoc: mocks.write,
   onSnapshot: (_ref: unknown, cb: (snapshot: unknown) => void) => { cb({ exists: () => true, id: 'post', data: () => mocks.post }); return vi.fn(); },
 }));
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => { vi.clearAllMocks(); Object.assign(mocks.post, { privacyVersion: 1 }); Object.assign(mocks.comment, { privacyVersion: 1 }); });
 afterEach(cleanup);
 it.each(['list post', 'detail post', 'detail comment'])('%s retains a rejected edit, blocks duplicate writes and closes only after confirmed retry', async kind => {
   render(kind === 'list post' ? <ForumPage /> : <PostDetailPage />);

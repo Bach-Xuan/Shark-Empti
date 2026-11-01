@@ -22,7 +22,7 @@ test('recovered feedback survives a denied save, reaches the same History/Dashbo
     faultRoutes.set('/api/ai/generations/' + input.generationId + '/attempt', async attempt => {
       const response = await attempt.fetch();
       const value = await response.json();
-      // The real response is complete before the unmodified owner Rules deny its merge.
+      // The real response completes before the persistence transaction observes the lock.
       if (value.state === 'succeeded') await lock.set({ status: 'synthetic-save-failure' });
       await attempt.fulfill({ response, json: value });
     });

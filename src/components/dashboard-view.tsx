@@ -21,6 +21,7 @@ DialogTitle,
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
+import { NOTES_MAX_LENGTH } from '@/lib/data-limits';
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useToast } from '@/hooks/use-toast';
 import { calculateDashboardStats } from '@/lib/stats-utils';
@@ -423,7 +424,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                 disabled={isSavingNotes}
                 className="min-h-[120px] md:min-h-[300px] bg-background border-2 md:border-[4px] border-primary/20 rounded-xl md:rounded-[2.5rem] focus:ring-4 md:ring-[10px] focus:ring-primary/5 font-bold p-4 md:p-10 text-xs md:text-2xl shadow-inner transition-all"
                 placeholder={t.notesPlaceholder}
-                value={tempNotesContent}
+                value={tempNotesContent} maxLength={NOTES_MAX_LENGTH}
                 onChange={(e) => setTempNotesContent(e.target.value)}
               />
 

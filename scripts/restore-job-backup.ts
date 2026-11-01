@@ -29,4 +29,5 @@ try {
   const storage = new PrivateJobStorage();
   const result = await restoreBackup({ db: getFirestore(app), auth: getAuth(app), artifacts: job.artifacts, read: artifact => storage.get(artifact), currentDeletedUids: deleted });
   console.log(JSON.stringify({ target, ...result, acceptance: 'Isolated restore only; production RPO/RTO remain unverified.' }));
+  if (result.community.blocked) throw new Error('Community reconstruction requires review; keep the restore target isolated.');
 } finally { await deleteApp(app); }

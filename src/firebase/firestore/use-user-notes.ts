@@ -7,6 +7,7 @@ import { doc,onSnapshot,serverTimestamp,setDoc } from 'firebase/firestore';
 import { useCallback,useEffect,useState } from 'react';
 import { useUser } from '../auth/use-user';
 import { useFirestore } from '../provider';
+import { NOTES_MAX_LENGTH } from '@/lib/data-limits';
 
 export function useUserNotes() {
   const { user } = useUser();
@@ -46,7 +47,9 @@ export function useUserNotes() {
     if (!user || !db) return false;
     const notesRef = doc(db, 'users', user.uid, 'notes', 'main');
 
-    return setDoc(notesRef, { content: newContent, updatedAt: serverTimestamp() }, { merge: true })
+    const write = newContent.length > NOTES_MAX_LENGTH ? Promise.reject({ code: 'APP-INVALID-INPUT' })
+      : setDoc(notesRef, { content: newContent, updatedAt: serverTimestamp() }, { merge: true });
+    return write
       .then(() => true)
       .catch(async (cause) => {
         errorEmitter.emit('permission-error', new FirestorePermissionError({

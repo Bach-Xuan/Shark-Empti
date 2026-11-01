@@ -7,6 +7,7 @@ import 'server-only';
 
 import { LATEX_RULE,SHARK_GURU_ROLE } from '@/ai/config/prompts';
 import { z } from 'zod';
+import { LEARNING_LIMITS } from '@/lib/data-limits';
 
 const QuizResultSchema = z.object({
   question: z.string(),
@@ -19,7 +20,7 @@ const QuizResultSchema = z.object({
   difficulty: z.string(),
 });
 
-import { cognitiveMetricsSchema,languageAnalysisSchema as LanguageAnalysisSchema } from '@/lib/analysis-schema';
+import { cognitiveMetricsSchema,boundedLanguageAnalysisSchema as LanguageAnalysisSchema } from '@/lib/analysis-schema';
 
 export const PersonalizedQuizFeedbackInputSchema = z.object({
   quizResults: z.array(QuizResultSchema),
@@ -28,11 +29,11 @@ export const PersonalizedQuizFeedbackInputSchema = z.object({
 export type PersonalizedQuizFeedbackInput = z.infer<typeof PersonalizedQuizFeedbackInputSchema>;
 
 export const PersonalizedQuizFeedbackOutputSchema = z.object({
-  topicEn: z.string().describe('English translation of the topic.'),
-  topicVi: z.string().describe('Vietnamese translation of the topic.'),
+  topicEn: z.string().trim().min(1).max(LEARNING_LIMITS.label).describe('English translation of the topic.'),
+  topicVi: z.string().trim().min(1).max(LEARNING_LIMITS.label).describe('Vietnamese translation of the topic.'),
   en: LanguageAnalysisSchema.describe('Feedback in English.'),
   vi: LanguageAnalysisSchema.describe('Feedback in Vietnamese.'),
-  errorCategories: z.record(z.string(), z.number().int().nonnegative()).describe('Count of errors by category.'),
+  errorCategories: z.record(z.string().min(1).max(LEARNING_LIMITS.label), z.number().int().min(0).max(LEARNING_LIMITS.items)).refine(value => Object.keys(value).length <= 100).describe('Count of errors by category.'),
   cognitiveMetrics: cognitiveMetricsSchema.describe('Scores from 0-100 for each cognitive dimension.'),
 });
 export type PersonalizedQuizFeedbackOutput = z.infer<typeof PersonalizedQuizFeedbackOutputSchema>;

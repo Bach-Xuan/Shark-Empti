@@ -12,10 +12,10 @@ const FocusTrackerWidget = dynamic(() => import('./focus-tracker-widget'));
 /** Public information and ordinary 404s do not initialize Auth, Firestore or camera UI. */
 export function RouteProviders({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const application = ['/', '/login', '/register', '/profile', '/forum', '/arena', '/moderation'].includes(pathname) || /^\/(?:forum|arena)\/[^/]+\/?$/.test(pathname);
+  const application = ['/', '/login', '/register', '/profile', '/forum', '/arena', '/moderation', '/account/data'].includes(pathname) || /^\/(?:forum|arena)\/[^/]+\/?$/.test(pathname);
   if (!application) return children;
-  return <Firebase>
+  return <Firebase requireServiceConsent={pathname !== '/account/data'}>
     {children}<Toaster />
-    {!['/login', '/register'].includes(pathname) && <ErrorBoundary><FocusTrackerWidget /></ErrorBoundary>}
+    {!['/login', '/register', '/account/data'].includes(pathname) && <ErrorBoundary><FocusTrackerWidget /></ErrorBoundary>}
   </Firebase>;
 }

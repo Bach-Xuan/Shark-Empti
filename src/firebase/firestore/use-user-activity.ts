@@ -5,6 +5,7 @@ import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { doc,onSnapshot } from 'firebase/firestore';
 import { recordActiveDay } from './record-active-day';
+import { isActivityDay } from '@/lib/activity-day';
 import { useCallback,useEffect,useMemo,useState } from 'react';
 import { useUser } from '../auth/use-user';
 import { useFirestore } from '../provider';
@@ -27,7 +28,10 @@ export function useUserActivity() {
       activityRef,
       (docSnap) => {
         if (!active) return;
-        setSnapshot({ uid: user.uid, days: docSnap.exists() ? docSnap.data().activeDays || {} : {}, loading: false });
+        const stored: unknown = docSnap.exists() ? docSnap.data().activeDays : null;
+        const days = stored && typeof stored === 'object' && !Array.isArray(stored)
+          ? Object.fromEntries(Object.entries(stored).filter(([day, value]) => isActivityDay(day) && value === true)) : {};
+        setSnapshot({ uid: user.uid, days, loading: false });
       },
       async (cause) => {
         if (!active) return;

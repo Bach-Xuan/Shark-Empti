@@ -13,10 +13,18 @@ vi.mock('@/components/app-preferences', () => ({ useAppPreferences: () => ({ lan
 vi.mock('@/components/service-consent', () => ({ ServiceConsent: ({ children }: { children: ReactNode }) => children }));
 import { FirebaseProvider } from '@/firebase/provider';
 
-function mount() {
-  return render(<FirebaseProvider firebaseApp={{} as FirebaseApp} firestore={{} as Firestore} auth={{} as Auth}><p>Private application</p></FirebaseProvider>);
+function mount(requireServiceConsent = true) {
+  return render(<FirebaseProvider firebaseApp={{} as FirebaseApp} firestore={{} as Firestore} auth={{} as Auth} requireServiceConsent={requireServiceConsent}><p>Private application</p></FirebaseProvider>);
 }
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
+
+it('keeps account-data controls available without profile provisioning or renewed learning consent', async () => {
+  mocks.repair.mockRejectedValue(Error('Account writes locked'));
+  mount(false);
+  await act(async () => mocks.observer!({ uid: 'deleting-owner' } as User));
+  expect(screen.getByText('Private application')).toBeTruthy();
+  expect(mocks.repair).not.toHaveBeenCalled();
+});
 
 it('holds authenticated children until profile bootstrap completes after a delayed popup', async () => {
   let finish!: () => void;
@@ -35,6 +43,7 @@ it('retains authentication on repair failure and supplies an explicit retry', as
   await act(async () => mocks.observer!({ uid: 'one' } as User));
   expect(screen.queryByText('Private application')).toBeNull();
   expect(screen.getByText(/Your session is preserved/)).toBeTruthy();
+  expect(screen.getByRole('link', { name: 'Export or delete account data' }).getAttribute('href')).toBe('/account/data');
   fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
   await act(async () => mocks.observer!({ uid: 'one' } as User));
   expect(screen.getByText('Private application')).toBeTruthy();

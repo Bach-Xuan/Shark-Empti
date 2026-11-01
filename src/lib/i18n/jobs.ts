@@ -12,6 +12,11 @@ export const jobMessages = {
     missingReceipt: 'No receipt is stored in this browser. Open the receipt file you saved to check its status.',
     receiptInfo: 'Keep this browser receipt to check deletion after signing out. It grants only minimal status access and expires seven days after completion.',
     reauth: 'Google will ask you to sign in again before this sensitive action.', error: 'Account services could not be reached. Retry to recover the saved status.',
+    recovering: 'Connection interrupted. Status checks will retry automatically.',
+    recoveryStopped: 'Automatic status checks paused. Refresh status to try again.',
+    receiptOnly: 'Sign-in access is unavailable. The read-only receipt can still show deletion status.',
+    receiptUnavailable: 'This receipt is unavailable or expired. Check your receipt file or contact support.',
+    invalidReceiptFile: 'The selected file is not a valid receipt. Choose the JSON receipt file you saved.',
     status: { queued: 'Queued', running: 'Processing', waiting_quota: 'Waiting for available free-tier capacity', ready: 'Ready to download', completed: 'Completed', failed: 'Needs recovery; contact support' } satisfies Record<JobStatus, string>,
   },
   vi: {
@@ -26,6 +31,11 @@ export const jobMessages = {
     missingReceipt: 'Trình duyệt này chưa lưu biên nhận. Hãy mở file biên nhận đã lưu để kiểm tra trạng thái.',
     receiptInfo: 'Giữ biên nhận trên trình duyệt này để kiểm tra sau khi đăng xuất. Biên nhận chỉ cho xem trạng thái tối thiểu và hết hạn bảy ngày sau khi hoàn tất.',
     reauth: 'Google sẽ yêu cầu đăng nhập lại trước thao tác nhạy cảm này.', error: 'Chưa thể kết nối dịch vụ tài khoản. Hãy thử lại để khôi phục trạng thái đã lưu.',
+    recovering: 'Kết nối bị gián đoạn. Việc kiểm tra trạng thái sẽ tự thử lại.',
+    recoveryStopped: 'Đã tạm dừng kiểm tra tự động. Hãy làm mới trạng thái để thử lại.',
+    receiptOnly: 'Chưa thể dùng phiên đăng nhập. Biên nhận chỉ đọc vẫn có thể hiển thị trạng thái xóa.',
+    receiptUnavailable: 'Biên nhận không khả dụng hoặc đã hết hạn. Hãy kiểm tra file biên nhận hoặc liên hệ hỗ trợ.',
+    invalidReceiptFile: 'File đã chọn không phải biên nhận hợp lệ. Hãy chọn file JSON biên nhận bạn đã lưu.',
     status: { queued: 'Đang chờ', running: 'Đang xử lý', waiting_quota: 'Đang chờ dung lượng hoặc hạn mức miễn phí', ready: 'Sẵn sàng tải', completed: 'Hoàn tất', failed: 'Cần khôi phục; hãy liên hệ hỗ trợ' } satisfies Record<JobStatus, string>,
   },
 } as const;

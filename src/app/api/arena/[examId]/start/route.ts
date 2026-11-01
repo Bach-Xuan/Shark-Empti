@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { readLimitedJson } from '@/lib/server-json';
 import { readArenaKey, publicPrompts } from '@/lib/arena-keys';
-import { prepareRequestBudget } from '@/lib/request-budget';
+import { enforceRequestBudget, prepareRequestBudget } from '@/lib/request-budget';
 import { createHash } from 'node:crypto';
 
 export const runtime = 'nodejs';
@@ -16,6 +16,7 @@ const StartSchema = z.object({ requestId: z.string().uuid() });
 export async function POST(request: NextRequest, { params }: { params: Promise<{ examId: string }> }) {
   try {
     const uid = await authenticatedUser(request);
+    await enforceRequestBudget(uid, 'community-traffic');
     const { requestId } = StartSchema.parse(await readLimitedJson(request, 4096));
     const { examId } = await params;
     requireDocumentId(examId);

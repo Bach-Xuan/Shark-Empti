@@ -100,16 +100,17 @@
       "type": "object",
       "properties": {
         "displayName": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 200
         },
         "photoURL": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "string",
+          "maxLength": 2048,
+          "description": "Empty or HTTP(S)."
         },
         "bio": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 20000
         },
         "sharkCoins": {
           "type": "number"
@@ -121,12 +122,16 @@
           "$ref": "#/$defs/FirestoreTimestamp"
         }
       },
-      "description": "Profiles may be partial after an Admin coin increment; account bootstrap repairs missing public fields. Email remains in Auth, not the public profile. Runtime reader and Rules define actual acceptance."
+      "description": "Profiles may be partial after an Admin coin increment; bootstrap repairs bounded public fields. New profiles require server creation/update timestamps; native creation time and server coins are immutable to clients. Updates preserve unknown legacy fields, which keep nonowner reads denied. Email stays in Auth. Readers and Rules define actual acceptance."
     },
     "QuizHistory": {
       "title": "Quiz history",
       "type": "object",
       "properties": {
+        "writeFingerprint": {
+          "type": "string",
+          "description": "Server-owned SHA-256 of canonical creation payload/owner/path; retained with the record for same-ID replay. Absent on legacy records."
+        },
         "userId": {
           "type": "string"
         },
@@ -164,14 +169,29 @@
           "description": "New writes use 2. The reader treats absence as legacy version 1, supports both permanently and rejects unsupported versions."
         }
       },
-      "description": "The writer persists userId and schemaVersion while the reader supplies the document ID separately. Legacy defaults come from history-schema.ts. Quiz completion awaits a stable-ID write, and the persistence DTO omits absent optional values."
+      "description": "Authenticated PUT validates the full bounded payload, derives userId and converts completion milliseconds to Timestamp. Up to 50 results must match config.numQuestions. Stable UUID/fingerprint replay preserves dates and feedback; changed payload conflicts. PATCH updates only analysis/topic labels. Legacy defaults come from history-schema.ts; direct SDK writes are denied."
+    },
+    "OwnForumReaction": {
+      "title": "Owner reaction view",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["postId", "liked", "privacyVersion"],
+      "properties": {
+        "postId": { "type": "string", "maxLength": 128 },
+        "commentId": { "type": "string", "maxLength": 128 },
+        "liked": { "const": true },
+        "privacyVersion": { "const": 1 },
+        "updatedAt": { "$ref": "#/$defs/FirestoreTimestamp" }
+      },
+      "description": "Private reaction view. Desired-state likes synchronize it atomically with private canonical membership and public metadata counts; unlike deletes it. SHA-256 of UTF-8 JSON [postId, commentId-or-null] is the flat document ID. Only the owner can read it; direct SDK writes, including deletion, are denied. Conflicting unknown private data is preserved with a 409 response."
     },
     "UserNotes": {
       "title": "Personal notes",
       "type": "object",
       "properties": {
         "content": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 20000
         },
         "updatedAt": {
           "$ref": "#/$defs/FirestoreTimestamp"
@@ -187,7 +207,7 @@
           "additionalProperties": {
             "type": "boolean"
           },
-          "description": "Keys are local calendar dates YYYY-MM-DD."
+          "description": "Real local calendar dates YYYY-MM-DD in years 1000-2999. New leaves must be true; at most one new leaf per write, no removal/change, maximum 5000 leaves. Existing legacy leaves remain untouched."
         },
         "updatedAt": {
           "$ref": "#/$defs/FirestoreTimestamp"
@@ -199,6 +219,10 @@
       "title": "Saved flashcard session",
       "type": "object",
       "properties": {
+        "writeFingerprint": {
+          "type": "string",
+          "description": "Server-owned canonical creation fingerprint for stable UUID replay; absent on legacy records."
+        },
         "userId": {
           "type": "string"
         },
@@ -209,18 +233,23 @@
           ]
         },
         "sourceValue": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 200
         },
         "cards": {
           "type": "array",
+          "minItems": 1,
+          "maxItems": 50,
           "items": {
             "type": "object",
             "properties": {
               "front": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 20000
               },
               "back": {
-                "type": "string"
+                "type": "string",
+                "maxLength": 20000
               }
             }
           }
@@ -235,17 +264,25 @@
       "title": "Saved practice session",
       "type": "object",
       "properties": {
+        "writeFingerprint": {
+          "type": "string",
+          "description": "Server-owned canonical creation fingerprint for stable UUID replay; absent on legacy records."
+        },
         "userId": {
           "type": "string"
         },
         "concept": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 200
         },
         "questions": {
-          "type": "array"
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 50
         },
         "userAnswers": {
-          "type": "array"
+          "type": "array",
+          "description": "Exactly one answer per saved question, with matching question/type/options/key/explanation. Score is the rounded percentage of isCorrect values."
         },
         "score": {
           "type": "number"
@@ -297,7 +334,25 @@
           "type": "integer"
         }
       },
-      "description": "Authenticated server deletion atomically removes the parent and records an owner recovery tombstone, then recursively deletes descendants. Updated Rules gate comment reads on a live, non-tombstoned parent; legacy orphans are inaccessible but are not automatically migrated."
+      "description": "Private canonical data. Authenticated deletion removes visibility and records a recovery tombstone, then deletes private and public descendants in bounded, guarded batches."
+    },
+    "PublicForumPost": {
+      "type": "object",
+      "description": "Versioned public metadata and counters from projectForumMetadata; excludes likedBy and unknown canonical fields. Intentional author attribution remains public."
+    },
+    "PublicForumComment": {
+      "type": "object",
+      "description": "Versioned public comment metadata and counters from projectForumMetadata; excludes likedBy and unknown canonical fields."
+    },
+    "PublicArenaRanking": {
+      "type": "object",
+      "description": "Eligible ranking metadata under an independent UUID; excludes userId and unknown canonical fields."
+    },
+    "OwnArenaRanking": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rankingId", "privacyVersion"],
+      "properties": { "rankingId": { "type": "string", "format": "uuid" }, "privacyVersion": { "const": 1 } }
     },
     "ForumComment": {
       "title": "Forum comment",
@@ -475,6 +530,11 @@
         "fingerprint": {
           "type": "string"
         },
+        "fingerprintVersion": {
+          "type": "integer",
+          "const": 2,
+          "description": "New receipts canonicalize nested object key order; arrays preserve order. Absent on retained legacy receipts, which keep their original JSON serialization comparison."
+        },
         "result": {
           "type": "object"
         },
@@ -490,6 +550,31 @@
     }
   },
   "serverInterfaces": {
+    "trafficAdmission": {
+      "authority": "src/lib/request-budget.ts",
+      "scopes": {
+        "community-traffic": { "subject": 180, "global": 1800, "refillMs": 60000 },
+        "moderation-traffic": { "subject": 30, "global": 300, "refillMs": 60000 },
+        "account-traffic": { "subject": 60, "global": 600, "refillMs": 60000 },
+        "account-receipt": { "global": 600, "refillMs": 60000, "subjectIdentifierStored": false }
+      },
+      "description": "Traffic is charged after shared identity/account authorization but before body/business resource work; moderator admission precedes the extra role lookup. Receipt format is checked before global admission and private-job lookup, preserving status after Auth deletion. Errors/replays consume traffic independently of transactional business quota. These token capacities/refill durations do not establish a rolling-window, edge or spending guarantee."
+    },
+    "learningWrite": {
+      "method": "PUT",
+      "path": "/api/learning/{kind}/{recordId}",
+      "authentication": "Owner Firebase bearer token with current consent; account locks and maintenance checked again transactionally",
+      "request": "kind history/flashcards/practice; stable UUID; strict nested payload from learning-records.ts; caller must omit userId, writeFingerprint and server creation metadata",
+      "limits": { "bodyBytes": 800000, "payloadBytes": 750000, "items": 50 },
+      "description": "Canonical fingerprint and count/byte admission commit with creation. Unchanged retry returns 200 without another business-write reservation; creation returns 201; changed payload or occupied legacy ID returns 409. Native history Timestamp preserves submitted completion milliseconds; Flashcard/Practice creation uses server Timestamp. Provisional learning-traffic 180/user and 1800/global per minute; learning-write 120/user and 1200/global per hour with 24/240 MB byte ceilings."
+    },
+    "historyFeedback": {
+      "method": "PATCH",
+      "path": "/api/learning/history/{recordId}",
+      "authentication": "Owner Firebase bearer token with current consent and transactional write-barrier checks",
+      "request": "Strict bounded analysis, topicEn and topicVi; legacy document IDs supported",
+      "description": "Validates existing history core; preserves completion, answers, creation fingerprint and unknown configuration fields. Identical replay is a no-op. Traffic/business budgets apply."
+    },
     "arenaCreate": {
       "method": "POST",
       "path": "/api/arena",
@@ -569,12 +654,19 @@
       "authentication": "Owner Firebase bearer token",
       "description": "Legacy bounded/idempotent export/deletion-review requests and owner-only statuses. These records never trigger automated deletion; current self-service uses separately configured account jobs. Public operator contact is configured; no fulfilment SLA is claimed."
     },
+    "serviceConsent": {
+      "methods": ["GET", "POST"],
+      "path": "/api/account/consent",
+      "authentication": "Owner Firebase bearer token; current consent is not required to inspect or acknowledge the policy",
+      "request": "POST requires exactly policyVersion, minimumAge and accept:true; maximum 4096 streamed UTF-8 bytes",
+      "description": "GET returns owner-only current acceptance. POST records the server timestamp idempotently in _serviceConsents; legacy owner-written preferences do not authorize features. Account traffic budgets apply. POST honors deletion and backup barriers; GET remains available during both."
+    },
     "forumMutation": {
       "method": "PATCH",
       "path": "/api/forum/{postId}",
       "authentication": "Firebase bearer token",
       "request": "required UUID and edit-post/edit-comment/desired-state like mutation",
-      "description": "Transactional ownership/live-parent/schema/count/byte budget enforcement."
+      "description": "Transactional ownership/live-parent/schema/count/byte budget enforcement. A desired-state like synchronizes private canonical membership, the published forumPosts projection and /users/{uid}/forumReactions/{hash}. Receipt replay does not repeat writes. Canonical posts/comments are not readable through client Rules. Unconverted legacy sources require the guarded migration before publication."
     },
     "communityReport": {
       "method": "POST",
@@ -589,7 +681,7 @@
       ],
       "path": "/api/community/moderation",
       "authentication": "Current Admin Auth moderator claim",
-      "description": "Bounded private queue; attributable idempotent dismiss/hide/restore, with archive/counter/tombstone safeguards."
+      "description": "GET defaults to status=open; status=hidden is separate. Pages expose at most 50 reports ordered by createdAt and document ID, with a nullable nextCursor passed as after. Cursors carry status and the Timestamp/ID boundary, so they survive boundary deletion and cannot cross lists. Attributable idempotent dismiss/hide/restore retains archive/counter/tombstone safeguards."
     },
     "forumCommentCreate": {
       "budget": "Per-user/global comment count and byte token buckets commit with the comment/counter",
@@ -630,9 +722,9 @@
       "writes": [
         "delete /posts/{postId}",
         "/_forumDeletions/{postId}",
-        "recursive deletion of /posts/{postId}/comments descendants"
+        "transactional deletion of all /posts/{postId} descendants in batches of at most 100"
       ],
-      "description": "The owner transaction removes public parent visibility and creates a persistent pending tombstone before Admin recursive deletion. Owner retry resumes a failed cascade; a completed tombstone makes retry idempotent and prevents post-ID reuse. No background cleanup worker or tombstone TTL exists."
+      "description": "The owner transaction removes public parent visibility and creates a persistent pending tombstone. Parent-scoped name-only queries enumerate at most 100 descendants, including missing-parent legacy subtrees; every delete batch and finalization rechecks owner/consent/account/backup guards transactionally. Inventory responses have ten-second/one-megabyte bounds and strict path validation. Owner retry re-enumerates remaining data; complete tombstones prevent ID reuse. No background cleanup worker or tombstone TTL exists. Total HTTP duration and deployed permissions remain environment gates."
     },
     "aiGenerationProtocol": {
       "transport": "Authenticated Next.js Route Handlers with a Firestore generation ledger",
@@ -667,7 +759,9 @@
         "POST /api/internal/jobs"
       ],
       "authority": "src/lib/jobs/types.ts, store.ts, queue.ts, worker.ts; owner API or exact raw-body QStash signature; minimal read-only deletion receipt",
+      "admission": "Authenticated creation/list/status/download use account-traffic before private work; read controls retain consent/lock/maintenance exceptions. Receipt-only status validates a 43-character base64url HMAC before database work and charges account-receipt_global before the job lookup, without persisting a credential identifier or requiring Auth. Capacities/refill follow request-budget.ts; authentication/admission cost and edge protection remain separate.",
       "documentation": "ACCOUNT_OPERATIONS.md",
+      "clientRecovery": "Serial read-only status polling: 12-second active/15-minute quota intervals; 30-second owner and 15-second public-receipt deadlines; four transient retries after 5/15/30/60 seconds, then pause. Hidden tabs suspend reads; online/visible focus can resume with a five-second minimum interval. Terminal/unavailable and permanent denial/protocol results stop automatic checks. Auth rejection may use a currently held minimal receipt; 429 does not use that fallback. File/request generations prevent stale replacement. No job mutation is replayed automatically.",
       "artifactIntegrity": "Ciphertext and plaintext SHA-256; manifest JSON filenames match downloads; native private-prefix version cleanup is bounded and includes uncheckpointed uploads.",
       "communityScope": "Collection-group matches restricted to posts/{id}/comments/{id} and arenaExams/{id}/attempts/{id}; never another owner private tree."
     }
@@ -675,7 +769,9 @@
   "auth": {
     "providers": [
       "google.com"
-    ]
+    ],
+    "apiVerification": "Bounded nonempty bearer token; Admin verifyIdToken with revocation and disabled-account checks. Invalid sessions return 401; Auth infrastructure failure returns a safe 503. Account jobs additionally require recent authentication.",
+    "configurationPreflight": "npm run check:configuration validates Web/Admin completeness, RSA PEM structure and matching project IDs offline without credential output; no authorization or readiness claim."
   },
   "firestore": {
     "/users/{uid}": {
@@ -684,31 +780,43 @@
     },
     "/users/{uid}/history/{id}": {
       "schema": "QuizHistory",
-      "description": "Private history."
+      "description": "Owner reads and explicit deletion; new writes and feedback updates require validated learning APIs. Direct SDK creation/update is denied."
+    },
+    "/users/{uid}/forumReactions/{hash}": {
+      "schema": "OwnForumReaction",
+      "description": "One flat private collection included in existing account export/deletion/backup/restore paths without a new catalog phase. Clients read explicit target hashes in chunks of 30, requiring server confirmation and supporting bounded recovery. Public Forum documents contain metadata/counts without reaction membership."
     },
     "/users/{uid}/notes/main": {
       "schema": "UserNotes",
-      "description": "Private notes, one main document."
+      "description": "Private notes/main SDK writes allow only bounded content and server updatedAt changes; unrelated legacy fields are preserved."
     },
     "/users/{uid}/activity/main": {
       "schema": "UserActivity",
-      "description": "Owner-only activity. Each write merges precisely one activeDays date leaf and updatedAt; account snapshots are isolated."
+      "description": "Owner-only activity. Bounded append-only real date:true leaves and server updatedAt; old leaves cannot be removed or changed. Legacy maps are retained; malformed leaves are filtered only for presentation."
     },
     "/users/{uid}/flashcards/{id}": {
       "schema": "FlashcardSession",
-      "description": "Private saved flashcards."
+      "description": "Owner reads/deletion; authenticated validated learning API creation with server timestamp and stable replay identity. Direct SDK writes are denied."
     },
     "/users/{uid}/practice/{id}": {
       "schema": "PracticeSession",
-      "description": "Private saved practice."
+      "description": "Owner reads/deletion; authenticated validated learning API creation with matching questions/answers/score, server timestamp and stable replay identity. Direct SDK writes are denied."
     },
     "/posts/{postId}": {
       "schema": "ForumPost",
-      "description": "Public-read feed; validated/budgeted Admin APIs own creation, owner edits and desired-state likes. Direct browser writes/deletion are denied."
+      "description": "Private canonical post and reaction membership; validated/budgeted Admin APIs own mutations. Browser reads and writes are denied."
     },
     "/posts/{postId}/comments/{commentId}": {
       "schema": "ForumComment",
-      "description": "Comment reads require a live, non-tombstoned parent. All mutations use authenticated, validated/budgeted Admin APIs; direct browser writes are denied."
+      "description": "Private canonical comment and reaction membership. Browser reads and writes are denied."
+    },
+    "/forumPosts/{postId}": {
+      "schema": "PublicForumPost",
+      "description": "Versioned public feed projection; server-managed. Unmarked records are not public."
+    },
+    "/forumPosts/{postId}/comments/{commentId}": {
+      "schema": "PublicForumComment",
+      "description": "Versioned public projection readable only under a published parent; server-managed."
     },
     "/arenaExams/{examId}": {
       "schema": "ArenaExam",
@@ -716,7 +824,15 @@
     },
     "/arenaExams/{examId}/attempts/{attemptId}": {
       "schema": "ArenaAttempt",
-      "description": "Public leaderboard attempts; server-created."
+      "description": "Private canonical ranking attempt, including owner identity; browser reads and writes are denied."
+    },
+    "/arenaExams/{examId}/rankings/{rankingId}": {
+      "schema": "PublicArenaRanking",
+      "description": "Versioned public ranking projection with an independent UUID, readable under a V2 exam; server-managed."
+    },
+    "/users/{uid}/arenaRankings/{examId}": {
+      "schema": "OwnArenaRanking",
+      "description": "Owner-only ranking pointer used for highlighting; direct SDK writes are denied."
     },
     "/_arenaSessions/{hash}": {
       "schema": "ArenaSession",
@@ -760,10 +876,13 @@
       "description": "Admin-only first-reservation-anchored attempt budget and active-reservation state; browser Rules explicitly deny access."
     },
     "/_requestBudgets/{scope}": {
-      "description": "Admin-only token buckets for request/count/byte admission. Creation budget and generation writes commit atomically. An ordinary expiry query index is declared for bounded signed cleanup; no native TTL is requested on Spark."
+      "description": "Admin-only token buckets for traffic/count/byte admission. Community and moderator traffic is charged before parsing/resource work, separately from transactional business reservations. Account reads retain explicit barrier exceptions; receipt-only status uses a global bucket with no credential identifier. UID scopes follow attributable export/deletion. Token capacity/refill is not a fixed-window or spending guarantee. Ordinary expiry indexes support signed cleanup; no native TTL is requested on Spark."
     },
     "/users/{uid}/preferences/service": {
-      "description": "Owner-only self-declared age 16+ confirmation, policyVersion and acceptedAt; no DOB. Client consent gate precedes learning features."
+      "description": "Legacy owner-written acknowledgement, retained as private data but ignored for authorization. It is not automatically imported into server consent."
+    },
+    "/_serviceConsents/{uid}": {
+      "description": "Server-only current policyVersion, minimumAge and acceptedAt Timestamp. Authenticated policy acknowledgement does not independently verify age. Server business APIs and private learning writes require the current record; profile provisioning, owner reads and account data controls have explicit exceptions. Included in exports, deletion and backup; restore excludes UIDs in the deletion journal."
     },
     "/_accountJobs/{uuid}": {
       "description": "Admin-only durable export/deletion/backup state: kind, environment, status, ownerUid until deletion completion, cursor, artifact metadata, progress, lease, nextRunAtMs and logical expiry."
@@ -798,7 +917,7 @@
     "shark.account-deletion-receipt": "Essential minimal read-only deletion receipt; no UID/content in receipt payload; server access expires seven days after completion."
   },
   "sessionStorage": {
-    "shark:draft:v1:{uid}:{kind}": "Validated same-tab Quiz/Practice/Flashcard/Arena checkpoints; 24-hour logical inactivity expiry, max 1 MB per key, removed on owner change/sign-out or explicit discard/completion. No cross-device guarantee."
+    "shark:draft:v1:{uid}:{kind}": "Validated same-tab Quiz/Practice/Flashcard/Arena checkpoints; 24-hour logical inactivity expiry, max 1 MB per key, removed on owner change/sign-out or explicit discard/completion. A pending Quiz save stores its complete frozen creation payload once, preserving date/locale/feedback across reload and superseding older progress without regeneration. No cross-device guarantee."
   },
   "x-derived-data": {
     "description": "Calendar month grouping derives from users/{uid}/activity/main.activeDays. Roadmap checks and language/theme use localStorage, not these collections. Locale/theme also use the essential validated preference cookie; server and client start from the same valid cookie when present."
@@ -812,9 +931,11 @@
       "email": "bachlxbach@gmail.com"
     },
     "minimumAge": 16,
-    "ageVerification": "Self-declared eligibility and policy-version confirmation; no date of birth",
+    "ageVerification": "Self-declared eligibility acknowledged through the authenticated API; current server record enforced by API and Rules; no independent age verification or date of birth",
+    "dataControls": "/account/data remains accessible without profile provisioning or renewed learning-policy acceptance; sensitive job creation still requires recent authentication",
     "documentation": "ACCOUNT_OPERATIONS.md",
     "privateCollections": [
+      "_serviceConsents",
       "_accountJobs",
       "_accountLocks",
       "_deletionJournal",

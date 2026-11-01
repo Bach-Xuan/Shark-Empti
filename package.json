@@ -9,6 +9,7 @@
     "build": "next build",
     "build:demo": "node scripts/build-demo.mjs",
     "migrate:arena": "node --conditions=react-server --env-file-if-exists=.env --import tsx scripts/migrate-arena.ts",
+    "migrate:community": "node --conditions=react-server --env-file-if-exists=.env --import tsx scripts/migrate-community-privacy.ts",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -23,6 +24,7 @@
     "clean:artifacts": "node scripts/clean.mjs artifacts",
     "clean:cache": "node scripts/clean.mjs cache",
     "check:maintenance": "node scripts/check-maintenance.mjs",
+    "check:configuration": "node --conditions=react-server --env-file-if-exists=.env --import tsx scripts/check-configuration.ts",
     "audit:dependencies": "node scripts/dependency-audit.mjs",
     "report:bundle": "node scripts/bundle-report.mjs",
     "test:production": "node scripts/production-smoke.mjs",
@@ -80,7 +82,7 @@
     "axe-core": "4.13.0",
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.3",
-    "firebase-tools": "^15.1.0",
+    "firebase-tools": "^15.34.2",
     "google-auth-library": "10.9.1",
     "jsdom": "30.0.1",
     "postcss": "^8",
@@ -93,9 +95,6 @@
   "overrides": {
     "@firebase/firestore@4.17.1": {
       "@grpc/grpc-js": "1.13.7"
-    },
-    "get-uri@6.0.5": {
-      "basic-ftp": "6.2.3"
     }
   },
   "engines": {

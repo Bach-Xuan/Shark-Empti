@@ -1,6 +1,7 @@
 
 "use client";
 import { uiMessage } from '@/lib/i18n';
+import { LEARNING_LIMITS } from '@/lib/data-limits';
 import { subjectOptions } from '@/lib/subjects';
 
 import { validateAcademicTopic } from '@/ai/client-flows';
@@ -239,7 +240,7 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
                 <RequiredLabel htmlFor="setup-topic" icon={<Target className="w-5 h-5 text-primary transition-transform group-hover:-translate-y-1" />}>{t.topic}</RequiredLabel>
                 <div className="relative">
                   <Input
-                    id="setup-topic"
+                    id="setup-topic" maxLength={LEARNING_LIMITS.label}
                     aria-required="true"
                     placeholder={uiMessage(lang, "setupview.e_g_calculus_redox_reactions")}
                     className="h-18 md:h-24 rounded-[2rem] border-4 border-border font-black text-xl md:text-3xl focus-visible:ring-8 focus-visible:ring-primary/10 focus:border-primary bg-background transition-all hover:border-primary/50 shadow-duo px-10 placeholder:text-muted-foreground"
@@ -260,7 +261,7 @@ export default function SetupView({ t, lang, onStart }: SetupViewProps) {
                   <XCircle className="w-5 h-5 text-primary transition-transform group-hover:-translate-y-1" /> {t.excludeOptional}
                 </Label>
                 <Textarea
-                  id="setup-exclude"
+                  id="setup-exclude" maxLength={LEARNING_LIMITS.text}
                   placeholder={t.excludePlaceholder}
                   className="min-h-[120px] rounded-[2rem] border-4 border-border font-bold text-base md:text-xl focus-visible:ring-8 focus-visible:ring-primary/10 focus:border-primary bg-background transition-all hover:border-primary/50 shadow-duo p-8 placeholder:text-muted-foreground"
                   value={config.excludeNotes}

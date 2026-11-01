@@ -34,6 +34,7 @@ SelectTrigger,
 SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from '@/components/ui/textarea';
+import { PROFILE_LIMITS } from '@/lib/data-limits';
 import { useAuth,useDoc,useFirestore,useUser } from '@/firebase';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -349,7 +350,7 @@ if (!authLoading && !user) {
                 <Textarea
                   className="min-h-[120px] rounded-2xl border-4 border-border bg-muted/20 font-bold p-6 focus:ring-8 focus:ring-primary/10 focus:border-primary transition-all shadow-inner text-base"
                   placeholder={uiMessage(lang, "profile.tell_shark_guru_about_yourself")}
-                  value={bio}
+                  value={bio} maxLength={PROFILE_LIMITS.bio}
                   disabled={isSaving} onChange={(e) => biography.edit(e.target.value)}
                 />
 

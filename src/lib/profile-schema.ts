@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { readTimeMillis } from './time';
+import { PROFILE_LIMITS } from './data-limits';
 const profileSchema = z.object({
-  displayName: z.string().catch(''),
-  photoURL: z.string().catch(''),
+  displayName: z.string().max(PROFILE_LIMITS.displayName).catch(''),
+  photoURL: z.string().max(PROFILE_LIMITS.photoURL).refine(value => value === '' || /^https?:\/\//i.test(value)).catch(''),
   bio: z.string().catch(''),
   createdAt: z.unknown().transform(readTimeMillis).default(null),
 });

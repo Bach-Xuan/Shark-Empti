@@ -7,7 +7,9 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { requireDocumentId } from '@/lib/forum-deletion';
 import { readLimitedJson } from '@/lib/server-json';
 import { readForumPost, readForumComment } from '@/lib/public-firestore-schema';
-import { prepareRequestBudget } from '@/lib/request-budget';
+import { enforceRequestBudget, prepareRequestBudget } from '@/lib/request-budget';
+import { prepareOwnForumReaction } from '@/lib/forum-reaction-owner';
+import { prepareForumPublication } from '@/lib/forum-publication';
 
 export const runtime = 'nodejs';
 
@@ -21,6 +23,7 @@ const Input = z.object({ requestId: z.string().uuid(), mutation: Mutation }).str
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ postId: string }> }) {
   try {
     const uid = await authenticatedUser(request);
+    await enforceRequestBudget(uid, 'community-traffic');
     const { postId } = await params;
     requireDocumentId(postId);
     const { requestId, mutation } = Input.parse(await readLimitedJson(request, 96_000));
@@ -35,21 +38,27 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       const snapshot = commentId ? await transaction.get(ref) : post;
       const data = commentId ? readForumComment(ref.id, snapshot.data()) : readForumPost(postId, snapshot.data());
       if (!snapshot.exists || !data) throw new ApiError('FORUM-NOT-FOUND', 404, 'Post or comment not found.');
+      const publication = await prepareForumPublication(transaction, db, ref.path);
+      const updatedAt = mutation.action === 'like' ? undefined : FieldValue.serverTimestamp();
       let patch: Record<string, unknown>;
+      let commitOwnReaction: (() => void) | undefined;
       if (mutation.action === 'like') {
         const likedBy = new Set(data.likedBy ?? []);
         const unchanged = likedBy.has(uid) === mutation.liked;
         mutation.liked ? likedBy.add(uid) : likedBy.delete(uid);
         if (mutation.liked && !unchanged && likedBy.size > 2000) throw new ApiError('APP-RATE-LIMITED', 429, 'This item has reached its reaction limit.');
         patch = unchanged ? {} : { likedBy: [...likedBy], likesCount: likedBy.size };
+        commitOwnReaction = await prepareOwnForumReaction(transaction, db, uid, { postId, ...(commentId ? { commentId } : {}) }, mutation.liked);
       } else {
         if (data.authorId !== uid) throw new ApiError('AUTH-FORBIDDEN', 403, 'You cannot edit this content.');
         patch = mutation.action === 'edit-post' ? { title: mutation.title, content: mutation.content, subject: mutation.subject } : { content: mutation.content };
-        patch.updatedAt = FieldValue.serverTimestamp();
+        patch.updatedAt = updatedAt;
       }
       const commitBudget = await prepareRequestBudget(transaction, uid, 'community-mutate', Buffer.byteLength(JSON.stringify(mutation)));
       commitBudget();
+      commitOwnReaction?.();
       if (Object.keys(patch).length) transaction.update(ref, patch);
+      publication.write({ ...snapshot.data(), ...patch }, updatedAt);
       return { ok: true };
     });
     return NextResponse.json(result);
@@ -59,6 +68,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 export async function DELETE(request: NextRequest, { params }: { params: Promise<{ postId: string }> }) {
   try {
     const uid = await authenticatedUser(request);
+    await enforceRequestBudget(uid, 'community-traffic');
     await deleteForumPostTree(getAdminDb(), (await params).postId, uid);
     return NextResponse.json({ ok: true });
   } catch (error) { return apiFailure(error); }
