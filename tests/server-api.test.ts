@@ -37,8 +37,17 @@ it('distinguishes an Auth infrastructure failure from a rejected session without
     .rejects.toMatchObject({ code: 'APP-UNAVAILABLE', status: 503, message: 'Authentication is temporarily unavailable.' });
 });
 it('returns a safe configuration error and never leaks diagnostic secrets', async () => {
-  const response = apiFailure(new AdminConfigurationError());
-  expect(response.status).toBe(503);
-  expect(await response.json()).toEqual({ error: 'Server configuration is unavailable.', code: 'APP-CONFIG-MISSING', values: {} });
-  expect(JSON.stringify(await apiFailure(new Error('private token fixture')).json())).not.toContain('private token');
+  const log = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  try {
+    const response = apiFailure(new AdminConfigurationError());
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: 'Server configuration is unavailable.', code: 'APP-CONFIG-MISSING', values: {} });
+    const id = response.headers.get('X-Request-ID');
+    expect(id).toMatch(/^[a-f0-9-]{36}$/);
+    expect(JSON.parse(log.mock.calls[0][0])).toEqual({ event: 'api-failure', incident: id, status: 503, category: 'configuration' });
+    const unknown = apiFailure(new Error('private token fixture'));
+    expect(JSON.stringify(await unknown.json())).not.toContain('private token');
+    expect(unknown.headers.get('X-Request-ID')).not.toBe(id);
+    expect(JSON.stringify(log.mock.calls)).not.toContain('private token');
+  } finally { log.mockRestore(); }
 });

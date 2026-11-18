@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { signInDemo } from './auth';
+import { signInDemoUid } from './auth';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { translations } from '../../src/lib/translations';
@@ -8,11 +8,7 @@ import { uiMessage } from '../../src/lib/i18n';
 test('999-minute quiz restores its original history ID, answers and clock without regenerating', async ({ page }) => {
   test.setTimeout(180000);
   const db = getFirestore(getApps()[0] ?? initializeApp({ projectId: 'demo-shark-empti' }));
-  const ownersBefore = new Set((await db.collection('users').get()).docs.map(document => document.id));
-  await signInDemo(page);
-  const owners = (await db.collection('users').get()).docs.filter(document => !ownersBefore.has(document.id));
-  expect(owners).toHaveLength(1);
-  const uid = owners[0].id;
+  const uid = await signInDemoUid(page);
   const creations: string[] = [];
   page.on('request', request => {
     if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/ai/generations') creations.push(request.url());
@@ -61,11 +57,7 @@ test('999-minute quiz restores its original history ID, answers and clock withou
 test('a committed save with two lost responses replays after locale change and reload without regeneration', async ({ page, faultRoutes }) => {
   test.setTimeout(180000);
   const db = getFirestore(getApps()[0] ?? initializeApp({ projectId: 'demo-shark-empti' }));
-  const before = new Set((await db.collection('users').get()).docs.map(row => row.id));
-  await signInDemo(page);
-  const owners = (await db.collection('users').get()).docs.filter(row => !before.has(row.id));
-  expect(owners).toHaveLength(1);
-  const uid = owners[0].id;
+  const uid = await signInDemoUid(page);
   const creations: string[] = [];
   page.on('request', request => { if (request.method() === 'POST' && new URL(request.url()).pathname === '/api/ai/generations') creations.push(request.url()); });
   await page.getByLabel(translations.en.topic).fill('Addition');

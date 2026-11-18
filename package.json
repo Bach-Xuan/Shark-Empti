@@ -57,37 +57,37 @@
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "firebase": "12.18.0",
-    "firebase-admin": "14.5.0",
+    "firebase-admin": "14.5.1",
     "katex": "0.18.5",
     "lucide-react": "1.40.0",
-    "next": "16.4.3",
+    "next": "16.4.6",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "recharts": "3.10.1",
     "server-only": "0.0.1",
-    "tailwind-merge": "^3.0.1",
+    "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "zod": "4.6.7"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "5.0.2",
     "@playwright/test": "^1.62.1",
-    "@tailwindcss/postcss": "^4.3.3",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
     "@types/node": "^24",
     "@types/react": "^19.2.1",
     "@types/react-dom": "^19.2.1",
     "@vitest/coverage-v8": "4.1.12",
+    "autoprefixer": "^10.4.0",
     "axe-core": "4.13.0",
     "eslint": "9.39.5",
-    "eslint-config-next": "16.4.3",
-    "firebase-tools": "^15.34.2",
+    "eslint-config-next": "16.4.6",
+    "firebase-tools": "15.36.0",
     "google-auth-library": "10.9.1",
     "jsdom": "30.0.1",
     "postcss": "^8",
     "semver": "6.3.1",
-    "tailwindcss": "^4.3.3",
+    "tailwindcss": "~3.4.17",
     "tsx": "^4",
     "typescript": "~6.0.0",
     "vitest": "4.1.12"
@@ -95,9 +95,27 @@
   "overrides": {
     "@firebase/firestore@4.17.1": {
       "@grpc/grpc-js": "1.13.7"
+    },
+    "firebase-tools@15.36.0": {
+      "@google-cloud/pubsub": "6.4.1"
+    },
+    "gaxios@6.7.1": {
+      "uuid": "11.1.1"
+    },
+    "glob@10.5.0": "14.0.6",
+    "@typescript-eslint/typescript-estree@8.69.0": {
+      "minimatch": "11.0.9"
     }
   },
   "engines": {
     "node": "24.x"
-  }
+  },
+  "browserslist": [
+    "Chrome >= 100",
+    "Firefox >= 102",
+    "Safari >= 15.4",
+    "iOS >= 15.4",
+    "and_chr >= 100",
+    "and_ff >= 102"
+  ]
 }

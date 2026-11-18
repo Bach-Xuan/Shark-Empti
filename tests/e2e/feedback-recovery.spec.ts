@@ -1,6 +1,6 @@
 import { observeReaderTimeouts } from './reader-timeouts';
 import { expect, test } from './fixtures';
-import { signInDemo } from './auth';
+import { signInDemoUid } from './auth';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { translations } from '../../src/lib/translations';
@@ -8,11 +8,8 @@ import { uiMessage } from '../../src/lib/i18n';
 
 test('recovered feedback survives a denied save, reaches the same History/Dashboard/report, and is not generated twice', async ({ page, faultRoutes }) => {
   const db = getFirestore(getApps()[0] ?? initializeApp({ projectId: 'demo-shark-empti' }));
-  const before = new Set((await db.collection('users').get()).docs.map(document => document.id));
-  await signInDemo(page);
-  const owners = (await db.collection('users').get()).docs.filter(document => !before.has(document.id));
-  expect(owners).toHaveLength(1);
-  const uid = owners[0].id, lock = db.doc('_accountLocks/' + uid);
+  const uid = await signInDemoUid(page);
+  const lock = db.doc('_accountLocks/' + uid);
   let feedbackUnavailable = true, generations = 0;
   faultRoutes.set('/api/ai/generations', async route => {
     const input = route.request().postDataJSON();

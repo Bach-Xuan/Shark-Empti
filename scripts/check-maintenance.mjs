@@ -55,15 +55,57 @@ else {
 }
 
 const docs = ['README.md', ...fs.readdirSync(path.join(root, 'docs')).filter(name => name.endsWith('.md')).map(name => `docs/${name}`)];
+const anchorsByFile = new Map();
+function markdownAnchors(file) {
+  if (anchorsByFile.has(file)) return anchorsByFile.get(file);
+  const prose = fs.readFileSync(file, 'utf8').replace(/^```[^\n]*\n[\s\S]*?^```\s*$/gm, '');
+  const anchors = new Set([...prose.matchAll(/<a\s+(?:id|name)="([^"]+)"/gi)].map(match => match[1]));
+  const headings = new Set();
+  for (const [, heading] of prose.matchAll(/^#{1,6}\s+(.+)$/gm)) {
+    const label = heading.trim().replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+    const base = label.toLowerCase().replace(/[^\p{L}\p{M}\p{N}_ -]/gu, '').replace(/ /g, '-');
+    let slug = base;
+    for (let suffix = 1; headings.has(slug); suffix++) slug = `${base}-${suffix}`;
+    headings.add(slug);
+    anchors.add(slug);
+  }
+  anchorsByFile.set(file, anchors);
+  return anchors;
+}
 for (const file of docs) {
   const text = fs.readFileSync(path.join(root, file), 'utf8');
   for (const match of text.matchAll(/npm run ([\w:-]+)/g)) {
     if (!Object.hasOwn(manifest.scripts, match[1])) problems.push(`Unknown documented npm script ${match[1]}: ${file}`);
   }
   for (const match of text.matchAll(/\]\(([^)]+)\)/g)) {
-    const target = match[1].split('#')[0];
-    if (!target || /^(?:[a-z]+:|\/)/i.test(target)) continue;
-    if (!fs.existsSync(path.resolve(root, path.dirname(file), decodeURIComponent(target)))) problems.push(`Missing local Markdown target ${target}: ${file}`);
+    const [target, fragment] = match[1].split('#');
+    if (/^(?:[a-z]+:|\/)/i.test(target)) continue;
+    const absolute = target ? path.resolve(root, path.dirname(file), decodeURIComponent(target)) : path.join(root, file);
+    if (!fs.existsSync(absolute)) problems.push(`Missing local Markdown target ${target}: ${file}`);
+    else if (fragment && absolute.endsWith('.md') && !markdownAnchors(absolute).has(decodeURIComponent(fragment))) {
+      problems.push(`Missing Markdown section ${match[1]}: ${file}`);
+    }
+  }
+}
+
+// Finding summaries and detailed evidence must remain navigable as the register grows.
+const audit = fs.readFileSync(path.join(root, 'docs/AUDIT_REPORT.md'), 'utf8');
+const summaryIds = [...audit.matchAll(/^\| ([MFDSNPV]\d+) \|/gm)].map(match => match[1]);
+const detailIds = [...audit.matchAll(/^### ([MFDSNPV]\d+) - /gm)].map(match => match[1]);
+if (!summaryIds.length || new Set(summaryIds).size !== summaryIds.length ||
+    new Set(detailIds).size !== detailIds.length || summaryIds.sort().join() !== detailIds.sort().join()) {
+  problems.push('Audit summary rows and detailed finding IDs must agree and be unique.');
+}
+const dispositions = new Map([...audit.matchAll(/^\| ([MFDSNPV]\d+) \| [^|\n]+ \| ([^|\n]+) \|/gm)]
+  .map(([, id, status]) => [id, status.split(' · ')[0].trim()]));
+for (const [, id, status] of audit.matchAll(/^### ([MFDSNPV]\d+) - [^\n]+\r?\n\s*\*\*Status:\*\* ([^\r\n]+)/gm)) {
+  if (status.split(' · ')[0].replace(/\.$/, '').trim() !== dispositions.get(id)) problems.push('Audit status mismatch: ' + id);
+  dispositions.delete(id);
+}
+for (const id of dispositions.keys()) problems.push('Missing detailed audit status: ' + id);
+for (const [, sources] of audit.matchAll(/^\*\*Implementation and verification sources:\*\* (.+)$/gm)) {
+  for (const [, source] of sources.matchAll(/`([^`]+)`/g)) {
+    if (!fs.existsSync(path.join(root, source))) problems.push('Missing audit evidence path: ' + source);
   }
 }
 

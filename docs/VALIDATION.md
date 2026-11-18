@@ -1,6 +1,6 @@
 # 🧪 Validation and Test Guide · Shark Empti v2.0.0 **β**
 
-This guide explains how to run the repository's built-in checks and interpret their results. [Configuration](CONFIGURATION.md) covers setup, [technical documentation](TECHNICAL_DOCUMENTATION.md) describes behavior, [account operations](ACCOUNT_OPERATIONS.md) covers operational drills, and the [audit register](AUDIT_REPORT.md) records outstanding concerns. A local pass applies to the tested source, configuration and environment; it does not establish deployed, live-provider or physical-device behavior.
+This guide explains how to run the repository's built-in checks and interpret their results. [Configuration](CONFIGURATION.md) covers setup, [technical documentation](TECHNICAL_DOCUMENTATION.md) describes behavior, [account operations](ACCOUNT_OPERATIONS.md) covers operational drills, and the [audit register](AUDIT_REPORT.md) records outstanding concerns. A local pass applies to the tested source, configuration and environment; it does not establish deployed, live-provider or physical-device behavior. The [interface design guide](design.md) covers learner-facing states and interactions.
 
 ## Prerequisites and isolation
 
@@ -37,7 +37,7 @@ npm run test:rules
 npm run test:integration
 ```
 
-Lint checks project code; typecheck validates the TypeScript program. Maintenance checks declared imports, package/lock agreement, documented npm scripts and local links, compiler/lint scope and ignored generated paths. Unit/component results cover exercised branches in their own denominator; integration separately exercises Rules, authenticated APIs and emulator-backed workflows. Do not add coverage counters from separate suites or treat a skipped case as passed. V8 coverage is produced under `coverage/`.
+Lint checks project code and typecheck validates the TypeScript program. Maintenance checks declared imports, package/lock agreement, documented npm scripts, local files and Markdown section links, audit table/detail status agreement, compiler/lint scope and ignored generated paths. Unit and component coverage uses the source set in the Vitest configuration. The integration suite exercises Rules and emulator-backed workflows. Its V8 percentages cover the AI and server API files selected in the integration configuration. V8 writes the separate reports under `coverage/`.
 
 The configuration preflight expects a deliberately configured Web/Admin environment. It checks structure offline and is independent of demo-only tests/builds, which do not need real Admin secrets. Passing it does not verify IAM, credential validity at the provider or deployed service readiness.
 
@@ -53,7 +53,7 @@ Account-status recovery regressions cover fresh request signals after timeout, f
 
 Forum cleanup regressions reproduce lock, maintenance and consent changes after parent visibility cutover. Guarded cleanup is tested across more than 500 descendants, missing intermediate parents, long legacy IDs, interruption between batches, finalization under a new barrier and retry. Unit checks reject foreign/malformed/duplicate inventory paths and unsupported database configuration. All returned paths are validated before transactional deletion; Emulator results do not prove deployed IAM or scale.
 
-D41 checks cover public serializer whitelists, stored timestamps, ranking eligibility and Web Crypto reaction keys. The client now reads versioned public projections and owner-only reaction/pointer records; Rules deny canonical Forum and Arena attempt reads. Hook tests cover 30-key query chunks, server confirmation after cached snapshots, live updates, account/target changes, malformed records, timeout, unsubscribe and explicit retry. Migration tests cover read-only inventory, repeatability, unknown-data preservation, pagination, hidden archives, duplicate ranking ownership/IDs, independent public IDs, account locks, deletion journals and lease expiry/takeover. The latest checks passed 491 unit/component cases with two opt-in skips and 181 Rules/integration cases. Chromium and WebKit each passed the post/comment reaction test against the final demo build. Deployed migration/Rules/index and operational acceptance remain required.
+D41 checks cover public serializer whitelists, stored timestamps, ranking eligibility and Web Crypto reaction keys. The client now reads versioned public projections and owner-only reaction/pointer records; Rules deny canonical Forum and Arena attempt reads. Hook tests cover 30-key query chunks, server confirmation after cached snapshots, live updates, account/target changes, malformed records, timeout, unsubscribe and explicit retry. Migration tests cover read-only inventory, repeatability, unknown-data preservation, pagination, hidden archives, duplicate ranking ownership/IDs, independent public IDs, account locks, deletion journals and lease expiry/takeover. The earlier projection checkpoint passed 491 unit/component cases with two opt-in skips and 181 Rules/integration cases. Chromium and WebKit each passed the post/comment reaction test against the final demo build. Deployed migration/Rules/index and operational acceptance remain required.
 
 The projection inventory must precede cutover. Regression fixtures include unrecognized documents, missing source records, hidden/tombstoned posts and public ranking IDs equal to owner UIDs. A blocked inventory preserves those records and stops before converting business data. Because Rules trust server-controlled version markers, the inventory and restricted privileged-writer access are operational prerequisites, not proof about a live dataset.
 
@@ -70,11 +70,33 @@ Remove-Item Env:E2E_PRODUCTION
 npm run test:production
 ```
 
+Authenticated fixtures that inspect private records look up the exact generated account in the Auth Emulator. Receipt recovery seeds local storage before the first page mount so the test observes the injected failure and subsequent recovery on the same page. Forum admission checks the visible notification, retained draft and number of committed posts after retry.
+
 The ordinary E2E command uses the development server; production mode requires `build:demo`. Its build ID records demo configuration and a source/assets/lock/configuration fingerprint. A missing, stale, non-demo or unverified artifact is rejected. Public Firebase variables are embedded at build time, so a runtime override cannot turn a production build into an isolated demo build. Rebuild after input changes.
 
-Playwright covers Chromium desktop/mobile, Firefox and WebKit. Inspect pass/fail/skip counts and traces for the exact run; a retry or isolated pass is not a stable repeated-matrix result. Current engines do not prove the exact documented minimum browser versions, physical devices, screen readers or camera permission behavior. Confirm locale/theme, responsive layouts, keyboard/focus, accessible names, reduced motion, loading/error/retry and print where relevant. Axe supplements manual accessibility review; a passing sample is not a full WCAG certification.
+The default Playwright matrix includes desktop Chromium, Firefox and WebKit and a touch viewport for each engine. The product targets Chrome 100+ and Firefox 102+ on desktop and Android, and Safari 15.4+ on macOS and iOS. A Firefox touch viewport uses the desktop Gecko engine.
 
-Optional print verification renders the actual report with long VI/EN fixtures:
+For the historical matrix, install trusted matching binaries and Playwright drivers outside the application dependency graph. Supply a UTF-8 JSON object with keys `chromium`, `firefox` and `webkit`. Each contains an absolute `driver` path to the extracted playwright-core package and an absolute `executable` path. The runner checks the engine version before exercising language, theme, layout, sign-in and a persisted quiz. The touch cases also check the Android Chrome, Android Firefox or iPhone Safari user agent and require a trusted touch event on the sign-in control.
+
+| Windows engine | Historical installation | Matching driver |
+|---|---|---|
+| Chromium 100.0.4896.0 | [Chromium snapshot 972766](https://storage.googleapis.com/chromium-browser-snapshots/Win_x64/972766/chrome-win.zip), executable `chrome-win/chrome.exe` | [playwright-core 1.20.2](https://www.npmjs.com/package/playwright-core/v/1.20.2) |
+| Firefox 102.0 with Playwright automation | Firefox revision 1335, executable `firefox/firefox.exe` | [playwright-core 1.24.2](https://www.npmjs.com/package/playwright-core/v/1.24.2) |
+| WebKit 15.4 Windows port | WebKit revision 1668, executable `Playwright.exe` | [playwright-core 1.23.4](https://www.npmjs.com/package/playwright-core/v/1.23.4) |
+
+Install the historical driver with its dependencies in an isolated directory. Use that driver’s matching browser install command for Firefox and WebKit. For Chromium, point to the snapshot above. The default Chromium downloaded by driver 1.20.2 reports milestone 101.
+
+```powershell
+npm run build:demo
+$env:BROWSER_FLOOR_CONFIG = (Resolve-Path (Join-Path $env:LOCALAPPDATA 'SharkEmpti/browser-installations.json')).Path
+try { npm run test:e2e } finally { Remove-Item Env:BROWSER_FLOOR_CONFIG }
+```
+
+Keep the machine-specific installation file in a private local directory. Windows WebKit, Chromium and Gecko results cover those engine builds. Native iOS Safari, Android browsers, permissions and camera hardware require separate device evidence. Inspect pass/fail/skip counts and traces for the exact run; a retry or isolated pass is not a stable repeated-matrix result. Current engines do not prove the exact documented minimum browser versions, physical devices, screen readers or camera permission behavior. Confirm locale/theme, responsive layouts, keyboard/focus, accessible names, reduced motion, loading/error/retry and print where relevant. Axe supplements manual accessibility review; a passing sample is not a full WCAG certification.
+
+For a physical-camera check, open Arena on the local demo, select **Focus Shield** and enable **Tracking Mode**. Confirm that the video plays and a focus measurement appears. Keep a reference to the active video track in browser developer tools, then use **Stop camera and close** and confirm its `readyState` is `ended`. Record the browser, device, frame dimensions and track states. Run with local model assets, recording disabled and external requests blocked. The Windows hardware result and outstanding device cases are recorded in [V02](AUDIT_REPORT.md#v02---unverified-minimum-browser-versions-and-physical-camera-behaviour).
+
+Optional print verification renders the report with long Vietnamese and English fixtures.
 
 ```powershell
 $env:REPORT_PRINT_BROWSER='chromium' # chrome, msedge, firefox or webkit are also supported
@@ -82,9 +104,9 @@ node node_modules/vitest/vitest.mjs run tests/report-print.browser.test.tsx
 Remove-Item Env:REPORT_PRINT_BROWSER
 ```
 
-Without opt-in, the normal unit suite skips these browser-print cases. Chromium can write PDFs to `tmp/pdfs/`; browser/PDF output does not verify native print dialogs or physical printers.
+With `BROWSER_FLOOR_CONFIG` set, the print tests use the configured historical engine. They render the report and locally served KaTeX fonts. The CI workflow installs all three current engines, enables Chromium print during coverage, and runs the bilingual fixtures again in Firefox and WebKit. Local unit runs select a browser with `REPORT_PRINT_BROWSER`. Chromium can write PDFs to `tmp/pdfs/`. Physical printers and native print dialogs need separate verification.
 
-Production HTTP smoke checks public HTML, metadata, API authentication and six existing gzip script budgets. It uses an optimized demo artifact and does not test the deployed origin or real user traffic.
+Production HTTP smoke checks public HTML, metadata, API authentication and six existing gzip script budgets. It checks the application response headers and requires a current fingerprinted demo artifact and does not test the deployed origin or real user traffic.
 
 ## Performance and dependency checks
 
@@ -106,6 +128,8 @@ Dependency compatibility checks retain the scoped Firestore/gRPC API regression 
 `npm run ai:health` authenticates the OpenRouter key and inspects model availability; it does not prove inference or quota. `npm run ai:smoke` invokes real quiz/chat generation and may consume quota; it does not validate the full authenticated ledger/recovery workflow. Both require the intended credentials and network.
 
 Account export/deletion, signed queue delivery, expiry, backup and isolated restore have separate provider, permission and cost boundaries. Use the built-in `npm run jobs:storage:check` and `npm run jobs:restore` only with their explicit confirmation flags and an identified authorized target as described in [account operations](ACCOUNT_OPERATIONS.md). Verify signatures, duplicate/expired leases, interrupted delivery, ownership, download expiry and deletion journal before enabling the service. A synthetic Emulator restore is not proof of an encrypted cloud restore or RPO/RTO target.
+
+For educational evaluation, sample Vietnamese and English items by subject, difficulty and answer type. Have two reviewers independently mark factual correctness, answerability and agreement between feedback and the submitted work, then reconcile disagreements. Record the sample sizes, model IDs, failure categories and uncertainty before changing score labels. For Focus Shield, use consented, separately labelled sessions across lighting and device conditions. Split evaluation by participant, report missing predictions and compare false-positive and false-negative rates per condition. Product owners must agree on acceptable error rates before interpreting results as calibrated.
 
 ## Results and cleanup
 

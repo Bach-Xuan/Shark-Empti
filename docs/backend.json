@@ -4,6 +4,7 @@
   "x-authority": {
     "description": "Actual contracts: Firestore Rules, AI/API Zod schemas, history/profile readers and server-api.ts. Updating this file changes no validation, migration or access policy.",
     "documentation": "TECHNICAL_DOCUMENTATION.md",
+    "design": "design.md",
     "configuration": "CONFIGURATION.md",
     "audit": "AUDIT_REPORT.md",
     "validation": "VALIDATION.md"
@@ -891,7 +892,7 @@
       "description": "Admin-only deletion/deleted write tombstone; Rules/Admin mutations reject new writes. Active deletion retained until completion; deleted tombstone seven days."
     },
     "/_deletionJournal/{uid}": {
-      "description": "Admin-only restore-prevention journal, 30 days after completion; active deletion entries cannot expire. Applied with the current source journal before isolated restore."
+      "description": "Admin-only restore-prevention journal, retained for 30 days after completion. Active deletion entries stay protected. An isolated restore combines source and backup journals and account locks, applies the deletions and writes a fresh completed lock and journal for each erased identity."
     },
     "/_jobWorkerState/lease": {
       "description": "Admin-only shared maintenance/job lease with random fencing token and deadline."
@@ -947,7 +948,7 @@
     "storage": "Private per-environment B2 bucket; gzip plus AES-256-GCM, filename AAD and SHA-256 integrity; 7 GB production / 1 GB staging internal ceilings",
     "retention": "AI access rejects expired records; bounded signed Firestore cleanup via RETENTION_ENABLED independently of B2/account jobs, with transactional expiry rechecks; no native TTL",
     "export": "Full attributable catalog plus discovered private descendants; live paged reads; processing at most seven days, owner download access 24 hours after ready, processing object fallback expiry eight days; failed processing remains visible 24 hours; manifest declares lifetime and status gives authoritative deadline; legacy unattributable receipts excluded pending retention",
-    "deletion": "New explicit recent-auth confirmation only; lock writes, cancel AI, remove private data, anonymize public/archive identity/reactions, Auth last; minimal receipt/tombstone seven days and deletion journal 30 days",
+    "deletion": "After explicit recent-auth confirmation, lock writes and erase owned AI generations with their active quota slots under the deletion worker lease. Remove private data, anonymize community records and archives, then remove Auth. Retain the receipt and tombstone for seven days and the journal for 30 days.",
     "backup": "Daily when enabled; seven-day encrypted artifacts, bounded write barrier; isolated empty-target restore applies current deletion journal; RPO/RTO unverified"
   }
 }

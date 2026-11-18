@@ -19,7 +19,7 @@ The product's educational purpose aligns with Vietnam's science and education mo
 - **Arena and Forum:** support community practice, symbolic leaderboards and discussion.
 - **Focus Shield:** offers optional in-browser camera support after explicit permission; its estimates remain experimental.
 
-Next.js 16, React 19, TypeScript 6, Firebase Auth/Firestore, OpenRouter, Tailwind 4, Radix UI, Recharts, KaTeX and TensorFlow.js form the application. Vitest, Testing Library, Firebase Emulators and Playwright provide local verification. The server validates AI requests/results; an authenticated ledger coordinates up to three attempts, at most one provider request per invocation and recovery after response loss. Safe errors exclude sensitive provider details. See [architecture and AI lifecycle](docs/TECHNICAL_DOCUMENTATION.md#ai-request-lifecycle).
+Next.js 16, React 19, TypeScript 6, Firebase Auth/Firestore, OpenRouter, Tailwind CSS 3.4, Radix UI, Recharts, KaTeX and TensorFlow.js form the application. Vitest, Testing Library, Firebase Emulators and Playwright provide local verification. The server validates AI requests/results; an authenticated ledger coordinates up to three attempts, at most one provider request per invocation and recovery after response loss. Safe errors exclude sensitive provider details. See [architecture and AI lifecycle](docs/TECHNICAL_DOCUMENTATION.md#ai-request-lifecycle).
 
 ## 🚀 Quick Start
 
@@ -56,6 +56,7 @@ Install browser engines with `npx --no-install playwright install chromium webki
 ## 📚 Documentation
 
 - [Configuration](docs/CONFIGURATION.md): environment, Firebase, OpenRouter, timestamp migration, deployment and troubleshooting.
+- [Interface design](docs/design.md) covers navigation, interaction states, accessibility, responsive layout and print.
 - [Technical documentation](docs/TECHNICAL_DOCUMENTATION.md): architecture, data ownership and security contracts.
 - [Backend data map](docs/backend.json): descriptive entities, storage paths and interfaces; executable code, schemas and Rules remain authoritative.
 - [Audit register](docs/AUDIT_REPORT.md): finding statuses and unresolved verification boundaries.
@@ -68,4 +69,4 @@ Authenticated account-data controls at `/account/data` remain accessible without
 
 Quiz, Flashcard and Practice saves use authenticated, schema-validated APIs with stable retry identity and count/byte admission. Profile, notes and activity SDK writes have bounded Rules; owner legacy reads and explicit record deletion remain available. Client/server/Rules changes require a coordinated rollout; see [configuration](docs/CONFIGURATION.md#learning-write-validation-rollout).
 
-The interface supports Vietnamese and English; preferences persist between pages and tabs. Camera access requires HTTPS or localhost and explicit permission. Lists expose 50 records per page; client-side search/statistics reflect exposed records. During timestamp migration, history merges two bounded candidate streams as described in the [data contract](docs/TECHNICAL_DOCUMENTATION.md). Documented browser targets are Safari 16.4+, Chrome 111+ and Firefox 128+; current engine tests do not establish exact-version or physical-device acceptance. See the [audit](docs/AUDIT_REPORT.md) before release.
+The interface supports Vietnamese and English; preferences persist between pages and tabs. Camera access requires HTTPS or localhost and explicit permission. Lists expose 50 records per page; client-side search/statistics reflect exposed records. During timestamp migration, history merges two bounded candidate streams as described in the [data contract](docs/TECHNICAL_DOCUMENTATION.md). The browser targets are Safari 15.4+ on macOS and iOS, Chrome 100+ on desktop and Android, and Firefox 102+ on desktop and Android. The [validation guide](docs/VALIDATION.md#optimized-build-and-browser-matrix) explains the engine and device evidence. See the [audit](docs/AUDIT_REPORT.md) before release.

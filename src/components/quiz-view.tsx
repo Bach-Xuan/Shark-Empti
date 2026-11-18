@@ -482,7 +482,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
             <div className="space-y-6 md:space-y-8">
               <div className="space-y-2">
                 <p className="font-black text-muted-foreground uppercase text-[9px] md:text-xs tracking-widest pl-1">{t.correctAnswer}:</p>
-                <div className="p-5 md:p-8 bg-white/40 dark:bg-black/20 rounded-2xl md:rounded-[2rem] border-2 border-current/10">
+                <div className="p-5 md:p-8 bg-white/40 dark:bg-black/20 rounded-2xl md:rounded-[2rem] border-2 border-foreground/10">
                   <p className="text-base md:text-2xl font-bold text-foreground whitespace-normal break-words">
                     <LatexText text={currentQ.correct} />
                   </p>

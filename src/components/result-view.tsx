@@ -222,7 +222,7 @@ function PerformanceInsightCard({ title, copyLabel, items, variantClass, onCopy,
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 md:h-10 md:w-10 rounded-xl opacity-40 hover:opacity-100 hover:bg-current/10 transition-all"
+            className="h-8 w-8 md:h-10 md:w-10 rounded-xl opacity-40 hover:opacity-100 hover:bg-foreground/10 transition-all"
             onClick={(e) => { e.stopPropagation(); onCopy(); }}
             aria-label={`${copyLabel}: ${title}`}
           >

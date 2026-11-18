@@ -526,7 +526,7 @@ if (!authLoading && !user) {
         t={t} lang={lang} onStatus={setPrintStatus}
       />}
       <Dialog open={isReportViewOpen} onOpenChange={setIsReportViewOpen}>
-        <DialogContent className="max-w-5xl w-[95vw] h-[90dvh] max-h-[90dvh] flex flex-col rounded-[2.5rem] border-[4px] shadow-2xl p-0 overflow-hidden bg-background">
+        <DialogContent className="max-w-5xl w-[95vw] report-panel flex flex-col rounded-[2.5rem] border-[4px] shadow-2xl p-0 overflow-hidden bg-background">
           <div className="flex flex-wrap gap-3 items-center justify-between p-6 md:p-8 bg-card border-b-4 border-border shrink-0">
             <DialogTitle className="text-xl md:text-3xl font-headline font-black text-primary uppercase tracking-tight flex items-center gap-4">
               <FileText className="w-8 h-8" /> {t.academicReport}

@@ -4,12 +4,11 @@ import animate from 'tailwindcss-animate';
 export default {
   darkMode: 'class',
   content: [
-    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    './src/**/*.{js,ts,jsx,tsx,mdx}',
   ],
   theme: {
     extend: {
+      spacing: { 18: '4.5rem', 22: '5.5rem' },
       fontFamily: {
         body: ['var(--font-system-sans)', 'sans-serif'],
         headline: ['var(--font-brand-headline)', 'sans-serif'],
@@ -75,7 +74,9 @@ export default {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
+      backdropBlur: { xs: '2px' },
       boxShadow: {
+        xs: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
         'duo': '0 4px 0 0 var(--duo-shadow)',
         'duo-active': '0 2px 0 0 var(--duo-shadow)',
       },

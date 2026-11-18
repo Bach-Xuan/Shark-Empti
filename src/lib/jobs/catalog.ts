@@ -48,6 +48,32 @@ export function continuation(query: Query, after?: string) {
   return after ? query.startAfter(getAdminDb().doc(after)) : query;
 }
 
+/** Preserve Firestore values and schema shape in retained contributions and archives. */
+export function anonymizeContributions(value: unknown, deleted: ReadonlySet<string>): unknown {
+  if (Array.isArray(value)) return value.map(item => anonymizeContributions(item, deleted));
+  if (!value || typeof value !== 'object' || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) return value;
+  const record = { ...value as Record<string, unknown> };
+  for (const field of ['authorId', 'userId', 'actorId', 'hiddenBy', 'reporterId', 'uid', 'ownerUid']) {
+    const owner = record[field];
+    if (typeof owner !== 'string' || !deleted.has(owner)) continue;
+    record[field] = '__deleted__';
+    if (field === 'authorId' || field === 'userId') {
+      const prefix = field === 'authorId' ? 'author' : 'user';
+      if (Object.hasOwn(record, prefix + 'Name')) record[prefix + 'Name'] = 'Former member';
+      if (Object.hasOwn(record, prefix + 'Photo')) record[prefix + 'Photo'] = '';
+    }
+  }
+  if (Array.isArray(record.likedBy)) {
+    const remaining = record.likedBy.filter(member => typeof member !== 'string' || !deleted.has(member));
+    if (remaining.length !== record.likedBy.length) {
+      record.likedBy = remaining;
+      record.likesCount = remaining.length;
+    }
+  }
+  for (const [key, child] of Object.entries(record)) record[key] = anonymizeContributions(child, deleted);
+  return record;
+}
+
 /** Exports contain the owner's records, not other members' IDs or credentials. */
 export function redactExport(value: unknown, uid: string): unknown {
   if (Array.isArray(value)) return value.map(item => redactExport(item, uid));

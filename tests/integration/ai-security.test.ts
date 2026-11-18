@@ -8,7 +8,7 @@ import { POST as create } from '@/app/api/ai/generations/route';
 import { POST as attempt } from '@/app/api/ai/generations/[generationId]/attempt/route';
 import { GET as status, DELETE as cancel } from '@/app/api/ai/generations/[generationId]/route';
 import { getAdminDb } from '@/lib/firebase-admin';
-import { createGeneration, claimGeneration, getGeneration, finalizeGeneration } from '@/ai/generation-store';
+import { createGeneration, claimGeneration, getGeneration, finalizeGeneration, cancelGeneration } from '@/ai/generation-store';
 import { Timestamp } from 'firebase-admin/firestore';
 import { AI_IO_LIMITS } from '@/ai/config/limits';
 
@@ -198,4 +198,41 @@ it('rejects finalization that crosses the generation deadline', async () => {
   await getAdminDb().doc('_aiGenerations/' + id).update({ expiresAt: Timestamp.fromMillis(Date.now() - 1) });
   await expect(finalizeGeneration(id, uid, claim.leaseId, claim.attempt, 1, { data: { isAcademic: true } })).rejects.toMatchObject({ status: 404 });
   expect((await getAdminDb().doc('_aiGenerations/' + id).get()).get('result')).toBeUndefined();
+});
+
+it('keeps repeated cancellation pending until the active provider attempt settles', async () => {
+  const id = randomUUID();
+  await createGeneration(id, uid, 'academic-validation', input);
+  const claim = await claimGeneration(id, uid);
+  if (claim.kind !== 'claimed') throw Error('Expected claim');
+  for (const result of await Promise.all([cancelGeneration(id, uid), cancelGeneration(id, uid)])) {
+    expect(result.state).toBe('cancel_requested');
+  }
+  const result = await finalizeGeneration(id, uid, claim.leaseId, claim.attempt, 1, { data: { isAcademic: true } });
+  expect(result.state).toBe('cancelled');
+  const stored = await getAdminDb().doc('_aiGenerations/' + id).get();
+  expect(stored.get('result')).toBeUndefined();
+  expect(stored.get('inFlight')).toBeUndefined();
+  expect((await getAdminDb().doc('_aiQuota/user_' + uid).get()).get('active')).toEqual([]);
+});
+
+it('defers finalization, cancellation and expired-lease settlement throughout a backup window', async () => {
+  const id = randomUUID();
+  const db = getAdminDb();
+  await createGeneration(id, uid, 'academic-validation', input);
+  const claim = await claimGeneration(id, uid);
+  if (claim.kind !== 'claimed') throw Error('Expected claim');
+  const barrier = db.doc('_serviceState/maintenance');
+  await barrier.set({ active: true, expiresAtMs: Date.now() + 60_000 });
+  const finish = () => finalizeGeneration(id, uid, claim.leaseId, claim.attempt, 1, { data: {} });
+  await expect(finish()).rejects.toMatchObject({ code: 'APP-MAINTENANCE' });
+  await expect(cancelGeneration(id, uid)).rejects.toMatchObject({ code: 'APP-MAINTENANCE' });
+  const ref = db.doc('_aiGenerations/' + id);
+  await ref.update({ 'inFlight.leaseExpiresAt': Timestamp.fromMillis(Date.now() - 1) });
+  await expect(getGeneration(id, uid)).rejects.toMatchObject({ code: 'APP-MAINTENANCE' });
+  expect((await ref.get()).get('status')).toBe('running');
+  await barrier.delete();
+  await expect(finish()).rejects.toMatchObject({ code: 'AI-LEASE-CONFLICT' });
+  expect((await getGeneration(id, uid)).state).toBe('retryable');
+  expect((await ref.get()).get('result')).toBeUndefined();
 });

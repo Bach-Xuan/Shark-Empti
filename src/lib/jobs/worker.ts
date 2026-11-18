@@ -77,8 +77,9 @@ async function cleanExpiredRecords(leaseId: string, now: number) {
   }, { merge: true }); });
   const journals = await db.collection('_deletionJournal').where('expiresAt', '<=', new Date(now)).limit(10).get();
   for (const journal of journals.docs) await maintenanceTransaction(leaseId, async transaction => {
-    const lock = await transaction.get(db.collection('_accountLocks').doc(journal.id));
-    if (!lock.exists) transaction.delete(journal.ref);
+    const [current, lock] = await Promise.all([transaction.get(journal.ref), transaction.get(db.collection('_accountLocks').doc(journal.id))]);
+    const expiry = current.get('expiresAt');
+    if (!lock.exists && typeof expiry?.toMillis === 'function' && expiry.toMillis() <= now) transaction.delete(journal.ref);
   });
   if (!jobsConfigured()) return removed;
   // Retain a visible failure after a bounded processing window instead of silently

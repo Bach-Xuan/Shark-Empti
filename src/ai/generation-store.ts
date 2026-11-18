@@ -1,6 +1,6 @@
 import 'server-only';
 import { createHash,randomUUID } from 'node:crypto';
-import { FieldValue,Timestamp,type Transaction } from 'firebase-admin/firestore';
+import { FieldValue,Timestamp,type DocumentSnapshot,type Transaction } from 'firebase-admin/firestore';
 import { getAdminDb } from '@/lib/firebase-admin';
 import { ApiError, assertWritable } from '@/lib/server-api';
 import { createAppError,type AppError } from '@/lib/app-error';
@@ -80,7 +80,8 @@ export async function getGeneration(id: string, uid: string): Promise<AiProtocol
     const now = Timestamp.now();
     const expired = record.inFlight && record.inFlight.leaseExpiresAt.toMillis() <= now.toMillis();
     if ((record.status === 'cancel_requested' && (!record.inFlight || expired)) || (record.status === 'running' && expired)) {
-      await releaseQuota(transaction, uid, id);
+      await assertWritable(transaction, uid);
+      await releaseQuota(transaction, uid, [id]);
       const nextAttempt = record.inFlight ? record.inFlight.attempt + 1 : record.nextAttempt;
       const cancelled = record.status === 'cancel_requested';
       const terminal = cancelled || nextAttempt >= 3;
@@ -137,7 +138,7 @@ export async function claimGeneration(id: string, uid: string): Promise<{ kind: 
     const recoveredAttempt = record.status === 'running' && record.inFlight ? record.inFlight.attempt + 1 : record.nextAttempt;
     if (recoveredAttempt >= 3) {
       const terminalError = createAppError('AI-FALLBACK-EXHAUSTED', 'The AI service could not complete this request.');
-      await releaseQuota(transaction, uid, id);
+      await releaseQuota(transaction, uid, [id]);
       transaction.update(ref, { status: 'failed', terminalError, nextAttempt: 3, updatedAt: now, inFlight: FieldValue.delete(), validatedInput: FieldValue.delete() });
       return { kind: 'response', value: { generationId: id, state: 'failed', error: terminalError } };
     }
@@ -153,13 +154,25 @@ export async function claimGeneration(id: string, uid: string): Promise<{ kind: 
   });
 }
 
-async function releaseQuota(transaction: Transaction, uid: string, generationId: string) {
+async function releaseQuota(transaction: Transaction, uid: string, generationIds: readonly string[]) {
   const db = getAdminDb();
   const refs = [db.collection('_aiQuota').doc(`user_${uid}`), db.collection('_aiQuota').doc('global')];
   const snapshots = await Promise.all(refs.map(ref => transaction.get(ref)));
   snapshots.forEach((snapshot, index) => {
-    if (snapshot.exists) transaction.update(refs[index], { active: ((snapshot.data() as QuotaRecord).active ?? []).filter(item => item.generationId !== generationId) });
+    const active = (snapshot.data() as QuotaRecord | undefined)?.active ?? [];
+    const remaining = active.filter(item => !generationIds.includes(item.generationId));
+    if (remaining.length !== active.length) transaction.update(refs[index], { active: remaining });
   });
+}
+
+/** The deletion worker reads this owner's page under its account lock and lease. */
+export async function eraseOwnedGenerations(transaction: Transaction, uid: string, page: readonly DocumentSnapshot[]) {
+  if (!page.length) return;
+  if (page.some(document => document.ref.parent.path !== COLLECTION || document.get('ownerUid') !== uid)) {
+    throw new ApiError('APP-DATA-INVALID', 409, 'The generation page does not belong to this account.');
+  }
+  await releaseQuota(transaction, uid, page.map(document => document.id));
+  for (const document of page) transaction.delete(document.ref);
 }
 
 export async function finalizeGeneration(id: string, uid: string, leaseId: string, attempt: AttemptOrdinal, durationMs: number, outcome: { data: unknown } | { failure: NormalizedAiFailure; decision: RetryDecision; retryAfterMs?: number }): Promise<AiProtocolResponse> {
@@ -170,11 +183,15 @@ export async function finalizeGeneration(id: string, uid: string, leaseId: strin
     if (!snapshot.exists || snapshot.get('ownerUid') !== uid) throw new ApiError('APP-NOT-FOUND', 404, 'Generation was not found.');
     const record = snapshot.data() as GenerationRecord;
     assertGenerationLifetime(record);
-    if (record.inFlight?.leaseId !== leaseId) throw new ApiError('AI-LEASE-CONFLICT', 409, 'The attempt lease has changed. Refresh its authoritative status.');
     const now = Timestamp.now();
-    await releaseQuota(transaction, uid, id);
+    if (record.inFlight?.leaseId !== leaseId || record.inFlight.attempt !== attempt
+      || record.inFlight.leaseExpiresAt.toMillis() <= now.toMillis()) {
+      throw new ApiError('AI-LEASE-CONFLICT', 409, 'Refresh the generation status before retrying.');
+    }
+    await assertWritable(transaction, uid);
+    await releaseQuota(transaction, uid, [id]);
     const attempts = [...record.attempts, { attempt, outcome: 'data' in outcome ? 'succeeded' : outcome.failure.code, durationMs, completedAt: now }];
-    if (record.status === 'cancel_requested') {
+    if (record.status === 'cancel_requested' || record.status === 'cancelled') {
       const terminalError = createAppError('AI-CANCELLED', 'The AI request was cancelled.');
       transaction.update(ref, { status: 'cancelled', terminalError, attempts, updatedAt: now, inFlight: FieldValue.delete(), result: FieldValue.delete(), validatedInput: FieldValue.delete() });
       return { generationId: id, state: 'cancelled', error: terminalError };
@@ -217,7 +234,8 @@ export async function cancelGeneration(id: string, uid: string): Promise<AiProto
     if (!snapshot.exists || snapshot.get('ownerUid') !== uid) throw new ApiError('APP-NOT-FOUND', 404, 'Generation was not found.');
     const record = snapshot.data() as GenerationRecord;
     assertGenerationLifetime(record);
-    if (['succeeded', 'failed', 'cancelled'].includes(record.status)) return response(id, record);
+    if (['succeeded', 'failed', 'cancelled', 'cancel_requested'].includes(record.status)) return response(id, record);
+    await assertWritable(transaction, uid);
     const state = record.status === 'running' ? 'cancel_requested' : 'cancelled';
     const terminalError = createAppError('AI-CANCELLED', 'The AI request was cancelled.');
     transaction.update(ref, { status: state, terminalError, updatedAt: Timestamp.now(), ...(state === 'cancelled' ? { validatedInput: FieldValue.delete() } : {}) });

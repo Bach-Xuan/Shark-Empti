@@ -1,6 +1,6 @@
 # 🛠️ Technical Documentation · Shark Empti v2.0.0 **β**
 
-This guide describes runtime ownership and contracts. See [configuration](CONFIGURATION.md), the [backend data map](backend.json), [validation](VALIDATION.md), [account operations](ACCOUNT_OPERATIONS.md) and the [audit register](AUDIT_REPORT.md). Executable source, schemas, Rules and configuration take precedence over descriptive documentation.
+This guide describes runtime ownership and contracts. See [configuration](CONFIGURATION.md), the [backend data map](backend.json), [validation](VALIDATION.md), [account operations](ACCOUNT_OPERATIONS.md) and the [audit register](AUDIT_REPORT.md). Executable source, schemas, Rules and configuration take precedence over descriptive documentation. The [interface design guide](design.md) covers learner-facing states and interactions.
 
 ## 🧭 Sources of truth
 
@@ -33,8 +33,8 @@ WebKit uses supported Firestore forced long polling with auto-detection disabled
 |---|---|
 | `users/{uid}` | Public-shaped profile; owner reads, known-UID reads restricted to public fields, list/root deletion denied; email stays in Auth and coins are server-owned. |
 | `users/{uid}/history`, `notes`, `activity`, `flashcards`, `practice` | Owner learning data. Readers accept supported legacy omissions and reject malformed core data without silently deleting it. |
-| `posts/{postId}/comments/{commentId}` | Public Forum reads require a live non-tombstoned parent; authenticated, budgeted server APIs handle post/comment mutations. Direct client writes are denied. |
-| `arenaExams/{examId}/attempts/{id}` | Public V2 metadata and eligible ranking attempts. Question banks, sessions, eligibility and legacy backups are private server records. |
+| `forumPosts/{postId}/comments/{commentId}` | Versioned public projections expose counts. Comment reads require a live public parent. Canonical posts, comments and membership stay private. Authenticated, budgeted APIs own mutations. |
+| `arenaExams/{examId}/rankings/{rankingId}` | V2 metadata and eligible ranking projections use public ranking IDs. Canonical attempts, answer keys, sessions, eligibility and legacy backups stay private. |
 | `_communityReports`, `_moderationArchives`, `_moderationActions` | Private reports, reversible archives and decision history; current server-assigned moderator claim is required for decisions. |
 | `_aiGenerations`, `_aiQuota`, `_requestBudgets`, `_requestReceipts` | Server-owned generation state, leases, usage budgets and idempotency receipts; browser access is denied. |
 | `_forumDeletions` | Owner-readable, server-written deletion tombstones for recovery and ID-reuse prevention. |
@@ -105,8 +105,9 @@ Forum endpoints include POST /api/forum, PATCH /api/forum/{postId}, POST /api/fo
 
 Public home/about offer SSR content and descriptive/canonical/social metadata; only these stable routes enter the sitemap, which is empty in preview/demo. Forum/Arena remain publicly readable but UGC, account, moderation and service-information routes are noindex/nofollow. Robots permits page crawling to observe noindex and disallows API routes. SITE_URL must match the deployed origin; local metadata checks do not establish crawler acceptance.
 
-<a id="ai-request-lifecycle"></a>
 Forum clients read versioned metadata from `forumPosts`; canonical `posts` and reaction membership remain server-private. Desired-state reactions atomically synchronize canonical counts, public counts, receipts and the flat owner view at `users/{uid}/forumReactions/{hash}`. An unchanged-like request repairs missing own state; replay cannot reapply an older intent. Own-state subscriptions query explicit target hashes in chunks of 30 and require server confirmation, with bounded timeout/retry and account-change isolation. Public Arena rankings use independent UUIDs under `arenaExams/{examId}/rankings`; attributable attempts remain private and `users/{uid}/arenaRankings/{examId}` supports own-row highlighting. Intentional public author attribution remains. Moderation and account deletion synchronize projections, and isolated restore rebuilds them after deletion-journal scrubbing. The guarded migration preserves canonical unknown fields and reports conflicts. Local tests do not establish deployed conversion, index readiness or browser acceptance; D41 remains open in the [audit register](AUDIT_REPORT.md#d41-public-community-documents-expose-reaction-membership-and-persistent-account-identifiers).
+
+<a id="ai-request-lifecycle"></a>
 
 ## 🤖 AI request lifecycle
 
@@ -118,11 +119,13 @@ Provider bodies are bounded to 2,000,000 decoded bytes, persisted results to 750
 
 The provider priority is fixed in src/ai/config/model.ts; the browser cannot choose models or attempt numbers. Gemma receives native JSON Schema, while the other adapters receive a JSON-only instruction. A 429/auth rejection is not treated as response loss. Retry-After hints longer than one minute end the current operation rather than overflowing or retrying early. Current provisional limits permit two concurrent generations per user and 30 weighted attempts per user / 300 globally per 15-minute fixed window, distinct from provider quota and admission byte/count buckets.
 
+Ordinary API error responses carry a server-generated `X-Request-ID`. Server failures log the matching identifier, HTTP status and a fixed category. Request bodies, URLs and upstream error text stay out of this event.
+
 Checkpoint events cover creation, claim, dispatch/receipt, parsing, validation, finalization and expired-lease recovery. Known Firestore failures produce a safe persistence classification; unexpected failures retain a generic boundary plus failed stage. Client cancellation is independently bounded and best-effort. The live deployed duration, proxy, privacy of telemetry and quota behavior require their own verification.
 
 ## 🖥️ Focus Shield and client safety
 
-Focus Shield starts only after user action in a secure context with camera permission. It loads TensorFlow/model lazily, throttles inference at 800 ms and uses ownership/generation guards. Stop and failure paths release the owned camera tracks, animation frame and model without globally disposing the shared backend. Local lifecycle tests do not establish attention accuracy, physical-device compatibility or permission-revocation behavior. AI and camera estimates are experimental, not diagnoses.
+The Focus Shield launcher becomes interactive after hydration. Enabling Tracking Mode starts a session in a secure context with camera permission. It loads TensorFlow/model lazily, skips hidden documents, shows a placeholder until the first measured score, validates the single sigmoid output and throttles visible inference at 800 ms and uses ownership/generation guards. Stop and failure paths release the owned camera tracks, animation frame and model without globally disposing the shared backend. Local lifecycle tests do not establish attention accuracy, physical-device compatibility or permission-revocation behavior. AI and camera estimates are experimental, not diagnoses.
 
 Dirty profile/notes/forum drafts survive relevant snapshots or failed saves. Stale asynchronous results are revoked after owner/configuration changes and unmount. Report printing uses an independent print surface and represents charts as tables. Native focus/visibility scrolling avoids moving controls during a pointer interaction; intentional smooth commands honor reduced motion.
 
@@ -130,7 +133,7 @@ Focus Shield ignores late camera/model completions after stop or account/session
 
 ## 🧪 Dependencies and verification
 
-The manifest/lockfile govern exact dependencies. Runtime includes Next/React, Firebase, Zod, Radix, TensorFlow, KaTeX and Recharts; development uses TypeScript, ESLint, Vitest, Firebase Emulators and Playwright. The parent-scoped Firestore/gRPC override is intentional and requires reassessment on parent updates. Firebase CLI's compatible parent update supplies patched CSV/streaming JSON dependencies and removes the legacy get-uri/basic-ftp path; its obsolete override/FTP regression were retired, with CLI parser compatibility checked through the installed parent adapter. Maintenance checks imports and lock agreement; advisory assessment uses the separate registry-backed command. See [validation](VALIDATION.md) for commands, output, demo-build fingerprinting, browser coverage and cleanup.
+The manifest/lockfile govern exact dependencies. Runtime includes Next/React, Firebase, Zod, Radix, TensorFlow, KaTeX and Recharts; development uses TypeScript, ESLint, Vitest, Firebase Emulators and Playwright. The parent-scoped Firestore/gRPC override is intentional and requires reassessment on parent updates. The Firebase CLI supplies its CSV/streaming JSON stack. Additional consumer tests cover Pub/Sub resource paths, CLI globbing, gaxios multipart boundaries and TypeScript parser patterns. Maintenance checks imports and lock agreement; advisory assessment uses the separate registry-backed command. See [validation](VALIDATION.md) for commands, output, demo-build fingerprinting, browser coverage and cleanup.
 
 <a id="technical-glossary"></a>
 ## 📖 Technical glossary

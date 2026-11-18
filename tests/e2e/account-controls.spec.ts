@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { signInDemo } from './auth';
+import { signInDemoUid } from './auth';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -10,11 +10,7 @@ test('unconfigured background services stay disabled and old review requests nev
   test.setTimeout(180000);
   const app = getApps()[0] ?? initializeApp({ projectId: 'demo-shark-empti' });
   const db = getFirestore(app);
-  const before = new Set((await db.collection('users').get()).docs.map(document => document.id));
-  await signInDemo(page);
-  const owners = (await db.collection('users').get()).docs.filter(document => !before.has(document.id));
-  expect(owners).toHaveLength(1);
-  const uid = owners[0].id;
+  const uid = await signInDemoUid(page);
   await db.doc('_accountRequests/legacy-' + uid).set({ uid, kind: 'deletion', status: 'pending_operator' });
   for (const lang of ['en', 'vi'] as const) {
     await page.context().addCookies([{ name: 'shark_preferences', value: 'v1.' + lang + '.light', url: 'http://127.0.0.1:9002' }]);
@@ -35,11 +31,7 @@ test('account-data controls remain available before renewed consent and without 
   test.setTimeout(180000);
   const app = getApps()[0] ?? initializeApp({ projectId: 'demo-shark-empti' });
   const db = getFirestore(app);
-  const before = new Set((await db.collection('users').get()).docs.map(document => document.id));
-  await signInDemo(page);
-  const owners = (await db.collection('users').get()).docs.filter(document => !before.has(document.id));
-  expect(owners).toHaveLength(1);
-  const uid = owners[0].id;
+  const uid = await signInDemoUid(page);
   expect((await db.doc('_serviceConsents/' + uid).get()).get('policyVersion')).toBe('2');
   await db.doc('_serviceConsents/' + uid).delete();
   await page.goto('/profile');

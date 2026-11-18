@@ -8,19 +8,24 @@ import { afterAll, beforeAll, expect, it } from 'vitest';
 import { ProfilePrintDocument } from '@/components/profile-print-report';
 import { calculateDashboardStats } from '@/lib/stats-utils';
 import { translations } from '@/lib/translations';
+import { launchMinimumBrowser } from './browser-floors/installation';
 import { history } from './fixtures/quiz';
 
 // Explicit opt-in keeps unit runs independent of installed browser binaries.
 // REPORT_PRINT_BROWSER=chrome|msedge|chromium|firefox|webkit
 const browserName = process.env.REPORT_PRINT_BROWSER;
 const katexPath = resolve('node_modules/katex/dist/katex.min.css');
-const katexCss = readFileSync(katexPath, 'utf8').replace(/url\(([^)]+)\)/g, (_, path: string) => {
-  const file = resolve(dirname(katexPath), path.replace(/["']/g, ''));
-  return `url(data:font/${file.endsWith('.woff2') ? 'woff2' : file.endsWith('.woff') ? 'woff' : 'ttf'};base64,${readFileSync(file).toString('base64')})`;
-});
+const katexCss = readFileSync(katexPath, 'utf8');
+const fixtureOrigin = 'http://print-fixture.invalid';
 let browser: Browser;
 beforeAll(async () => {
   if (!browserName) return;
+  if (process.env.BROWSER_FLOOR_CONFIG) {
+    if (browserName !== 'chromium' && browserName !== 'firefox' && browserName !== 'webkit') throw new Error('Choose a configured minimum engine for the print check.');
+    browser = await launchMinimumBrowser(browserName);
+    return;
+  }
+  if (!['chrome', 'msedge', 'chromium', 'firefox', 'webkit'].includes(browserName)) throw new Error('Unsupported report print browser.');
   const engine = browserName === 'firefox' ? firefox : browserName === 'webkit' ? webkit : chromium;
   browser = await engine.launch({ ...(browserName === 'chrome' || browserName === 'msedge' ? { channel: browserName } : {}) });
 });
@@ -42,14 +47,29 @@ it.skipIf(!browserName).each(['en', 'vi'] as const)('prints long %s reports in b
   expect(markup).toContain('class="katex"'); // A lazy fallback must not print raw TeX.
   const page = await browser.newPage({ viewport: { width: 794, height: 1123 } });
   try {
+    await page.route(fixtureOrigin + '/**', async route => {
+      const path = new URL(route.request().url()).pathname;
+      if (path === '/katex.min.css') return route.fulfill({ contentType: 'text/css', body: katexCss });
+      if (/^\/fonts\/KaTeX_[A-Za-z0-9_-]+\.(?:woff2?|ttf)$/.test(path)) {
+        const font = readFileSync(resolve(dirname(katexPath), '.' + path));
+        return route.fulfill({ contentType: 'font/' + path.split('.').pop(), body: font });
+      }
+      return route.abort();
+    });
     for (const theme of ['light', 'dark']) {
-      await page.setContent(`<!doctype html><html class="${theme}"><head><meta charset="utf-8"><style>*{margin:0;padding:0}h1,h2,h3{font-size:inherit;font-weight:inherit}ul{list-style:none}html,body{height:100vh;overflow:hidden}.dark{color:white;background:black}${katexCss}</style></head><body style="overflow:hidden"><main>APPLICATION-NOT-PRINTED</main><div role="dialog" style="position:fixed;height:80vh;overflow:hidden">DIALOG-NOT-PRINTED</div>${markup}</body></html>`);
+      const html = `<!doctype html><html class="${theme}"><head><meta charset="utf-8"><link rel="stylesheet" href="/katex.min.css"><style>*{margin:0;padding:0}h1,h2,h3{font-size:inherit;font-weight:inherit}ul{list-style:none}html,body{height:100vh;overflow:hidden}.dark{color:white;background:black}</style></head><body style="overflow:hidden"><main>APPLICATION-NOT-PRINTED</main><div role="dialog" style="position:fixed;height:80vh;overflow:hidden">DIALOG-NOT-PRINTED</div>${markup}</body></html>`;
+      const url = fixtureOrigin + '/' + theme;
+      await page.route(url, route => route.fulfill({ contentType: 'text/html; charset=utf-8', body: html }));
+      await page.goto(url, { waitUntil: 'load' });
       await page.evaluate(() => document.fonts.ready);
       await page.emulateMedia({ media: 'screen' });
       await expect.poll(() => page.locator('.profile-print-report').isVisible()).toBe(false);
+      expect(await page.locator('main').isVisible()).toBe(true);
+      expect(await page.locator('[role=dialog]').isVisible()).toBe(true);
       await page.emulateMedia({ media: 'print' });
+      await page.evaluate(() => document.fonts.ready);
       expect(await page.locator('main').isVisible()).toBe(false);
-      expect(await page.getByRole('dialog').isVisible()).toBe(false);
+      expect(await page.locator('[role=dialog]').isVisible()).toBe(false);
       const layout = await page.locator('.profile-print-report').evaluate(report => ({
         parent: report.parentElement?.tagName, height: report.getBoundingClientRect().height,
         width: report.scrollWidth, available: report.clientWidth,
@@ -62,8 +82,8 @@ it.skipIf(!browserName).each(['en', 'vi'] as const)('prints long %s reports in b
       expect(layout.overflow).toBe('visible');
       expect(layout.color).toBe('rgb(17, 17, 17)');
       expect(layout.topicBreaks).toEqual(['page', 'page', 'page']);
-      expect(await page.getByText(/END-2/).isVisible()).toBe(true);
-      if (browser.browserType().name() === 'chromium') {
+      expect(await page.locator('text=/END-2/').isVisible()).toBe(true);
+      if (['chromium', 'chrome', 'msedge'].includes(browserName!)) {
         await mkdir(resolve('tmp/pdfs'), { recursive: true });
         const pdf = await page.pdf({ path: resolve(`tmp/pdfs/report-${browserName}-${lang}-${theme}.pdf`), preferCSSPageSize: true });
         expect((pdf.toString('latin1').match(/\/Type \/Page\b/g) ?? []).length).toBeGreaterThan(3);

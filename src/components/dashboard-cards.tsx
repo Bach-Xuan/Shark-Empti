@@ -105,7 +105,7 @@ export function DashboardInsightList({ title, icon, data, type, t, onCopy, isCop
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 md:h-12 md:w-12 rounded-lg md:rounded-xl opacity-40 hover:opacity-100 hover:bg-current/10 transition-all active:scale-95 shrink-0"
+              className="h-8 w-8 md:h-12 md:w-12 rounded-lg md:rounded-xl opacity-40 hover:opacity-100 hover:bg-foreground/10 transition-all active:scale-95 shrink-0"
               onClick={onCopy}
               aria-label={`${t.copy}: ${title}`}
             >

@@ -1,4 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { renderToString } from 'react-dom/server';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import type { FocusFailure, FocusState } from '@/components/focus-tracker-session';
 import { focusRecoveryCopy } from '@/components/focus-tracker-session';
@@ -12,7 +13,10 @@ const context = vi.hoisted(() => ({ lang: 'en' as 'en' | 'vi', path: '/', instan
   attach: ReturnType<typeof vi.fn>;
   detach: ReturnType<typeof vi.fn>;
 }[] }));
-vi.mock('@/components/app-preferences', () => ({ useLanguageState: () => [context.lang] }));
+vi.mock('@/components/app-preferences', async importOriginal => ({
+  ...await importOriginal<typeof import('@/components/app-preferences')>(),
+  useLanguageState: () => [context.lang],
+}));
 vi.mock('next/navigation', () => ({ usePathname: () => context.path }));
 vi.mock('@/components/ui-text', () => ({ UiText: ({ id }: { id: string }) => <span>{id}</span> }));
 vi.mock('@/components/focus-tracker-session', async importOriginal => {
@@ -27,6 +31,19 @@ vi.mock('@/components/focus-tracker-session', async importOriginal => {
 });
 beforeEach(() => { context.lang = 'en'; context.path = '/'; context.instances.length = 0; });
 afterEach(cleanup);
+
+it('enables the server-rendered launcher after hydration and opens it on the first click', () => {
+  const container = document.createElement('div');
+  container.innerHTML = renderToString(<FocusTrackerWidget />);
+  document.body.append(container);
+  const launcher = container.querySelector('button')!;
+  expect(launcher.disabled).toBe(true);
+  render(<FocusTrackerWidget />, { container, hydrate: true });
+  expect(launcher.disabled).toBe(false);
+  fireEvent.click(launcher);
+  expect(screen.getByRole('switch', { name: translations.en.trackingMode })).toBeTruthy();
+  expect(context.instances).toHaveLength(0);
+});
 
 function openAndStart() {
   fireEvent.click(screen.getByRole('button', { name: translations[context.lang].focusShield }));
@@ -53,6 +70,7 @@ it.each((['en', 'vi'] as const).flatMap(lang =>
     expect(screen.getByRole('status').textContent).toBe(focusRecoveryCopy[lang].starting);
     act(() => context.instances[1].update({ phase: 'active', score: 80 }));
     expect(screen.getByText('80%')).toBeTruthy();
+    expect(screen.getByRole('progressbar').getAttribute('aria-valuenow')).toBe('80');
     expect(screen.getByRole('switch').getAttribute('aria-checked')).toBe('true');
   },
 );
@@ -100,6 +118,14 @@ it.each(['/login', '/register'])('stops resources on auth navigation to %s', pat
 it('detaches on minimize, reattaches on expand and stops on close', () => {
   render(<FocusTrackerWidget />);
   const session = openAndStart();
+  act(() => session.update({ phase: 'active', score: null }));
+  const progress = screen.getByRole('progressbar', { name: 'focusIndex' });
+  expect(progress.hasAttribute('aria-valuenow')).toBe(false);
+  expect(screen.getByText('—')).toBeTruthy();
+  expect(screen.queryByText('0%')).toBeNull();
+  act(() => session.update({ phase: 'active', score: 0 }));
+  expect(progress.getAttribute('aria-valuenow')).toBe('0');
+  expect(screen.getByText('0%')).toBeTruthy();
   act(() => session.update({ phase: 'active', score: 80 }));
   expect(session.attach).toHaveBeenCalledOnce();
   fireEvent.click(screen.getByRole('button', { name: uiMessage('en', 'focus.minimize') }));

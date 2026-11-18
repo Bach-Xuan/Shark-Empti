@@ -1,10 +1,10 @@
 import 'server-only';
 import { FieldPath, type DocumentSnapshot, type Query } from 'firebase-admin/firestore';
-import { cancelGeneration } from '@/ai/generation-store';
+import { eraseOwnedGenerations } from '@/ai/generation-store';
 import { exportValue } from '../export-value';
 import { getAdminAuth, getAdminDb } from '../firebase-admin';
 import { ApiError } from '../server-api';
-import { continuation, isCommunityRecordPath, isOwnedRecordPath, OWNED_RECORDS, ownedQuery, redactExport, userBudgetPaths } from './catalog';
+import { anonymizeContributions, continuation, isCommunityRecordPath, isOwnedRecordPath, OWNED_RECORDS, ownedQuery, redactExport, userBudgetPaths } from './catalog';
 import { digest } from './crypto';
 import { JOB_LIMITS } from './config';
 import { PrivateJobStorage } from './storage';
@@ -15,17 +15,6 @@ import { SERVICE_CONSENT_COLLECTION } from '../service-policy';
 import { prepareForumPublication } from '../forum-publication';
 import { prepareArenaPublication } from '../arena-publication';
 
-const DELETED_AUTHOR = { authorId: '__deleted__', authorName: 'Former member', authorPhoto: '' };
-function anonymousArchive(value: unknown, uid: string): unknown {
-  if (Array.isArray(value)) return value.map(item => anonymousArchive(item, uid));
-  if (!value || typeof value !== 'object' || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) return value;
-  const result = { ...value as Record<string, unknown> };
-  if (result.authorId === uid) Object.assign(result, DELETED_AUTHOR);
-  for (const field of ['uid', 'ownerUid', 'userId', 'actorId', 'hiddenBy', 'reporterId']) if (result[field] === uid) result[field] = '__deleted__';
-  if (Array.isArray(result.likedBy)) { result.likedBy = result.likedBy.filter(item => item !== uid); result.likesCount = (result.likedBy as unknown[]).length; }
-  for (const [key, child] of Object.entries(result)) result[key] = anonymousArchive(child, uid);
-  return result;
-}
 async function writePart(id: string, job: JobRecord, value: unknown, records: number, label: string) {
   const data = Buffer.from(JSON.stringify(value));
   if (data.length > JOB_LIMITS.objectBytes) throw new ApiError('APP-EXPORT-LIMIT', 413, 'An export record exceeds the supported part size.');
@@ -131,8 +120,8 @@ export async function exportStep(id: string, job: JobRecord): Promise<StepResult
   return { cursor: { phase: job.cursor.phase + 1 }, processed: 0, artifact: await writePart(id, job, manifest, 0, 'manifest'), complete: true };
 }
 
-async function deleteOrAnonymize(id: string, job: JobRecord, snapshot: DocumentSnapshot, action: string) {
-  const db = getAdminDb(), uid = job.ownerUid!;
+async function deleteOrAnonymize(id: string, job: JobRecord, snapshot: DocumentSnapshot, source: typeof OWNED_RECORDS[number]) {
+  const db = getAdminDb(), uid = job.ownerUid!, action = source.action;
   if (snapshot.ref.path === '_accountJobs/' + id) return true;
   if (action === 'job') {
     const record = readJob(snapshot.data());
@@ -150,20 +139,25 @@ async function deleteOrAnonymize(id: string, job: JobRecord, snapshot: DocumentS
   await db.runTransaction(async transaction => {
     await assertJobLease(transaction, id, job);
     const current = await transaction.get(snapshot.ref);
-    if (!current.exists) return;
+    if (!current.exists || current.get(source.field) !== uid) return;
+    if (source.collection === '_aiGenerations') {
+      // Jobs checkpointed by an older worker can already be past the first phase.
+      await eraseOwnedGenerations(transaction, uid, [current]);
+      return;
+    }
     const publication = await prepareForumPublication(transaction, db, snapshot.ref.path);
     const publishArena = action === 'attempt' ? await prepareArenaPublication(transaction, db, snapshot.ref.path, current.data()!) : null;
     if (action === 'author') {
       const key = snapshot.ref.parent.id === 'arenaExams' ? await transaction.get(db.collection('_arenaAnswerKeys').doc(snapshot.id)) : null;
       // Keep metadata/key ownership atomic; private schemas do not accept display fields.
-      if (key?.exists) transaction.update(key.ref, { authorId: '__deleted__' });
+      if (key?.get('authorId') === uid) transaction.update(key.ref, { authorId: '__deleted__' });
       const patch = { authorId: '__deleted__',
-        ...(current.get('authorName') !== undefined ? { authorName: DELETED_AUTHOR.authorName } : {}),
+        ...(current.get('authorName') !== undefined ? { authorName: 'Former member' } : {}),
         ...(current.get('authorPhoto') !== undefined ? { authorPhoto: '' } : {}) };
       transaction.update(snapshot.ref, patch);
       publication.write({ ...current.data(), ...patch });
     }
-    else if (action === 'archive') transaction.set(snapshot.ref, anonymousArchive(current.data(), uid) as Record<string, unknown>);
+    else if (action === 'archive') transaction.set(snapshot.ref, anonymizeContributions(current.data(), new Set([uid])) as Record<string, unknown>);
     else if (action === 'actor') transaction.update(snapshot.ref, { actorId: '__deleted__' });
     else if (action === 'moderator') transaction.update(snapshot.ref, { hiddenBy: '__deleted__' });
     else if (action === 'attempt') {
@@ -180,12 +174,18 @@ async function deleteOrAnonymize(id: string, job: JobRecord, snapshot: DocumentS
 export async function deletionStep(id: string, job: JobRecord): Promise<StepResult> {
   const uid = job.ownerUid!, db = getAdminDb();
   if (job.cursor.phase === 0) {
-    const documents = await page(continuation(db.collection('_aiGenerations').where('ownerUid', '==', uid).orderBy(FieldPath.documentId()), job.cursor.after));
-    for (const document of documents) {
-      try { await cancelGeneration(document.id, uid); }
-      catch (error) { if (!(error instanceof ApiError) || error.status !== 404) throw error; }
-    }
-    return { cursor: documents.more ? { phase: 0, after: documents.at(-1)!.ref.path } : { phase: 1 }, processed: 0 };
+    const query = continuation(db.collection('_aiGenerations').where('ownerUid', '==', uid).orderBy(FieldPath.documentId()), job.cursor.after);
+    return db.runTransaction(async transaction => {
+      await assertJobLease(transaction, id, job);
+      const lock = await transaction.get(db.collection('_accountLocks').doc(uid));
+      if (job.kind !== 'deletion' || lock.get('status') !== 'deleting' || lock.get('jobId') !== id) {
+        throw new ApiError('ACCOUNT-DELETING', 409, 'The deletion job no longer owns the account lock.');
+      }
+      const result = await transaction.get(query.select('ownerUid').limit(JOB_LIMITS.pageSize + 1));
+      const documents = result.docs.slice(0, JOB_LIMITS.pageSize);
+      await eraseOwnedGenerations(transaction, uid, documents);
+      return { cursor: result.size > documents.length ? { phase: 0, after: documents.at(-1)!.ref.path } : { phase: 1 }, processed: documents.length };
+    });
   }
   if (job.cursor.phase === 1) { const result = await privatePage(id, job, true); return { cursor: result.cursor, processed: result.documents.length }; }
   const index = job.cursor.phase - 2;
@@ -193,7 +193,7 @@ export async function deletionStep(id: string, job: JobRecord): Promise<StepResu
     const documents = await page(continuation(ownedQuery(index, uid), job.cursor.after));
     let after = job.cursor.after, processed = 0;
     for (const document of documents) {
-      if (isOwnedRecordPath(index, document.ref.path) && !await deleteOrAnonymize(id, job, document, OWNED_RECORDS[index].action)) {
+      if (isOwnedRecordPath(index, document.ref.path) && !await deleteOrAnonymize(id, job, document, OWNED_RECORDS[index])) {
         return { cursor: advanced(job, { after }), processed };
       }
       after = document.ref.path; processed++;
@@ -210,7 +210,7 @@ export async function deletionStep(id: string, job: JobRecord): Promise<StepResu
       await db.runTransaction(async transaction => {
         await assertJobLease(transaction, id, job);
         const current = await transaction.get(document.ref);
-        if (!current.exists || !Array.isArray(current.get('likedBy'))) return;
+        if (!current.exists || !Array.isArray(current.get('likedBy')) || !current.get('likedBy').includes(uid)) return;
         const publication = await prepareForumPublication(transaction, db, document.ref.path);
         const likedBy = current.get('likedBy').filter((member: unknown) => member !== uid);
         transaction.update(document.ref, { likedBy, likesCount: likedBy.length });
@@ -226,7 +226,7 @@ export async function deletionStep(id: string, job: JobRecord): Promise<StepResu
     for (const document of documents) await db.runTransaction(async transaction => {
       await assertJobLease(transaction, id, job);
       const current = await transaction.get(document.ref);
-      if (current.exists) transaction.set(document.ref, anonymousArchive(current.data(), uid) as Record<string, unknown>);
+      if (current.exists) transaction.set(document.ref, anonymizeContributions(current.data(), new Set([uid])) as Record<string, unknown>);
     });
     return { cursor: advanced(job, documents.more ? { after: documents.at(-1)!.ref.path } : { phase: job.cursor.phase + 1 }), processed: documents.length };
   }

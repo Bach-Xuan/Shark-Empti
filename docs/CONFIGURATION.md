@@ -1,6 +1,6 @@
 # ⚙️ Configuration, Dependencies and Troubleshooting · Shark Empti v2.0.0 **β**
 
-This guide configures the application and its release environment. See [README](../README.md), [architecture](TECHNICAL_DOCUMENTATION.md), [validation](VALIDATION.md), [account operations](ACCOUNT_OPERATIONS.md), the [data map](backend.json) and [audit register](AUDIT_REPORT.md). Runtime behavior is determined by source, Rules and configuration, not this guide alone.
+This guide configures the application and its release environment. See [README](../README.md), [architecture](TECHNICAL_DOCUMENTATION.md), [validation](VALIDATION.md), [account operations](ACCOUNT_OPERATIONS.md), the [data map](backend.json) and [audit register](AUDIT_REPORT.md). Runtime behavior is determined by source, Rules and configuration, not this guide alone. The [interface design guide](design.md) covers learner-facing states and interactions.
 
 ## 🧰 Runtime and dependencies
 
@@ -12,7 +12,9 @@ npx --no-install playwright install chromium firefox webkit
 
 Use [validation](VALIDATION.md) to select tests and interpret results. Package versions and peer requirements belong to the manifest/lockfile. Dependency assessment queries npm and applies `config/dependency-audit-policy.json`; maintenance checks declarations/lock agreement but does not assess advisories.
 
-The Firebase CLI development dependency has a `^15.34.2` floor for its supported patched CSV/streaming JSON stack. Keep the npm lockfile and use its installed CLI for Emulators; do not restore the removed get-uri/basic-ftp override. The separate Firestore/gRPC override remains intentional. Compatible-parent upgrades and unresolved advisory paths are recorded in the [audit register](AUDIT_REPORT.md#v04-dependency-risk-assessment-is-not-current).
+The Firebase CLI is pinned to `15.36.0`. Its Pub/Sub dependency, the legacy gaxios UUID dependency, glob and the TypeScript parser’s minimatch use reviewed overrides. Recheck their consumer interfaces when changing parent versions. Keep the npm lockfile and use its installed CLI for Emulators; do not restore the removed get-uri/basic-ftp override. The separate Firestore/gRPC override remains intentional. Compatible-parent upgrades and unresolved advisory paths are recorded in the [audit register](AUDIT_REPORT.md#v04-dependency-risk-assessment-is-not-current).
+
+Tailwind CSS 3.4 and Autoprefixer compile the stylesheet for the Browserslist targets in `package.json`. The installed browser dataset resolves the Android queries to its latest mobile entries. The desktop queries also select Chrome 100 and Firefox 102, and the historical engine suite exercises mobile user agents and touch input at those floors. Keep a conventional viewport-height fallback before dynamic units. Review generated CSS and run the minimum-engine tests after changes to Next.js, React, Firebase or the CSS toolchain. Next.js documents a newer browser baseline, so this project owns validation at its lower floors. [Next.js browser support](https://nextjs.org/docs/architecture/supported-browsers) · [Tailwind compatibility guidance](https://tailwindcss.com/docs/upgrade-guide#browser-requirements)
 
 ## 🔐 Environment file and variable matrix
 
@@ -63,7 +65,6 @@ Drain in-flight background workers and deploy the consent API, updated client an
 
 Do not infer a missing private key or assume local credentials point to a staging project. If a key is exposed, revoke/rotate it and update the deployment; `.gitignore` alone does not remove committed history.
 
-<a id="timestamp-migration"></a>
 ## Learning write validation rollout
 
 Deploy the learning PUT/PATCH API and updated Quiz/Flashcard/Practice clients together before applying the matching restrictive Rules. Older tabs that still write complex records through the SDK require refresh; do not temporarily reopen arbitrary private writes. Verify authenticated creation, response-loss replay, feedback recovery, notes/profile edits, activity leaf merging and owner legacy read/delete access. The new API uses document lookups and requires no additional composite index. This is a coordinated client/server/Rules rollout, not a remote data migration.
@@ -145,6 +146,8 @@ For an action update, resolve the exact release tag in its official repository, 
 4. Confirm Function duration/region, IAM, ready indexes, signed retention delivery and rollback plan. Use the [release procedure](#release-procedure), [audit](AUDIT_REPORT.md) and [account operations](ACCOUNT_OPERATIONS.md) for remaining acceptance and provider setup.
 
 There is no `vercel.json`; dashboard settings govern hosting. Never assume Preview uses a separate Firebase database merely because the website URL differs. Local Emulator success does not verify remote Rules or IAM.
+
+The application sets a same-origin camera policy, disables microphone and geolocation access, and sets `nosniff` and a strict-origin cross-site referrer policy. CSP limits base URLs and frame ancestors to the same origin and disables object embeds. The local HTTP smoke verifies the four headers. Recheck the final hosted responses when CDN or platform headers change.
 
 ## 🛡️ Credential security
 

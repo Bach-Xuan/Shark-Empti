@@ -167,7 +167,7 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
   return (
     <div className="fixed bottom-4 right-4 md:bottom-6 md:right-6 z-[100] flex flex-col items-end gap-4 pointer-events-none max-w-[calc(100vw-32px)]">
       {isOpen && (
-        <Card className="card-duo w-full sm:w-[350px] md:w-[420px] h-[500px] max-h-[calc(100dvh-2rem)] md:h-[600px] md:max-h-[calc(100dvh-3rem)] flex flex-col overflow-hidden animate-in slide-in-from-bottom-12 fade-in duration-500 pointer-events-auto border-[3px] shadow-2xl">
+        <Card className="card-duo w-full sm:w-[350px] md:w-[420px] h-[500px] chat-panel md:h-[600px] flex flex-col overflow-hidden animate-in slide-in-from-bottom-12 fade-in duration-500 pointer-events-auto border-[3px] shadow-2xl">
           {/* Enhanced Header */}
           <div className="bg-primary p-4 md:p-5 flex items-center justify-between text-primary-foreground shadow-xl relative overflow-hidden group shrink-0">
             <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />

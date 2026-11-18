@@ -14,12 +14,12 @@ export const reportPrintCss = `
 .profile-print-report { display: none; }
 @media print {
   @page { size: A4; margin: 16mm; }
-  html:has(.profile-print-report), body:has(.profile-print-report) {
+  html, body {
     height: auto !important; min-height: 0 !important; overflow: visible !important;
     position: static !important; margin: 0 !important; padding: 0 !important;
     background: white !important; color: black !important;
   }
-  body:has(.profile-print-report) > :not(.profile-print-report) { display: none !important; }
+  body > :not(.profile-print-report) { display: none !important; }
   .profile-print-report {
     display: block !important; position: static !important; width: auto !important;
     max-width: none !important; height: auto !important; max-height: none !important;

@@ -3,7 +3,7 @@ import type * as TF from '@tensorflow/tfjs';
 type Runtime = typeof TF;
 type Model = TF.LayersModel | TF.GraphModel;
 export type FocusFailure = 'model' | 'camera' | 'playback' | 'inference';
-export type FocusState = { phase: 'idle' | 'starting' | 'active' | 'error'; error?: FocusFailure; score: number };
+export type FocusState = { phase: 'idle' | 'starting' | 'active' | 'error'; error?: FocusFailure; score: number | null };
 type Dependencies = {
   runtime: () => Promise<Runtime>;
   camera: () => Promise<MediaStream>;
@@ -105,7 +105,7 @@ export class FocusTrackerSession {
         if (track.readyState === 'ended') throw new Error('Camera track already ended');
       }
       this.runtime = tf;
-      this.update({ phase: 'active', score: 0 });
+      this.update({ phase: 'active', score: null });
     } catch { this.fail(stage); }
   }
 
@@ -118,9 +118,12 @@ export class FocusTrackerSession {
     if (Array.isArray(output) || !('dataSync' in output) || typeof output.dataSync !== 'function') {
       throw new Error('Expected a single focus probability tensor');
     }
-    const value = output.dataSync()[0];
-    if (!Number.isFinite(value)) throw new Error('Invalid focus probability');
-    return Math.max(0, Math.min(100, Math.round(value * 100)));
+    const values = output.dataSync();
+    const value = values[0];
+    if (values.length !== 1 || !Number.isFinite(value) || value < 0 || value > 1) {
+      throw new Error('Invalid focus probability');
+    }
+    return Math.round(value * 100);
   }
 
   attach(video: HTMLVideoElement): () => void {
@@ -149,7 +152,7 @@ export class FocusTrackerSession {
       frame = null;
       if (!current()) return;
       try {
-        if (video.readyState >= 2 && timestamp - lastTime >= 800) {
+        if (!document.hidden && video.readyState >= 2 && timestamp - lastTime >= 800) {
           lastTime = timestamp;
           const score = tf.tidy(() => {
             const pixels = tf.browser.fromPixels(video);

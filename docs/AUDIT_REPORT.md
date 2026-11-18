@@ -1,8 +1,8 @@
 # 📋 Consolidated Technical Audit Report · Shark Empti v2.0.0 **β**
 
-This register records 82 findings: **65 resolved and 17 unresolved**. Names summarize each concern; status records its disposition. Local tests, deployed operation and device validation are distinct evidence.
+This register covers **82 findings**. **64 are resolved, 16 are accepted on local evidence and 2 remain open.** Local acceptance applies when the remaining evidence requires real infrastructure, devices, providers or human evaluation. Each accepted row names the outstanding evidence. A failing local release check stays open.
 
-[Technical documentation](TECHNICAL_DOCUMENTATION.md) describes current behavior; [validation](VALIDATION.md) explains available checks, and [account operations](ACCOUNT_OPERATIONS.md) covers operational safeguards. A resolved entry is not a certification of untested deployment or provider behavior.
+[Technical documentation](TECHNICAL_DOCUMENTATION.md) describes current behavior; [validation](VALIDATION.md) explains available checks, and [account operations](ACCOUNT_OPERATIONS.md) covers operational safeguards. A resolved entry is not a certification of untested deployment or provider behavior. The [interface design guide](design.md) covers learner-facing states and interactions.
 
 ## 🧭 Finding-Code Legend
 
@@ -20,97 +20,124 @@ This register records 82 findings: **65 resolved and 17 unresolved**. Names summ
 
 | ID | Finding | Status | Last Updated |
 |---|---|---|---|
-| M01 | Multi-Model AI Fallback Can Exceed a Single Transport Lifetime and Obscure Terminal Failures | Local recovery regressions pass; staging and canary acceptance pending | 29 October 2026 |
-| F01 | Missing Server-Side Authentication and Quota Enforcement for AI Actions | Creation/traffic admission verified locally; staging calibration pending | 29 October 2026 |
-| F02 | Inadequate Validation of Persisted and Legacy Firestore Data | Write contracts and browser recovery verified locally; coordinated rollout and budget calibration pending | 1 November 2026 |
-| D19 | AI Generation Finalization Failures Lose Stage Classification and Correlated Telemetry | Checkpoints and safe persistence classification implemented; staged acceptance pending | 29 October 2026 |
-| D24 | Public Arena Answers and Repeat Rewards Undermine Competition Integrity | Private-key/eligibility and repeated browser flows pass; coordinated migration deployment pending | 31 October 2026 |
-| D39 | Revoked Sessions Remain Accepted by Ordinary Authenticated APIs | Revoked/disabled-session enforcement verified locally; deployed verification cost pending | 1 November 2026 |
-| D41 | Public Community Documents Expose Reaction Membership and Persistent Account Identifiers | Local projection cutover implemented; deployment and acceptance pending | 1 November 2026 |
-| S05 | User-Facing Service Information and Account-Data Controls Are Missing | Server-owned consent, independent data controls and bounded polling verified locally; legacy inventory and environment acceptance pending | 1 November 2026 |
-| S06 | Community Operations Lack Moderation and Abuse Budgets | Pre-query traffic admission and queue pagination verified locally; deployed abuse calibration pending | 1 November 2026 |
-| P04 | Idempotency Receipts Have No Defined Retention Bound | Spark scheduled-retention implementation and expiry indexes; deployed schedule/index acceptance pending | 31 October 2026 |
-| P06 | Shared Transaction and Inventory Resources Have Unmeasured Concurrency Limits | Global budgets, post counters, worker lease and B2 inventory require measured capacity | 1 November 2026 |
-| P07 | Timestamp Migration Performs One Sequential Transaction per Convertible Record | Bounded batching verified locally; staging duration and cost acceptance pending | 1 November 2026 |
-| V02 | Unverified Minimum Browser Versions and Physical-Camera Behaviour | Partial; historical physical-camera result is not reproducible from the current checkout; target matrix pending | 19 September 2026 |
-| V03 | Unverified Remote CI, Production Runtime, and Firestore Index State | Local release gates verified; hosted runtime and deployed metadata acceptance pending | 31 October 2026 |
-| V04 | Dependency-Risk Assessment Is Not Current | Six advisories remediated compatibly; four moderate advisories require parent-major review | 1 November 2026 |
-| V07 | Educational and Focus Scores Lack Product Validation Evidence | Uncertainty labels and conservative provenance added; labelled product validation remains pending | 29 October 2026 |
-| V08 | Backup, Restore and Service-Incident Recovery Are Unverified | Encrypted backup/isolated-restore implementation; operational RPO/RTO and deployed acceptance pending | 31 October 2026 |
+| V04 | Dependency-Risk Assessment Is Not Current | Open · refreshed registry inventory still fails the high-severity gate | 18 November 2026 |
+| D32 | Locked Dependencies Trigger Blocking Security Advisories | Reopened · blocking high advisory in four picomatch installations | 18 November 2026 |
+
+## 🧪 Findings Accepted on Local Evidence
+
+| ID | Finding | Status | Last Updated |
+|---|---|---|---|
+| M01 | Multi-Model AI Fallback Can Exceed a Single Transport Lifetime and Obscure Terminal Failures | Accepted locally · Provider duration, proxy failures and canary recovery unverified | 18 November 2026 |
+| F01 | Missing Server-Side Authentication and Quota Enforcement for AI Actions | Accepted locally · Production quota and traffic calibration unverified | 18 November 2026 |
+| F02 | Inadequate Validation of Persisted and Legacy Firestore Data | Accepted locally · Coordinated client/API/Rules rollout and deployed admission ceilings unverified | 18 November 2026 |
+| D19 | AI Generation Finalization Failures Lose Stage Classification and Correlated Telemetry | Accepted locally · Cross-service incident correlation and deployed log privacy unverified | 18 November 2026 |
+| D24 | Public Arena Answers and Repeat Rewards Undermine Competition Integrity | Accepted locally · Coordinated key migration, Rules and indexes unverified | 18 November 2026 |
+| D39 | Revoked Sessions Remain Accepted by Ordinary Authenticated APIs | Accepted locally · Revocation-check latency and Auth capacity unverified | 18 November 2026 |
+| D41 | Public Community Documents Expose Reaction Membership and Persistent Account Identifiers | Accepted locally · Live projection inventory, migration and Rules cutover unverified | 18 November 2026 |
+| S05 | User-Facing Service Information and Account-Data Controls Are Missing | Accepted locally · Legacy ownership inventory and deployed account operations unverified | 18 November 2026 |
+| S06 | Community Operations Lack Moderation and Abuse Budgets | Accepted locally · Real moderation traffic and edge calibration unverified | 18 November 2026 |
+| P04 | Idempotency Receipts Have No Defined Retention Bound | Accepted locally · Signed schedule, expiry indexes and cleanup backlog unverified | 18 November 2026 |
+| P06 | Shared Transaction and Inventory Resources Have Unmeasured Concurrency Limits | Accepted locally · Peak contention, worker queue age and provider quota unverified | 18 November 2026 |
+| P07 | Timestamp Migration Performs One Sequential Transaction per Convertible Record | Accepted locally · Migration time and cost on representative remote data unverified | 18 November 2026 |
+| V02 | Unverified Minimum Browser Versions and Physical-Camera Behaviour | Accepted locally · native Apple/Android, hardware permission revocation and sustained use unverified | 18 November 2026 |
+| V03 | Unverified Remote CI, Production Runtime, and Firestore Index State | Accepted locally · Hosted CI, headers, IAM, indexes and deployment unverified | 18 November 2026 |
+| V07 | Educational and Focus Scores Lack Product Validation Evidence | Accepted locally · Independent bilingual educational labels and consented camera evaluation unverified | 18 November 2026 |
+| V08 | Backup, Restore and Service-Incident Recovery Are Unverified | Accepted locally · Cloud restore, identity continuity and operational RPO/RTO unverified | 18 November 2026 |
 
 ## ✅ Resolved Findings
 
 | ID | Finding | Status | Last Updated |
 |---|---|---|---|
-| F03 | Non-Durable History Persistence Caused by `undefined` Values and Unawaited Writes | Resolved | 19 September 2026 |
-| F04 | Prototype-Key Collisions in Topic Aggregation | Resolved | 3 September 2026 |
-| F05 | Incorrect Denominators in Per-Skill Aggregate Scores | Resolved | 3 September 2026 |
-| F06 | Insufficient Semantic Validation of AI Inputs and Outputs | Resolved | 20 September 2026 |
-| F07 | Duplicate Forum Submission and Premature Draft Disposal | Resolved | 3 September 2026 |
-| F08 | Duplicate AI Feedback Generation for a Single Arena Attempt | Resolved | 3 September 2026 |
-| F09 | Inadequate Authentication Guarding and Retry Behaviour in Arena | Resolved | 3 September 2026 |
-| F10 | Unstable Business Identity for Roadmap Checklist Entries | Resolved | 19 September 2026 |
-| F11 | Incomplete Model and Camera Cleanup Across Failure Paths | Resolved | 19 September 2026 |
-| F12 | Loss of Error State and Diagnostic Context Across Arena and API Boundaries | Resolved | 19 September 2026 |
-| F13 | Incomplete Localization and Accessible Naming in Identified Controls | Resolved | 3 September 2026 |
-| F14 | False-Positive Clipboard Success Notification | Resolved | 3 September 2026 |
-| D01 | Arena Retakes Reuse the Previous Attempt Identifier | Resolved | 19 September 2026 |
-| D02 | LaTeX Corruption Caused by Redundant Escape Replacement | Resolved | 12 September 2026 |
-| D03 | Profile Snapshots Can Overwrite an Unsaved Biography Draft | Resolved | 20 September 2026 |
-| D04 | Report-Selection Checkboxes Can Toggle Twice per Interaction | Resolved | 19 September 2026 |
-| D05 | Stale Setup Validation Can Start a Quiz After Context Changes | Resolved | 19 September 2026 |
-| D06 | Forum Edit Drafts Are Discarded Before Write Confirmation | Resolved | 20 September 2026 |
-| D07 | Post Deletion Leaves Publicly Readable Orphaned Comments | Resolved | 31 October 2026 |
-| D08 | Arena “Ask Guru” Action Has No User-Facing Effect | Resolved | 19 September 2026 |
-| D09 | Report Printing Is Constrained by the Dialog Scroll Container | Resolved | 19 September 2026 |
-| D10 | Duplicate Error Codes and English Text in Vietnamese Toasts | Resolved | 12 September 2026 |
-| D11 | Invalid Responsive Utility Classes Produce No CSS Effect | Resolved | 19 September 2026 |
-| D12 | Incomplete Keyboard Semantics and Accessible Naming | Resolved | 19 September 2026 |
-| D13 | OpenRouter Health Check Does Not Authenticate the Supplied Key | Resolved | 19 September 2026 |
-| D14 | Authentication Restoration Can Discard an Early Forum Draft | Resolved | 19 September 2026 |
-| D15 | Client-Controlled Duration Compromises Arena Leaderboard Integrity | Resolved | 29 October 2026 |
-| D16 | Arena Leaderboard Applies Its Result Limit Before the Duration Tie-Break | Resolved | 29 October 2026 |
-| D17 | English Bonus Copy Misrepresents the Arena Reward Rule | Resolved | 29 October 2026 |
-| D18 | Activity Tracking Can Lose Concurrent Day Updates | Resolved | 19 September 2026 |
-| D20 | Indexability and Discoverability Policy Is Undefined Across Public and Authenticated Routes | Resolved | 31 October 2026 |
-| D21 | Custom Not-Found Experience Is Functionally Present but Incomplete | Resolved | 31 October 2026 |
-| D22 | User Avatar Images Lack Alternative Text | Resolved | 29 October 2026 |
-| D23 | Authenticated Profile Reads Expose Private Email Data | Resolved | 31 October 2026 |
-| D25 | Profile Deletion Removes Protected Coin State but Retains Descendants | Resolved | 31 October 2026 |
-| D26 | Quiz Duration Limits Disagree Between Setup and Runtime | Resolved | 29 October 2026 |
-| D27 | Recovered AI Feedback Is Not Persisted to Learning History | Resolved | 31 October 2026 |
-| D28 | Form Naming, Contrast and Page Semantics Remain Incomplete | Resolved | 31 October 2026 |
-| D29 | Subscription Failures Produce Blank or Misleading Empty States | Resolved | 31 October 2026 |
-| D30 | Authentication Can Complete Before Profile Initialization | Resolved | 31 October 2026 |
-| D31 | Unfinished Learning Sessions Have No Leave Protection or Recovery | Resolved | 31 October 2026 |
-| D32 | Locked Dependencies Trigger Blocking Security Advisories | Resolved | 31 October 2026 |
-| D33 | Practice Short Answers Use Unqualified Exact-Text Grading | Resolved | 29 October 2026 |
-| D34 | Authentication Controls and Chat Panels Fail Small-Viewport Layout | Resolved | 31 October 2026 |
-| D35 | Production Browser Checks Do Not Verify Demo Build Configuration | Resolved | 31 October 2026 |
-| D36 | Expiry Cleanup Can Delete Renewed Quota and Budget Records | Resolved | 31 October 2026 |
-| D37 | AI Generation Expiry Is Not Enforced Independently of Scheduled Cleanup | Resolved | 31 October 2026 |
-| D38 | Firebase Configuration Errors Are Not Validated Proactively | Resolved | 1 November 2026 |
-| D40 | Receipt Fingerprints Depend on JSON Object Insertion Order | Resolved | 1 November 2026 |
-| D42 | Forum Descendant Cleanup Bypasses Write Guards After Visibility Cutover | Resolved | 1 November 2026 |
-| N01 | Inconsistent Naming and File-Name Conventions | Resolved | 13 September 2026 |
-| N02 | Domain Types and Schemas Do Not Consistently Represent Their Lifecycle Stage | Resolved | 13 September 2026 |
-| N03 | Readability Debt and Potentially Unused Modules | Resolved | 13 September 2026 |
-| S01 | Feature Modules Combine Excessive and Heterogeneous Responsibilities | Resolved | 13 September 2026 |
-| S02 | Duplicated Implementations Have Diverged Semantically | Resolved | 13 September 2026 |
-| S03 | Ambiguous State Ownership Between Views and Reducers | Resolved | 13 September 2026 |
-| S04 | Inconsistent Asynchronous Completion and Error-Boundary Contracts | Resolved | 13 September 2026 |
-| S07 | CI Action References Are Mutable and Runtime Compatibility Is Not Explicitly Governed | Resolved | 1 November 2026 |
-| P01 | Unbounded Queries and Client-Side List Processing | Resolved | 13 September 2026 |
-| P02 | Recurrent Timer Updates and Repeated KaTeX Rendering | Resolved | 13 September 2026 |
-| P03 | Duplicate Conversation Context in AI Requests | Resolved | 13 September 2026 |
-| P05 | Route-Level Client JavaScript Is Excessive | Resolved | 31 October 2026 |
-| V01 | Incomplete WebKit Validation | Resolved | 31 October 2026 |
-| V05 | Inadequate Comparative Baselines and Incomplete Coverage Evidence | Resolved | 31 October 2026 |
-| V06 | Production Builds Depend on Live Google Fonts Availability | Resolved | 13 September 2026 |
+| F03 | Non-Durable History Persistence Caused by `undefined` Values and Unawaited Writes | Resolved | 18 November 2026 |
+| F04 | Prototype-Key Collisions in Topic Aggregation | Resolved | 18 November 2026 |
+| F05 | Incorrect Denominators in Per-Skill Aggregate Scores | Resolved | 18 November 2026 |
+| F06 | Insufficient Semantic Validation of AI Inputs and Outputs | Resolved | 18 November 2026 |
+| F07 | Duplicate Forum Submission and Premature Draft Disposal | Resolved | 18 November 2026 |
+| F08 | Duplicate AI Feedback Generation for a Single Arena Attempt | Resolved | 18 November 2026 |
+| F09 | Inadequate Authentication Guarding and Retry Behaviour in Arena | Resolved | 18 November 2026 |
+| F10 | Unstable Business Identity for Roadmap Checklist Entries | Resolved | 18 November 2026 |
+| F11 | Incomplete Model and Camera Cleanup Across Failure Paths | Resolved | 18 November 2026 |
+| F12 | Loss of Error State and Diagnostic Context Across Arena and API Boundaries | Resolved | 18 November 2026 |
+| F13 | Incomplete Localization and Accessible Naming in Identified Controls | Resolved | 18 November 2026 |
+| F14 | False-Positive Clipboard Success Notification | Resolved | 18 November 2026 |
+| D01 | Arena Retakes Reuse the Previous Attempt Identifier | Resolved | 18 November 2026 |
+| D02 | LaTeX Corruption Caused by Redundant Escape Replacement | Resolved | 18 November 2026 |
+| D03 | Profile Snapshots Can Overwrite an Unsaved Biography Draft | Resolved | 18 November 2026 |
+| D04 | Report-Selection Checkboxes Can Toggle Twice per Interaction | Resolved | 18 November 2026 |
+| D05 | Stale Setup Validation Can Start a Quiz After Context Changes | Resolved | 18 November 2026 |
+| D06 | Forum Edit Drafts Are Discarded Before Write Confirmation | Resolved | 18 November 2026 |
+| D07 | Post Deletion Leaves Publicly Readable Orphaned Comments | Resolved | 18 November 2026 |
+| D08 | Arena “Ask Guru” Action Has No User-Facing Effect | Resolved | 18 November 2026 |
+| D09 | Report Printing Is Constrained by the Dialog Scroll Container | Resolved | 18 November 2026 |
+| D10 | Duplicate Error Codes and English Text in Vietnamese Toasts | Resolved | 18 November 2026 |
+| D11 | Invalid Responsive Utility Classes Produce No CSS Effect | Resolved | 18 November 2026 |
+| D12 | Incomplete Keyboard Semantics and Accessible Naming | Resolved | 18 November 2026 |
+| D13 | OpenRouter Health Check Does Not Authenticate the Supplied Key | Resolved | 18 November 2026 |
+| D14 | Authentication Restoration Can Discard an Early Forum Draft | Resolved | 18 November 2026 |
+| D15 | Client-Controlled Duration Compromises Arena Leaderboard Integrity | Resolved | 18 November 2026 |
+| D16 | Arena Leaderboard Applies Its Result Limit Before the Duration Tie-Break | Resolved | 18 November 2026 |
+| D17 | English Bonus Copy Misrepresents the Arena Reward Rule | Resolved | 18 November 2026 |
+| D18 | Activity Tracking Can Lose Concurrent Day Updates | Resolved | 18 November 2026 |
+| D20 | Indexability and Discoverability Policy Is Undefined Across Public and Authenticated Routes | Resolved | 18 November 2026 |
+| D21 | Custom Not-Found Experience Is Functionally Present but Incomplete | Resolved | 18 November 2026 |
+| D22 | User Avatar Images Lack Alternative Text | Resolved | 18 November 2026 |
+| D23 | Authenticated Profile Reads Expose Private Email Data | Resolved | 18 November 2026 |
+| D25 | Profile Deletion Removes Protected Coin State but Retains Descendants | Resolved | 18 November 2026 |
+| D26 | Quiz Duration Limits Disagree Between Setup and Runtime | Resolved | 18 November 2026 |
+| D27 | Recovered AI Feedback Is Not Persisted to Learning History | Resolved | 18 November 2026 |
+| D28 | Form Naming, Contrast and Page Semantics Remain Incomplete | Resolved | 18 November 2026 |
+| D29 | Subscription Failures Produce Blank or Misleading Empty States | Resolved | 18 November 2026 |
+| D30 | Authentication Can Complete Before Profile Initialization | Resolved | 18 November 2026 |
+| D31 | Unfinished Learning Sessions Have No Leave Protection or Recovery | Resolved | 18 November 2026 |
+| D33 | Practice Short Answers Use Unqualified Exact-Text Grading | Resolved | 18 November 2026 |
+| D34 | Authentication Controls and Chat Panels Fail Small-Viewport Layout | Resolved | 18 November 2026 |
+| D35 | Production Browser Checks Do Not Verify Demo Build Configuration | Resolved | 18 November 2026 |
+| D36 | Expiry Cleanup Can Delete Renewed Quota and Budget Records | Resolved | 18 November 2026 |
+| D37 | AI Generation Expiry Is Not Enforced Independently of Scheduled Cleanup | Resolved | 18 November 2026 |
+| D38 | Firebase Configuration Errors Are Not Validated Proactively | Resolved | 18 November 2026 |
+| D40 | Receipt Fingerprints Depend on JSON Object Insertion Order | Resolved | 18 November 2026 |
+| D42 | Forum Descendant Cleanup Bypasses Write Guards After Visibility Cutover | Resolved | 18 November 2026 |
+| N01 | Inconsistent Naming and File-Name Conventions | Resolved | 18 November 2026 |
+| N02 | Domain Types and Schemas Do Not Consistently Represent Their Lifecycle Stage | Resolved | 18 November 2026 |
+| N03 | Readability Debt and Potentially Unused Modules | Resolved | 18 November 2026 |
+| S01 | Feature Modules Combine Excessive and Heterogeneous Responsibilities | Resolved | 18 November 2026 |
+| S02 | Duplicated Implementations Have Diverged Semantically | Resolved | 18 November 2026 |
+| S03 | Ambiguous State Ownership Between Views and Reducers | Resolved | 18 November 2026 |
+| S04 | Inconsistent Asynchronous Completion and Error-Boundary Contracts | Resolved | 18 November 2026 |
+| S07 | CI Action References Are Mutable and Runtime Compatibility Is Not Explicitly Governed | Resolved | 18 November 2026 |
+| P01 | Unbounded Queries and Client-Side List Processing | Resolved | 18 November 2026 |
+| P02 | Recurrent Timer Updates and Repeated KaTeX Rendering | Resolved | 18 November 2026 |
+| P03 | Duplicate Conversation Context in AI Requests | Resolved | 18 November 2026 |
+| P05 | Route-Level Client JavaScript Is Excessive | Resolved | 18 November 2026 |
+| V01 | Incomplete WebKit Validation | Resolved | 18 November 2026 |
+| V05 | Inadequate Comparative Baselines and Incomplete Coverage Evidence | Resolved | 18 November 2026 |
+| V06 | Production Builds Depend on Live Google Fonts Availability | Resolved | 18 November 2026 |
+
+## 🧪 Local verification
+
+Node 24 passed the optimized demo build, TypeScript, ESLint, maintenance checks and all six production HTTP script budgets. Two earlier unit runs each reached the five-second timeout in a different fixture. The dashboard interactions passed on a focused rerun. The Firebase CLI checks now load the dependency at suite setup and independently verify file discovery and Pub/Sub naming. The complete unit and component suite then passed 501/501 with Chromium print enabled. Its V8 report measured 55.28% of lines and 44.23% of branches. An independent Windows installation from the same lockfile built the same source fingerprint and passed 187/187 Auth/Firestore Emulator Rules and integration cases. Integration coverage measured 92.64% of lines and 77.01% of branches within its configured AI and server API files. Deletion tests cover an active AI attempt, retry after erasure of a pagination boundary and a checkpoint written by an older worker. Restore tests verify completed tombstones, private records and Arena key schemas. The registry policy still blocks one high advisory.
+
+Both report languages and themes passed with the application and dialog visible on screen and only the printable report visible in print media. The fixtures loaded the real local KaTeX styles and fonts. Printing passed on current and historical Chromium, Firefox and WebKit. Both optimized stylesheets used conventional min-width queries and contained no `@property`, `color-mix()`, `oklch()` or `:has()`. The minimum-engine suite passed all six desktop and touch flows together. The three touch cases checked mobile user agents and received trusted touch events when opening sign-in. A separately installed, signed Mozilla Firefox 102.0 distribution passed bilingual contact, theme and horizontal overflow checks on Windows. The native Auth/Firestore export/import drill recovered its interrupted deletion checkpoint.
+
+All 138 end-to-end cases passed across the six desktop and touch configurations in a single run in each mode. The optimized demo took 40.7 minutes and the development server took 51.9 minutes, with zero retries and zero skips in either run. The optimized build ID was `shark-demo-v1-228265d9c8692b1195d88f2a1cba1311-158043ee-5d83-45bc-b112-8978669b042d`. Both runs covered receipt recovery, visible rate-limit feedback, account-specific profile persistence and the Focus Shield launcher. An earlier development run had exposed a lost first click before hydration. The bilingual regression checks that the server-rendered button is disabled and that the first enabled click opens the panel.
+
+## 🔎 Scope of the renewed review
+
+Each row identifies the neighboring failure modes considered alongside the original finding. The detailed entries retain their individual source paths and acceptance boundaries.
+
+| Findings | What was rechecked | Local evidence |
+|---|---|---|
+| M01, F01, F06, D13, D19, D37, P03 | One provider dispatch per invocation, bounded responses, semantic validation, cancelled and expired leases, status recovery, model health and conversation duplication. Repeat user cancellation preserves the in-flight lease until finalization. Account deletion erases owned generations under the deletion worker lease. | AI client, flow, generation-route, attempt-route and Emulator AI security suites. |
+| F02, F03, F04, F05, F10, D18, D26, D27, D31, D33, D40, P01, P02, P07 | Malformed and legacy data, identity and order, missing metrics, timer bounds, recoverable history, Firestore timestamps and owner transitions. Check the last budget token, save replay and migration barriers. | Learning-write and timestamp Emulator suites, history pagination, stats, roadmap, timer and persistence tests. |
+| F07, F08, F09, D01, D06, D07, D08, D14, D15, D16, D17, D23, D24, D25, D39, D41, D42, S05, S06 | Auth loss, retries, draft retention and reaction membership. Verify server score authority, public projection fields, private canonical records, deletion locks and recoverable projection rebuilds. | Rules, Arena, Forum, consent, community migration, account jobs and account-data suites. |
+| F11, F12, F13, F14, D02, D03, D04, D05, D09, D10, D11, D12, D22, D28, D29, D30, D34, V01, V02, V07 | Track ownership of camera, subscriptions and pending UI work. Exercise VI/EN, theme, narrow screens, keyboard, labelled controls and printable tables. Verify the difference between an unknown score and measured zero. | Focus session/widget, clipboard, report print, profile, reader, setup and responsive browser tests. |
+| D20, D21, D32, D35, D38, S07, P05, V03, V04, V05, V06 | Inspect discoverability, 404s, local fonts, dependency paths, pinned actions, browser CSS output, response headers, demo artifact identity and all six gzip budgets. | Optimized demo build, HTTP smoke, dependency audit, configuration, override and maintenance checks. |
+| D36, P04, P06, V08 | Re-read expiry inside the committing transaction. Keep active deletion journals, include legacy locks when restoring and check decoded ownership before writing restored records. Recheck worker contention and bounded B2 inventory. | Emulator account jobs, signed retention, quota/lease and encrypted isolated-restore fixtures. |
+| N01, N02, N03, S01, S02, S03, S04 | Follow the public/private, wire/domain and component/reducer boundaries through their consumers. Revoke stale operations and keep error handling near each asynchronous owner. | TypeScript, ESLint, maintenance checks, lifecycle/reducer tests and the source map in the technical guide. |
 
 ## Reference-report reconciliation
 
-The supplied Vietnamese report `Shark-Empti_Consolidated_Findings.md` contains 32 claims. Its SHA-256 is `3c5cc8f4fb0159f8bddd1e557142f5e8075f8e31ce8eac5b595f97a0dc2239cf`. Each row below preserves a distinct claim and records its disposition against executable source; inclusion is not an admission of a deployed incident. No historical CI or hosting state was assumed current. Existing resolved statuses retain their earlier local scope unless explicitly reopened. New and expanded scopes remain unresolved until their stated acceptance is met.
+The supplied Vietnamese report `Shark-Empti_Consolidated_Findings.md` contains 32 claims. Its SHA-256 is `3c5cc8f4fb0159f8bddd1e557142f5e8075f8e31ce8eac5b595f97a0dc2239cf`. Each row below preserves a distinct claim and records its disposition against executable source; inclusion is not an admission of a deployed incident. No historical CI or hosting state was assumed current. Existing resolved statuses retain their earlier local scope unless explicitly reopened. This reconciliation describes the reference report at intake. The register above records subsequent findings and their current disposition.
 
 | Reference item | Classification | Audit finding | Verified interpretation and preserved boundary |
 |---|---|---|---|
@@ -125,7 +152,7 @@ The supplied Vietnamese report `Shark-Empti_Consolidated_Findings.md` contains 3
 | 9 | Confirmed at helper; fixed for new receipts | D40 | Insertion-order hashes differ; route schema normalization already stabilizes many current payloads. |
 | 10 | Validation gap | D19, V03 | AI has content-free checkpoints; non-AI diagnostics and deployed telemetry privacy require verification. |
 | 11 | Confirmed | S06 | The former mixed queue could hide new open work; separate status lists and deletion-tolerant continuation are now verified on the Emulator. |
-| 12 | Validation gap | V03 | Repository has no central policy; hosting-provided headers have not been measured. |
+| 12 | Validation gap | V03 | The repository lacked a central policy at intake. Next responses now set four baseline headers. Hosting overrides still require inspection. |
 | 13 | Performance opportunity | P06 | Per-scope global bucket contention is structural; throughput is not measured. |
 | 14 | Performance/privacy concern | P06, D41 | Post counters and public likedBy concentrate writes and metadata. |
 | 15 | Performance opportunity; local remediation | P07 | Former per-record transactions are replaced with bounded chunks sharing owner/barrier reads. Safety and operation-count regressions are separate from unmeasured staging duration/cost. |
@@ -147,7 +174,7 @@ The supplied Vietnamese report `Shark-Empti_Consolidated_Findings.md` contains 3
 | 31 | Partly mitigated; legacy gap | S05, V08 | showMissing discovers private orphan descendants and exact paths avoid collisions; unknown legacy ownership cannot be inferred safely. |
 | 32 | Operational gap | V08, D19 | Durable cursor/lease recovery exists; multi-provider outage duration, backlog and reconciliation remain unverified. |
 
-## Local verification checkpoint
+## Earlier local verification checkpoints
 
 The preceding consent checkpoint included offline Firebase configuration checks (D38), revoked/disabled-session enforcement and safe Auth outage classification (D39), canonical new receipts with retained legacy compatibility (D40), status-separated moderation pagination (S06), and server-owned consent with independent account-data access (S05). Its local checks passed 434 unit/component tests with two opt-in browser-print skips and 104 Emulator Rules/integration tests, plus static checks, optimized build and HTTP smoke. The configured offline preflight passed at the configuration checkpoint and was not a live-service test. These counts have separate denominators.
 
@@ -169,17 +196,17 @@ The S05/D42 checkpoint reproduced two polling recovery failures and three post-c
 
 The S07 local configuration change resolved official release tags to full commit SHAs and inspected each pinned manifest and compatibility notes. YAML parsing verified four immutable references, standard triggers, read-only contents permission, non-persisted checkout credentials, application Node 24, Temurin 21 and zipped artifacts. The reviewed actions all declare Node 24; the minimum runner and release-update process are documented. No hosted action/post-step/cache/artifact execution is inferred from that local check; V03 retains hosted acceptance.
 
-The V04 compatible-dependency checkpoint passed 476 unit/component cases with two opt-in print skips, all 159 Rules/integration cases, ESLint, TypeScript without incremental output, maintenance contracts, optimized demo build and HTTP smoke. Twenty production browser cases passed across desktop Chromium and WebKit on artifact `shark-demo-v1-a7b47b6a87d2ec280e4d35b3c11bee86-ef60bb00-33a1-43f0-91b0-26aa720ae951`: account controls/recovery, Auth-independent receipt, account isolation, Quiz/history/notes/preferences, dashboard failure recovery and real Forum/Arena flows. The same tested artifact's server route traces contain no glob/rimraf/minimatch package files; this narrow output observation does not override their production flags in the installed graph or establish hosted reachability. Registry evidence, parent constraints and the retired FTP regression are detailed under V04; the four residual advisories remain open.
+The V04 compatible-dependency checkpoint passed 476 unit/component cases with two opt-in print skips, all 159 Rules/integration cases, ESLint, TypeScript without incremental output, maintenance contracts, optimized demo build and HTTP smoke. Twenty production browser cases passed across desktop Chromium and WebKit on artifact `shark-demo-v1-a7b47b6a87d2ec280e4d35b3c11bee86-ef60bb00-33a1-43f0-91b0-26aa720ae951`: account controls/recovery, Auth-independent receipt, account isolation, Quiz/history/notes/preferences, dashboard failure recovery and real Forum/Arena flows. The same tested artifact's server route traces contain no glob/rimraf/minimatch package files; this narrow output observation does not override their production flags in the installed graph or establish hosted reachability. Registry evidence, parent constraints and the retired FTP regression are detailed under V04; four residual advisories remained at that checkpoint.
 
 The earlier D41 preparation checkpoint passed 483 unit/component cases with two opt-in print skips and 164 Rules/integration cases, plus two browser cases on artifact `shark-demo-v1-221404e33ef23b3ef6da2e91c8fb0d2d-d884df06-bb0c-4e09-a13a-ecc49b9ddc7a`. That artifact predates the local projection cutover. The current verification and outstanding acceptance are recorded under D41 below.
 
-The current diff received a technical review of ownership, cancellation, cursor/receipt compatibility, admission ordering, transaction atomicity, configuration and error boundaries, followed by a readability/maintainability/accessibility review of named native controls, locale parity, retry states and documentation consistency. Audit row/detail counts, all 32 reference claims, backend JSON and local CI YAML were reconciled. Registry/smoke summaries and browser result status were reviewed; fixed-scope artifact cleanup removed generated reports, screenshots and Emulator logs after preserving evidence here. The tested demo build remains available and matches current application inputs. Component tests and Emulator evidence do not substitute for deployment, physical-device or operational gates. D39 remains open for deployed verification cost; S05 retains legacy inventory/environment gates; S06 remains open for deployed abuse calibration and edge-cost acceptance. The full remediation objective is not complete.
+The projection-cutover diff received a technical review of ownership, cancellation, cursor/receipt compatibility, admission ordering, transaction atomicity, configuration and error boundaries, followed by a readability/maintainability/accessibility review of named native controls, locale parity, retry states and documentation consistency. Audit row/detail counts, all 32 reference claims, backend JSON and local CI YAML were reconciled. Registry/smoke summaries and browser result status were reviewed; fixed-scope artifact cleanup removed generated reports, screenshots and Emulator logs after preserving evidence here. That checkpoint used its own fingerprinted demo build. Component tests and Emulator evidence do not substitute for deployment, physical-device or operational gates. The later review retains the deployment and calibration limits on D39, S05 and S06.
 
 ## Detailed findings
 
 ### M01 - Multi-Model AI Fallback Can Exceed a Single Transport Lifetime and Obscure Terminal Failures
 
-**Status:** Local recovery regressions pass; staging and canary acceptance pending.
+**Status:** Accepted locally · Provider duration, proxy failures and canary recovery unverified.
 
 **Scope and evidence:** One provider request per invocation, three ordinals, lease recovery and client deadlines replace the former long fallback chain.
 
@@ -189,7 +216,7 @@ The current diff received a technical review of ownership, cancellation, cursor/
 
 ### F01 - Missing Server-Side Authentication and Quota Enforcement for AI Actions
 
-**Status:** Creation/traffic admission verified locally; staging calibration pending.
+**Status:** Accepted locally · Production quota and traffic calibration unverified.
 
 **Scope and evidence:** Authenticated AI admission and transactional weighted quotas exist; limits are provisional.
 
@@ -199,7 +226,7 @@ The current diff received a technical review of ownership, cancellation, cursor/
 
 ### F02 - Inadequate Validation of Persisted and Legacy Firestore Data
 
-**Status:** Write contracts and browser recovery verified locally; coordinated rollout and budget calibration pending.
+**Status:** Accepted locally · Coordinated client/API/Rules rollout and deployed admission ceilings unverified.
 
 **Scope and evidence:** The former recursive owner-write grant admitted unknown structures, and profile field names lacked complete type/length constraints. Direct SDK writes are now limited to bounded profiles, notes/main and single-date activity updates. New Quiz/Flashcard/Practice records use authenticated APIs with full nested/cross-field validation, byte/count admission, owner-derived identity and stable fingerprinted retry. Feedback updates preserve completion, answers and unrelated legacy configuration. Owner legacy reads/deletion and tolerant history readers remain available; no existing records are silently migrated or removed. This addresses owner-scoped schema/resource exposure; no cross-account write was established.
 
@@ -213,7 +240,7 @@ The current diff received a technical review of ownership, cancellation, cursor/
 
 **Scope and evidence:** Quiz completion awaits a stable-ID write and removes undefined optional values.
 
-**Implementation and verification sources:** `src/hooks/use-learning-session.ts`, `tests/session-persistence.test.ts`.
+**Implementation and verification sources:** `src/hooks/use-learning-session.ts`, `tests/session-persistence.test.tsx`.
 
 **Acceptance boundary:** Retain retry and account-change regression coverage.
 
@@ -441,9 +468,9 @@ The current diff received a technical review of ownership, cancellation, cursor/
 
 **Status:** Resolved.
 
-**Scope and evidence:** Named controls, semantic keyboard interaction and focus behavior address identified gaps.
+**Scope and evidence:** Named controls, semantic keyboard interaction and focus behavior address the identified gaps. A development browser trace showed a lost first activation on the server-rendered Focus Shield launcher. Holding the client scripts reproduced it. The launcher now stays disabled until hydration. Component and browser checks verify that the first enabled activation opens the panel in both locales.
 
-**Implementation and verification sources:** `src/components/playground/flashcard-game.tsx`, `tests/playground.test.tsx`, `tests/e2e/platform-accessibility.spec.ts`.
+**Implementation and verification sources:** `src/components/playground/flashcard-game.tsx`, `src/components/focus-tracker-widget.tsx`, `tests/playground.test.tsx`, `tests/focus-tracker-widget.test.tsx`, `tests/e2e/app.spec.ts`, `tests/e2e/platform-accessibility.spec.ts`.
 
 **Acceptance boundary:** Sampled automation does not certify all accessibility requirements.
 
@@ -509,9 +536,9 @@ The current diff received a technical review of ownership, cancellation, cursor/
 
 ### D19 - AI Generation Finalization Failures Lose Stage Classification and Correlated Telemetry
 
-**Status:** Checkpoints and safe persistence classification implemented; staged acceptance pending.
+**Status:** Accepted locally · Cross-service incident correlation and deployed log privacy unverified.
 
-**Scope and evidence:** AI records content-free stage checkpoints and storage classifications; ordinary API failures still lack equivalent correlation and operational metrics.
+**Scope and evidence:** AI records content-free stage checkpoints and persistence classifications. Ordinary API failures return a random incident ID. Server failures emit its matching fixed-category event without identifiers from the request. Deployed aggregation and cross-service tracing remain unmeasured.
 
 **Implementation and verification sources:** `src/ai/telemetry.ts`, `src/ai/route-utils.ts`, `src/lib/server-api.ts`, `tests/ai-attempt-route.test.ts`.
 
@@ -559,7 +586,7 @@ The current diff received a technical review of ownership, cancellation, cursor/
 
 ### D24 - Public Arena Answers and Repeat Rewards Undermine Competition Integrity
 
-**Status:** Private-key/eligibility and repeated browser flows pass; coordinated migration deployment pending.
+**Status:** Accepted locally · Coordinated key migration, Rules and indexes unverified.
 
 **Scope and evidence:** V2 metadata excludes answers; private keys, first-start eligibility and compact receipts enforce server grading and one eligible ranking/reward. Legacy migration remains practice-only.
 
@@ -571,7 +598,7 @@ The current diff received a technical review of ownership, cancellation, cursor/
 
 **Status:** Resolved.
 
-**Scope and evidence:** Root profile deletion is denied; account deletion locks writes, removes private descendants and deletes Auth last.
+**Scope and evidence:** Root profile deletion is denied. Account deletion holds a write lock, removes private descendants and deletes Auth last. The first worker phase erases ready and in-flight AI generations and releases only their active quota slots. Emulator regressions check an obsolete lease, a mismatched lock, a delayed AI finalizer, page replay and an unrelated owner's running attempt.
 
 **Implementation and verification sources:** `firestore.rules`, `src/lib/jobs/account-worker.ts`, `tests/integration/account-jobs.test.ts`.
 
@@ -639,13 +666,13 @@ The current diff received a technical review of ownership, cancellation, cursor/
 
 ### D32 - Locked Dependencies Trigger Blocking Security Advisories
 
-**Status:** Resolved.
+**Status:** Reopened · blocking high advisory in four picomatch installations.
 
-**Scope and evidence:** Targeted security remediation and dependency policy address the previously blocking advisory set. The Firestore/gRPC override remains covered; V04's compatible CLI update removes the legacy FTP dependency path and its obsolete override. Residual moderate advisory records remain V04.
+**Scope and evidence:** The previous blocking set was addressed. A fresh registry check identifies one high advisory on four installed picomatch paths. This reopens D32. The shared inventory and remediation history are under V04.
 
 **Implementation and verification sources:** `package.json`, `package-lock.json`, `tests/dependency-overrides.test.ts`.
 
-**Acceptance boundary:** Current moderate advisories and reachability are tracked by V04; this is not a clean-dependency certification.
+**Acceptance boundary:** Close only after the checked-in dependency policy passes on the actual supported lockfile.
 
 ### D33 - Practice Short Answers Use Unqualified Exact-Text Grading
 
@@ -709,7 +736,7 @@ The current diff received a technical review of ownership, cancellation, cursor/
 
 ### D39 - Revoked Sessions Remain Accepted by Ordinary Authenticated APIs
 
-**Status:** Revoked/disabled-session enforcement verified locally; deployed verification cost pending.
+**Status:** Accepted locally · Revocation-check latency and Auth capacity unverified.
 
 **Scope and evidence:** Ordinary authenticatedUser formerly omitted revocation checking. The shared helper now rejects malformed credentials before Admin initialization, requests revoked/disabled-account verification, and distinguishes rejected sessions from Auth infrastructure outages. Account-job creation additionally requires recent auth.
 
@@ -727,17 +754,19 @@ The current diff received a technical review of ownership, cancellation, cursor/
 
 **Acceptance boundary:** Canonicalize nested JSON objects, preserve array order and safely replay retained legacy receipts.
 
+<a id="d41-public-community-documents-expose-reaction-membership-and-persistent-account-identifiers"></a>
+
 ### D41 - Public Community Documents Expose Reaction Membership and Persistent Account Identifiers
 
-**Status:** Local projection cutover implemented; deployment and acceptance pending.
+**Status:** Accepted locally · Live projection inventory, migration and Rules cutover unverified.
 
-**Scope and evidence:** The original public Forum documents exposed likedBy UID arrays and public Arena rankings exposed userId. UID is not a credential and this did not grant private-history access. The current local implementation keeps canonical Forum records and Arena attempts private, publishes versioned metadata projections, reads own reaction state privately and assigns independent UUIDs to public rankings with private owner pointers. API writers, moderation, account deletion and isolated restore synchronize or rebuild projections. A guarded migration inventories by default and preserves unknown/conflicting data. Intentional public author attribution remains visible. This implementation has not been converted or verified in a deployed environment; D41 remains unresolved.
+**Scope and evidence:** The original public Forum documents exposed likedBy UID arrays and public Arena rankings exposed userId. UID is not a credential and this did not grant private-history access. The current local implementation keeps canonical Forum records and Arena attempts private, publishes versioned metadata projections, reads own reaction state privately and assigns independent UUIDs to public rankings with private owner pointers. API writers, moderation, account deletion and isolated restore synchronize or rebuild projections. A guarded migration inventories by default and preserves unknown/conflicting data. Intentional public author attribution remains visible. Remote inventory, conversion and deployment verification remain outstanding.
 
 **Implementation and verification sources:** `firestore.rules`, `src/lib/public-firestore-schema.ts`, `src/lib/community-privacy.ts`, `src/lib/community-projections.ts`, `src/lib/forum-reaction-owner.ts`, `src/app/api/forum/[postId]/route.ts`, `tests/community-projections.test.ts`, `tests/integration/community.test.ts`, `tests/firebase.rules.test.ts`, `tests/integration/account-jobs.test.ts`.
 
 **Acceptance boundary:** Minimize public membership/identifiers with a coordinated storage/API/UI migration and preserve reaction, export and deletion correctness.
 
-**Current local verification:** 491 unit/component cases passed with two opt-in skips; 181 Rules/integration cases passed after projection preflight and fixture isolation. A red-to-green Emulator regression demonstrated that the earlier inventory missed three unknown projections; further cases cover orphan, hidden, tombstoned and UID-linked records. TypeScript, ESLint, maintenance contracts over 390 source/config files and six Markdown documents, optimized demo build and HTTP smoke passed. Two real post/comment reaction browser cases passed on Chromium and WebKit against artifact `shark-demo-v1-43860fbabe1c65a3c1d1cdfaecd2220b-c78647bd-bc78-4dc8-993a-3e27781d6fc1`. These are local Emulator checks, not deployment/index/migration acceptance.
+**Projection-cutover checkpoint:** 491 unit/component cases passed with two opt-in skips; 181 Rules/integration cases passed after projection preflight and fixture isolation. A red-to-green Emulator regression demonstrated that the earlier inventory missed three unknown projections; further cases cover orphan, hidden, tombstoned and UID-linked records. TypeScript, ESLint, maintenance contracts over 390 source/config files and six Markdown documents, optimized demo build and HTTP smoke passed. Two real post/comment reaction browser cases passed on Chromium and WebKit against artifact `shark-demo-v1-43860fbabe1c65a3c1d1cdfaecd2220b-c78647bd-bc78-4dc8-993a-3e27781d6fc1`. These are local Emulator checks, not deployment/index/migration acceptance.
 
 **Remaining acceptance:** Review a fresh read-only inventory, including the public projection namespaces, and resolve any unrecognized or orphaned records without deleting unknown data. Establish backup and recovery evidence before any authorized remote conversion. Validate coordinated Rules, indexes, migration, old clients and deployed behavior. Existing job phase/cursor compatibility must be maintained. No remote conversion has been applied.
 
@@ -823,7 +852,7 @@ The current diff received a technical review of ownership, cancellation, cursor/
 
 ### S05 - User-Facing Service Information and Account-Data Controls Are Missing
 
-**Status:** Server-owned consent, independent data controls and bounded polling verified locally; legacy inventory and environment acceptance pending.
+**Status:** Accepted locally · Legacy ownership inventory and deployed account operations unverified.
 
 **Scope and evidence:** Service information, self-service jobs and minimal receipts exist. Consent uses authenticated explicit acknowledgement in the server-only `_serviceConsents` collection, with current policy/eligibility and Timestamp checks at business API/transaction and private learning Rules boundaries. Legacy owner-written preferences cannot authorize access. `/account/data` retains controls before acknowledgement and without profile provisioning; export, deletion and restore include the server record without shifting durable phases. Serial status polling now applies per-request deadlines and four transient retries, hidden-tab suspension and throttled event recovery. It never replays a job mutation; rejected Auth may continue with a currently held minimal receipt. Late status/file work cannot overwrite newer input, and malformed receipt identities fail closed. Attributable legacy inventory and environment acceptance remain incomplete.
 
@@ -833,7 +862,7 @@ The current diff received a technical review of ownership, cancellation, cursor/
 
 ### S06 - Community Operations Lack Moderation and Abuse Budgets
 
-**Status:** Pre-query traffic admission and queue pagination verified locally; deployed abuse calibration pending.
+**Status:** Accepted locally · Real moderation traffic and edge calibration unverified.
 
 **Scope and evidence:** Community writes are budgeted and moderation is reversible. The former mixed 50-record queue could hide open work; separate open/hidden lists now provide timestamp/document-ID continuation. Emulator coverage includes 55 hidden plus 52 open reports, equal timestamps, a removed boundary, and invalid/cross-status cursors. Nine Forum/report/Arena entry points now charge community traffic before body/resource work, and moderator admission precedes the additional role lookup and queue/body processing. Account job creation/list/status/download has distinct traffic admission before private lookups/storage. Receipt-only status rejects malformed HMAC syntax before database work and uses a global bucket without storing credential identifiers or requiring the deleted Auth identity. Admitted errors/replays consume traffic while business quota remains tied to business effects. Authentication/admission cost and deployed calibration remain outside local acceptance.
 
@@ -883,7 +912,7 @@ The current diff received a technical review of ownership, cancellation, cursor/
 
 ### P04 - Idempotency Receipts Have No Defined Retention Bound
 
-**Status:** Spark scheduled-retention implementation and expiry indexes; deployed schedule/index acceptance pending.
+**Status:** Accepted locally · Signed schedule, expiry indexes and cleanup backlog unverified.
 
 **Scope and evidence:** Seven-day receipts and bounded signed ordinary-index cleanup exist; journal/tombstone policies differ deliberately.
 
@@ -899,13 +928,13 @@ The current diff received a technical review of ownership, cancellation, cursor/
 
 **Implementation and verification sources:** `src/components/route-providers.tsx`, `src/components/focus-tracker-session.ts`, `config/bundle-budgets.json`.
 
-**Acceptance boundary:** Profile runtime/model cost and hidden-tab behavior; do not resize model inputs or share model ownership without quality/lifecycle evidence.
+**Acceptance boundary:** Hidden-tab inference is suppressed and visible inference resumes in the session test. Profile runtime/model cost on devices; do not resize model inputs or share model ownership without quality/lifecycle evidence.
 
 ### P06 - Shared Transaction and Inventory Resources Have Unmeasured Concurrency Limits
 
-**Status:** Global budgets, post counters, worker lease and B2 inventory require measured capacity.
+**Status:** Accepted locally · Peak contention, worker queue age and provider quota unverified.
 
-**Scope and evidence:** Global budget documents, post counters/likedBy, one worker lease and full B2 version inventory serialize work. D41's owner-state preparation adds a point read/write to admitted non-replayed reaction transactions; include that cost and retry amplification in capacity measurement. B2 capacity checking has no atomic external reservation, but the global worker reduces normal concurrency.
+**Scope and evidence:** Global budget documents, post counters/likedBy, one worker lease and full B2 version inventory serialize work. D41's owner-state preparation adds a point read/write to admitted non-replayed reaction transactions; include that cost and retry amplification in capacity measurement. The Emulator four-caller fixture checks that one shared worker lease is granted, while the other three jobs stay queued with intact checkpoints. Backup and export workers write under that lease. The explicit storage check also writes a synthetic object and must run separately from live worker inventory checks. B2 capacity checking has no atomic external reservation.
 
 **Implementation and verification sources:** `src/lib/request-budget.ts`, `src/lib/jobs/store.ts`, `src/lib/jobs/storage.ts`, `src/app/api/forum/[postId]/route.ts`.
 
@@ -913,7 +942,7 @@ The current diff received a technical review of ownership, cancellation, cursor/
 
 ### P07 - Timestamp Migration Performs One Sequential Transaction per Convertible Record
 
-**Status:** Bounded batching verified locally; staging duration and cost acceptance pending.
+**Status:** Accepted locally · Migration time and cost on representative remote data unverified.
 
 **Scope and evidence:** The former migration awaited one transaction per convertible record. It now scans 100-record pages and applies at most 20 candidates per transaction, sharing barrier/distinct-owner reads and rereading every candidate before any update. The 105-record Emulator fixture uses six conversion transactions. Locked-owner atomic refusal, concurrent canonicalization/deletion/invalidation, a newly active backup barrier and safe continuation pass. A protected owner aborts the entire current chunk. Previously committed chunks remain safely repeatable; remote duration and cost are unmeasured.
 
@@ -933,37 +962,45 @@ The current diff received a technical review of ownership, cancellation, cursor/
 
 ### V02 - Unverified Minimum Browser Versions and Physical-Camera Behaviour
 
-**Status:** Partial; historical physical-camera result is not reproducible from the current checkout; target matrix pending.
+**Status:** Accepted locally · native Apple/Android, hardware permission revocation and sustained use unverified.
 
-**Scope and evidence:** Current browser engines and synthetic camera lifecycle coverage do not prove minimum versions or physical camera behavior.
+**Scope and evidence:** The optimized demo passed six historical browser flows on Windows. Chromium 100.0.4896.0, Firefox 102.0 and WebKit 15.4 each changed language/theme, signed in through the Auth Emulator, completed a quiz and received a 201 history save on desktop and touch viewports. The print tests passed on all three engines. In Chrome 157 on Windows, Focus Shield acquired a physical HP Wide Vision camera at 640 × 480, performed local inference and ended the live video track through its stop control. The check blocked off-device requests and retained no frames or scores.
 
-**Implementation and verification sources:** `playwright.config.ts`, `tests/focus-tracker-session.test.ts`, `docs/VALIDATION.md`.
+**Implementation and verification sources:** `playwright.config.ts`, `tests/browser-floors/minimum.spec.ts`, `tests/browser-floors/installation.ts`, `tests/focus-tracker-session.test.ts`, `tests/report-print.browser.test.tsx`, `docs/VALIDATION.md`.
 
-**Acceptance boundary:** Run the stated version/device matrix, permission revocation and resource profiling.
+**Acceptance boundary:** Repeat the historical engine suite after build-tool changes. Native Safari on macOS/iOS, Chrome and Firefox on Android, hardware permission revocation and sustained resource use still need device evidence.
 
 ### V03 - Unverified Remote CI, Production Runtime, and Firestore Index State
 
-**Status:** Local release gates verified; hosted runtime and deployed metadata acceptance pending.
+**Status:** Accepted locally · Hosted CI, headers, IAM, indexes and deployment unverified.
 
-**Scope and evidence:** Local config is not proof of remote Rules/index readiness, hosting duration, header policy or old-client compatibility. No explicit CSP/security-header policy exists in next.config.ts.
+**Scope and evidence:** Local config is not proof of remote Rules/index readiness, hosting duration, header policy or old-client compatibility. Next configuration now sets content-type, referrer, camera/microphone/geolocation permissions and base/object/frame-ancestor CSP directives. Optimized HTTP smoke asserts these response values.
 
 **Implementation and verification sources:** `next.config.ts`, `firestore.indexes.json`, `.github/workflows/ci.yml`, `scripts/inspect-firestore.mjs`.
 
 **Acceptance boundary:** Inspect deployed HTML/API/assets headers and index/Rules revision, validate Firebase/Next-compatible CSP, coordinate timestamp clients and rollout; no missing deployed header is presumed.
 
+<a id="v04-dependency-risk-assessment-is-not-current"></a>
+
 ### V04 - Dependency-Risk Assessment Is Not Current
 
-**Status:** Six advisories remediated compatibly; four moderate advisories require parent-major review.
+**Status:** Open · refreshed registry inventory still fails the high-severity gate.
 
-**Scope and evidence:** Policy reports all advisory severities and blocks high/critical only. Compatible Express/qs and Firebase CLI updates remove six advisory records. Four moderate records remain in parent-constrained dependencies. Reported npm instance counts and advisory counts have different denominators; the remaining findings are not approved exceptions.
+**Scope and evidence:** The pre-change lock produced 15 advisory records when rescanned. The updated lock has 1,412 package instances and one high advisory affecting four picomatch installations. It has zero low, moderate and critical records. The policy correctly returns a failing exit code.
 
 **Implementation and verification sources:** `scripts/dependency-audit.mjs`, `config/dependency-audit-policy.json`, `package-lock.json`.
 
-**Acceptance boundary:** Registry evidence and installed paths are current. Complete compatible parent/API remediation or reviewed parent-major options for the four residual records; source/trace inspection alone is not proof of unexploitable deployed behavior. Historical CI counts and RCE applicability are not assumed.
+**Acceptance boundary:** Retest a patched picomatch or a supported replacement throughout the parent graph and rerun the unchanged registry policy. The advisory lists no patched version. [GHSA-fc5q-39xc-vjpf](https://github.com/advisories/GHSA-fc5q-39xc-vjpf)
 
 #### V04 dependency evidence
 
-The baseline lock SHA-256 `52e71fb9aa986f50918ad16f8b617b8e61db2fc2087978f6f12ccaf65e5e1660` had 10 moderate advisory records across 1,457 package instances. Express/qs updates reduced that to eight on interim lock `80b5015af3b8111e341e1d3e693a1c4cf394caa5af81538a02fb2a9a9c00637e`; compatible Firebase CLI `15.34.2` then supplied patched CSV/streaming JSON packages. Current lock SHA-256 `359f8556e031781843f3a7a3d20571dbc3f2f973ee1ee58d9c372873d80e164d` reports four moderate records across 1,432 package instances and zero high/critical. These are successive inventories, not additive counts or proof of exploitability. The policy remains unchanged and lower severities remain visible work.
+Lock SHA-256 `c8855c6dfee387731f072da77ff3bf566e1cd76f2a5c79d0dcc6c4a2796ac3b5` includes the updated Next.js, Firebase Admin and CLI packages. Scoped dependency changes cover Pub/Sub, gaxios/uuid, glob and minimatch. Consumer regressions exercise the CLI file finder, Pub/Sub resource names, gaxios multipart handling, TypeScript parser pattern matching, streaming JSON and CSV. Registry results have one high advisory on picomatch 2.3.2 at the root and 4.0.7 under tinyglobby, Vite and Vitest. The lock classifies the root and tinyglobby paths as production dependencies. Runtime exposure at a deployed origin remains unverified. The preceding lock produced two low, twelve moderate and one high advisory on a fresh scan.
+
+Six direct consumers require picomatch across the 2.x and 4.x lines. `fdir` also declares an optional peer on 3.x or 4.x. The installed `micromatch` calls `makeRe`, `scan` and `parse`. `tinyglobby` calls the matcher and `scan` in both its CommonJS and ESM builds. A replacement must preserve these interfaces throughout the graph.
+
+#### Earlier registry inventories
+
+The baseline lock SHA-256 `52e71fb9aa986f50918ad16f8b617b8e61db2fc2087978f6f12ccaf65e5e1660` had 10 moderate advisory records across 1,457 package instances. Express/qs updates reduced that to eight on interim lock `80b5015af3b8111e341e1d3e693a1c4cf394caa5af81538a02fb2a9a9c00637e`; compatible Firebase CLI `15.34.2` then supplied patched CSV/streaming JSON packages. At the earlier checkpoint, lock SHA-256 `359f8556e031781843f3a7a3d20571dbc3f2f973ee1ee58d9c372873d80e164d` reports four moderate records across 1,432 package instances and zero high/critical. These are successive inventories, not additive counts or proof of exploitability. The policy remains unchanged and lower severities remain visible work.
 
 | Advisory | Examined package versions | Installed dependency paths | Disposition and reachability boundary |
 |---|---|---|---|
@@ -986,11 +1023,11 @@ Remaining parent constraints were inspected with bundled npm and registry metada
 
 **Status:** Resolved.
 
-**Scope and evidence:** Synthetic CPU, browser, query and build comparisons document sample/denominator limits.
+**Scope and evidence:** The Focus Shield comparison used the pre-fix source `9d89d840e8d6f5c5144e2958c854f711` and final source `228265d9c8692b1195d88f2a1cba1311` on the same Windows host, Chromium build and physical npm installation. Each build recorded five cold and five warm guest navigations on Login, Forum and Arena, for 60 observations. Median cold navigation changed from 157.6 to 160.5 ms on Login, 270.4 to 266.2 ms on Forum and 249.6 to 272.1 ms on Arena. The report retains the warm measurements and per-route distributions. The CPU and Emulator query reports record their dataset sizes separately.
 
 **Implementation and verification sources:** `scripts/performance-baseline.ts`, `scripts/performance-comparison.mjs`, `docs/VALIDATION.md`.
 
-**Acceptance boundary:** These baselines do not measure authenticated provider/camera or all new concurrency scopes.
+**Acceptance boundary:** Five samples per route and cache state describe this local run. Authenticated provider latency, physical camera performance and deployed concurrency require measurements in those environments.
 
 ### V06 - Production Builds Depend on Live Google Fonts Availability
 
@@ -1004,7 +1041,7 @@ Remaining parent constraints were inspected with bundled npm and registry metada
 
 ### V07 - Educational and Focus Scores Lack Product Validation Evidence
 
-**Status:** Uncertainty labels and conservative provenance added; labelled product validation remains pending.
+**Status:** Accepted locally · Independent bilingual educational labels and consented camera evaluation unverified.
 
 **Scope and evidence:** Educational categories, cognitive metrics and focus estimates are explicitly uncertain; no labelled calibration evidence is present.
 
@@ -1014,9 +1051,9 @@ Remaining parent constraints were inspected with bundled npm and registry metada
 
 ### V08 - Backup, Restore and Service-Incident Recovery Are Unverified
 
-**Status:** Encrypted backup/isolated-restore implementation; operational RPO/RTO and deployed acceptance pending.
+**Status:** Accepted locally · Cloud restore, identity continuity and operational RPO/RTO unverified.
 
-**Scope and evidence:** Encrypted jobs, backup barriers, deletion journal and empty-target restore exist. Prolonged deletion/provider failures, semantic post-restore integrity, Google identity continuity, legacy ownership and realistic RPO/RTO are not accepted. The confirmed Forum cleanup bypass is remediated under D42 with guarded transactions and concurrent interruption/retry regressions. This does not close broader background/operator writer inventory or deployed backup/lock acceptance.
+**Scope and evidence:** An encrypted Emulator backup restored to an empty target excludes erased identities, applies legacy deletion locks, preserves another owner's private records and retains the exact schema of anonymized Arena keys. Each applied deletion receives a fresh, finite completed lock and a longer-lived journal. Nested archive identities and reaction counts use the same anonymization rules during deletion and restore. D42 covers interrupted Forum cleanup and retry. Cloud identity continuity, broader writer coverage, realistic RPO/RTO and prolonged provider outages still require operational evidence.
 
 **Implementation and verification sources:** `src/lib/jobs/`, `tests/integration/account-jobs.test.ts`, `docs/ACCOUNT_OPERATIONS.md`.
 

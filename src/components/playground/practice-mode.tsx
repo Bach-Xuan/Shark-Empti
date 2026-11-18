@@ -366,7 +366,7 @@ export default function PracticeMode({ t, lang, weakPoints, totalAttempts, total
               <div className="space-y-6 md:space-y-8">
                 <div className="space-y-2">
                   <p className="font-black text-muted-foreground uppercase text-[7px] md:text-xs tracking-widest pl-1">{t.correctAnswer}:</p>
-                  <div className="p-4 md:p-6 bg-white/40 dark:bg-black/20 rounded-xl md:rounded-2xl border-2 border-current/10">
+                  <div className="p-4 md:p-6 bg-white/40 dark:bg-black/20 rounded-xl md:rounded-2xl border-2 border-foreground/10">
                     <p className="text-sm md:text-2xl font-bold text-foreground whitespace-normal break-words">
                       <LatexText text={q.correct} />
                     </p>

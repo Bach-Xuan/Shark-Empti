@@ -143,8 +143,18 @@ for (const language of ['en', 'vi']) {
       expect(Buffer.byteLength(source)).toBeLessThan(4096);
     }
     await page.screenshot({ path: `test-results/auth-${language}-${test.info().project.name}.png`, fullPage: true });
-    await page.goto('/arena');
-    await page.getByRole('button', { name: language === 'vi' ? 'Lá Chắn Tập Trung' : 'Focus Shield', exact: true }).click();
+    const navigation = await page.goto('/arena');
+    if (!navigation?.ok()) throw new Error('Arena did not return the server-rendered page.');
+    const name = language === 'vi' ? 'Lá Chắn Tập Trung' : 'Focus Shield';
+    // Inspect the HTML from this navigation independently of how quickly the engine hydrates it.
+    const initiallyDisabled = await page.evaluate(({ html, label }) => {
+      const initial = new DOMParser().parseFromString(html, 'text/html');
+      return [...initial.querySelectorAll('button')].find(button => button.getAttribute('aria-label') === label)?.disabled;
+    }, { html: await navigation.text(), label: name });
+    expect(initiallyDisabled).toBe(true);
+    const launcher = page.getByRole('button', { name, exact: true });
+    await expect(launcher).toBeEnabled();
+    await launcher.click();
     await expect(page.getByRole('button', { name: language === 'vi' ? 'Thu nhỏ Lá chắn tập trung' : 'Minimize Focus Shield', exact: true })).toBeVisible();
   });
 }

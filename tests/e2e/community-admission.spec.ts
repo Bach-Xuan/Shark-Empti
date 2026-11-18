@@ -21,7 +21,7 @@ test('real traffic rejection retains a Forum draft and permits one successful re
     const refused = page.waitForResponse(response => new URL(response.url()).pathname === '/api/forum' && response.request().method() === 'POST');
     await page.getByRole('button', { name: 'Publish', exact: true }).click();
     expect((await refused).status()).toBe(429);
-    await expect(page.getByText(errorMessages.en.rate, { exact: false })).toBeVisible();
+    await expect(page.locator('[role=region] li').getByText(errorMessages.en.rate, { exact: false })).toBeVisible();
     await expect(content).toHaveValue('Keep this draft after the server rejects admission.');
     expect((await db.collection('posts').where('title', '==', title).get()).empty).toBe(true);
     await budget.delete();

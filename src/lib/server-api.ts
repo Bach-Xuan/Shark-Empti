@@ -1,6 +1,6 @@
 import { type Transaction } from 'firebase-admin/firestore';
 import { NextResponse } from 'next/server';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import 'server-only';
 import { ZodError } from 'zod';
 import { AdminConfigurationError,getAdminAuth,getAdminDb } from './firebase-admin';
@@ -46,11 +46,24 @@ export async function assertWritable(transaction: Transaction, uid: string, opti
   if (!options.allowMaintenance && maintenance.get('active') === true && maintenance.get('expiresAtMs') > Date.now()) throw new ApiError('APP-MAINTENANCE', 503, 'Writes are temporarily paused for a consistent backup.');
   if (consent && !hasCurrentServiceConsent(consent.data())) throw new ApiError('APP-CONSENT-REQUIRED', 403, 'Confirm the current service policy before using learning and community features.');
 }
+function classifyFailure(error: unknown): ApiError {
+  if (error instanceof AdminConfigurationError) return new ApiError('APP-CONFIG-MISSING', 503, 'Server configuration is unavailable.');
+  if (error instanceof ApiError) return error;
+  if (error instanceof ZodError || error instanceof SyntaxError) return new ApiError('APP-INVALID-INPUT', 400, 'Invalid request data.');
+  return new ApiError('APP-REQUEST-FAILED', 500, 'Could not complete the request.');
+}
+
 export function apiFailure(error: unknown) {
-  if (error instanceof AdminConfigurationError) return NextResponse.json({ error: 'Server configuration is unavailable.', code: 'APP-CONFIG-MISSING', values: {} }, { status: 503 });
-  if (error instanceof ApiError) return NextResponse.json({ error: error.message, code: error.code, values: {} }, { status: error.status });
-  if (error instanceof ZodError || error instanceof SyntaxError) return NextResponse.json({ error: 'Invalid request data.', code: 'APP-INVALID-INPUT', values: {} }, { status: 400 });
-  return NextResponse.json({ error: 'Could not complete the request.', code: 'APP-REQUEST-FAILED', values: {} }, { status: 500 });
+  const { code, status, message } = classifyFailure(error);
+  const incident = randomUUID();
+  // Only server-side failures enter the event log. Omit request paths, bodies,
+  // credential identifiers, upstream messages and other user-controlled values.
+  if (status >= 500) {
+    const category = code === 'APP-CONFIG-MISSING' ? 'configuration' : code.startsWith('ACCOUNT-STORAGE-') ? 'storage'
+      : code === 'APP-UNAVAILABLE' ? 'service' : code === 'APP-MAINTENANCE' ? 'maintenance' : 'internal';
+    console.warn(JSON.stringify({ event: 'api-failure', incident, status, category }));
+  }
+  return NextResponse.json({ error: message, code, values: {} }, { status, headers: { 'X-Request-ID': incident } });
 }
 
 /** Receipt and business writes share a transaction, including concurrent retries. */

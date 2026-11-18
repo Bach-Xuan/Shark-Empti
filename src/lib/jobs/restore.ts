@@ -5,7 +5,8 @@ import type { Auth, UserImportRecord } from 'firebase-admin/auth';
 import { z } from 'zod';
 import { ApiError } from '../server-api';
 import { digest } from './crypto';
-import { isCommunityRecordPath, OWNED_RECORDS, userBudgetPaths } from './catalog';
+import { anonymizeContributions, isCommunityRecordPath, OWNED_RECORDS, userBudgetPaths } from './catalog';
+import { JOB_LIMITS } from './config';
 import type { Artifact } from './types';
 import { SERVICE_CONSENT_COLLECTION } from '../service-policy';
 import { isCommunityProjectionPath, isManagedCommunityProjection, rebuildRestoredCommunity } from '../community-privacy-migration';
@@ -28,17 +29,6 @@ export function importValue(value: unknown, db: Firestore): unknown {
     default: return Object.fromEntries(Object.entries(item).map(([key, child]) => [key, importValue(child, db)]));
   }
 }
-function scrub(value: unknown, deleted: Set<string>): unknown {
-  if (Array.isArray(value)) return value.map(item => scrub(item, deleted));
-  if (!value || typeof value !== 'object' || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) return value;
-  const result = { ...value as Record<string, unknown> };
-  if (typeof result.authorId === 'string' && deleted.has(result.authorId)) Object.assign(result, { authorId: '__deleted__', authorName: 'Former member', authorPhoto: '' });
-  if (typeof result.userId === 'string' && deleted.has(result.userId)) Object.assign(result, { userId: '__deleted__', userName: 'Former member', userPhoto: '' });
-  for (const key of ['actorId', 'hiddenBy', 'reporterId', 'uid', 'ownerUid']) if (typeof result[key] === 'string' && deleted.has(result[key] as string)) result[key] = '__deleted__';
-  if (Array.isArray(result.likedBy)) { result.likedBy = result.likedBy.filter(uid => typeof uid !== 'string' || !deleted.has(uid)); result.likesCount = (result.likedBy as unknown[]).length; }
-  for (const [key, child] of Object.entries(result)) result[key] = scrub(child, deleted);
-  return result;
-}
 
 /** Empty, isolated target only. This never overwrites an operating environment. */
 export async function restoreBackup(options: {
@@ -46,7 +36,11 @@ export async function restoreBackup(options: {
 }) {
   const { db, auth, artifacts, read } = options;
   if ((await db.listCollections()).length || (await auth.listUsers(1)).users.length) throw new ApiError('APP-RESTORE-TARGET', 409, 'Restore requires an empty isolated target.');
-  const manifest = z.object({ format: z.literal('shark-backup-v1'), artifacts: z.array(z.object({ fileId: z.string(), sha256: z.string() })) }).parse(JSON.parse((await read(artifacts.at(-1)!)).toString()));
+  const last = artifacts.at(-1);
+  if (!last) throw new ApiError('APP-DATA-INVALID', 409, 'Backup manifest is missing.');
+  const manifest = z.object({ format: z.literal('shark-backup-v1'), writeWindowStartedAtMs: z.number().int(), artifacts: z.array(z.object({ fileId: z.string(), sha256: z.string() })) }).parse(JSON.parse((await read(last)).toString()));
+  const age = Date.now() - manifest.writeWindowStartedAtMs;
+  if (age < 0 || age >= JOB_LIMITS.backupLifetimeMs) throw new ApiError('APP-DATA-INVALID', 409, 'Backup is outside the supported restore window.');
   const parts = artifacts.slice(0, -1);
   if (manifest.artifacts.length !== parts.length || manifest.artifacts.some((part, index) => part.fileId !== parts[index].fileId || part.sha256 !== parts[index].sha256)) throw new ApiError('APP-DATA-INVALID', 409, 'Backup manifest integrity check failed.');
   const deleted = new Set(options.currentDeletedUids), operationId = randomUUID();
@@ -54,13 +48,14 @@ export async function restoreBackup(options: {
   for (const artifact of parts) {
     const data = JSON.parse((await read(artifact)).toString());
     if (data.kind === 'firestore') for (const document of data.documents) {
-      if (document.path.startsWith('_deletionJournal/')) deleted.add(document.path.split('/')[1]);
+      const [root, id, child] = document.path.split('/');
+      if (!child && id && (root === '_deletionJournal' || root === '_accountLocks')) deleted.add(id);
       if (isCommunityProjectionPath(document.path) && !isManagedCommunityProjection(document.path, importValue(document.data, db) as Record<string, unknown>)) {
         throw new ApiError('APP-DATA-INVALID', 409, 'Unrecognized data in a public projection namespace requires review before restore.');
       }
     }
   }
-  const excluded = new Set(['_accountJobs', '_jobWorkerState', '_jobBudgets', '_serviceState']);
+  const excluded = new Set(['_accountJobs', '_jobWorkerState', '_jobBudgets', '_serviceState', '_accountLocks', '_deletionJournal']);
   const deletedBudgetPaths = new Set([...deleted].flatMap(userBudgetPaths));
   let documents = 0, users = 0;
   for (const artifact of parts) {
@@ -71,14 +66,15 @@ export async function restoreBackup(options: {
         const [collection, id] = item.path.split('/');
         if (isCommunityProjectionPath(item.path)) continue;
         if (excluded.has(collection) || (['users', SERVICE_CONSENT_COLLECTION].includes(collection) && deleted.has(id)) || deletedBudgetPaths.has(item.path)
-          || (collection === '_aiQuota' && [...deleted].some(uid => id === 'user_' + uid))) continue;
+          || (collection === '_aiQuota' && id.startsWith('user_') && deleted.has(id.slice(5)))) continue;
+        const decoded = importValue(item.data, db) as Record<string, unknown>;
         const rule = OWNED_RECORDS.find(source => source.collection === collection);
-        const owner = rule?.field.split('.').reduce<unknown>((value, field) => value && typeof value === 'object' ? (value as Record<string, unknown>)[field] : undefined, item.data);
+        const owner = rule?.field.split('.').reduce<unknown>((value, field) => value && typeof value === 'object' ? (value as Record<string, unknown>)[field] : undefined, decoded);
         if (rule && ['delete', 'job'].includes(rule.action) && typeof owner === 'string' && deleted.has(owner)) continue;
-        if (collection === '_requestReceipts' && typeof item.data.ownerUid !== 'string') continue;
+        if (collection === '_requestReceipts' && typeof decoded.ownerUid !== 'string') continue;
         let path = item.path;
-        if (isCommunityRecordPath(path, 'attempts') && typeof item.data.userId === 'string' && deleted.has(item.data.userId)) path = path.split('/').slice(0, -1).join('/') + '/' + digest(operationId + path);
-        const restored = importValue(scrub(item.data, deleted), db) as Record<string, unknown>;
+        if (isCommunityRecordPath(path, 'attempts') && typeof decoded.userId === 'string' && deleted.has(decoded.userId)) path = path.split('/').slice(0, -1).join('/') + '/' + digest(operationId + path);
+        const restored = collection === 'users' ? decoded : anonymizeContributions(decoded, deleted) as Record<string, unknown>;
         batch.set(db.doc(path), restored); count++;
       }
       if (count) { await batch.commit(); documents += count; }
@@ -98,8 +94,14 @@ export async function restoreBackup(options: {
       }
     } else throw new ApiError('APP-DATA-INVALID', 409, 'Unsupported backup part.');
   }
-  // Fresh minimal tombstones continue protecting the isolated restored dataset.
-  for (const uid of deleted) await db.collection('_deletionJournal').doc(uid).set({ uid, restoredDeletion: true, expiresAt: new Date(Date.now() + 30 * 86_400_000) });
+  // No live deletion job is restored. Give erased accounts the normal completed lock and journal lifetimes.
+  const now = Date.now();
+  for (const uid of deleted) {
+    const batch = db.batch();
+    batch.set(db.collection('_accountLocks').doc(uid), { status: 'deleted', expiresAt: new Date(now + JOB_LIMITS.backupLifetimeMs) });
+    batch.set(db.collection('_deletionJournal').doc(uid), { uid, restoredDeletion: true, expiresAt: new Date(now + JOB_LIMITS.journalLifetimeMs) });
+    await batch.commit();
+  }
   const community = await rebuildRestoredCommunity(db);
   return { documents, users, appliedDeletions: deleted.size, community };
 }

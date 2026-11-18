@@ -71,6 +71,14 @@ afterEach(() => {
 });
 
 describe('focus session resource ownership', () => {
+  it.each([[[-0.1]], [[1.1]], [[0.1, 0.9]]])('rejects an invalid model probability %j before starting the camera', async values => {
+    const h = harness();
+    h.model.predict.mockImplementationOnce(() => tf.tensor1d(values));
+    await h.session.start();
+    expect(h.update).toHaveBeenLastCalledWith({ phase: 'error', error: 'model', score: 0 });
+    expect(h.deps.camera).not.toHaveBeenCalled();
+  });
+
   it.each(['runtime', 'ready', 'load'] as const)('recovers from %s failure without requesting the camera', async stage => {
     const h = harness();
     // A failed loader never transfers ownership of a model to the session.
@@ -256,7 +264,7 @@ describe('focus session resource ownership', () => {
     expect(old.update).toHaveBeenCalledTimes(1);
     expect(old.runtime.loadGraphModel).not.toHaveBeenCalled();
     expect(fresh.model.dispose).not.toHaveBeenCalled();
-    expect(fresh.update).toHaveBeenLastCalledWith({ phase: 'active', score: 0 });
+    expect(fresh.update).toHaveBeenLastCalledWith({ phase: 'active', score: null });
     if (stage === 'layers') old.weight.dispose();
   });
 
@@ -305,6 +313,20 @@ describe('focus session resource ownership', () => {
     expect(h.update).toHaveBeenLastCalledWith({ phase: 'error', error: 'model', score: 0 });
     expect(h.model.dispose).toHaveBeenCalledOnce();
     expect(tf.memory().numTensors).toBe(baseline);
+  });
+
+  it('skips inference while hidden and records a real zero after visibility returns', async () => {
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+    const h = harness();
+    await h.session.start();
+    h.session.attach(h.video);
+    await flush();
+    h.frame(1000);
+    expect(h.model.predict).toHaveBeenCalledTimes(1); // Warmup only.
+    hidden.mockReturnValue(false);
+    h.model.predict.mockImplementationOnce(() => tf.tensor1d([0]));
+    h.frame(2000);
+    expect(h.update).toHaveBeenLastCalledWith({ phase: 'active', score: 0 });
   });
 
   it('waits for metadata, starts one loop and resumes after minimize', async () => {

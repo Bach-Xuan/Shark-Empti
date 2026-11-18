@@ -38,9 +38,12 @@ test('a public receipt recovers and follows real demo status after Auth is absen
     await route.continue();
   });
   try {
+    // Seed the receipt before the first mount, so a discarded page cannot
+    // consume the injected failure before the assertion observes recovery.
+    await page.addInitScript(({ key, value }) => {
+      if (location.pathname === '/account/status' && !localStorage.getItem(key)) localStorage.setItem(key, JSON.stringify(value));
+    }, { key: RECEIPT_STORAGE_KEY, value: { id, receipt: credential } });
     await page.goto('/account/status');
-    await page.evaluate(({ key, value }) => localStorage.setItem(key, JSON.stringify(value)), { key: RECEIPT_STORAGE_KEY, value: { id, receipt: credential } });
-    await page.reload();
     await expect(page.getByText(jobMessages.en.recovering, { exact: true })).toBeVisible();
     await expect(page.getByText(jobMessages.en.status.running, { exact: true })).toBeVisible();
     await record.update({ status: 'completed', ownerUid: FieldValue.delete() });

@@ -37,7 +37,7 @@ export async function createAccountJob(uid: string, kind: 'export' | 'deletion',
     if (kind === 'deletion') {
       transaction.create(db.collection('_accountLocks').doc(uid), { status: 'deleting', jobId: id, createdAtMs: now });
       // Journal survives job completion so a later restore cannot resurrect this UID.
-      transaction.set(db.collection('_deletionJournal').doc(uid), { uid, jobId: id, createdAtMs: now, expiresAt: new Date(now + JOB_LIMITS.journalLifetimeMs) });
+      transaction.set(db.collection('_deletionJournal').doc(uid), { uid, jobId: id, createdAtMs: now });
     }
     return record;
   });
@@ -94,7 +94,7 @@ export async function finishStep(id: string, job: JobRecord, result: StepResult,
     if (completed && job.kind === 'backup') transaction.update(maintenance, { active: false, jobId: FieldValue.delete() });
     if (completed && job.kind === 'deletion') {
       transaction.set(db.collection('_accountLocks').doc(job.ownerUid!), { status: 'deleted', expiresAt: new Date(now + JOB_LIMITS.backupLifetimeMs) });
-      transaction.update(db.collection('_deletionJournal').doc(job.ownerUid!), { expiresAt: new Date(now + JOB_LIMITS.journalLifetimeMs) });
+      transaction.set(db.collection('_deletionJournal').doc(job.ownerUid!), { uid: job.ownerUid!, jobId: id, expiresAt: new Date(now + JOB_LIMITS.journalLifetimeMs) }, { merge: true });
     }
   });
 }

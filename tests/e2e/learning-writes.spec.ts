@@ -1,16 +1,14 @@
 import { expect, test } from './fixtures';
-import { signInDemo } from './auth';
+import { signInDemoUid } from './auth';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { uiMessage } from '../../src/lib/i18n';
 
 test('bounded biography writes preserve creation time, server coins and unrelated legacy fields', async ({ page }) => {
   const db = getFirestore(getApps()[0] ?? initializeApp({ projectId: 'demo-shark-empti' }));
-  const before = new Set((await db.collection('users').get()).docs.map(row => row.id));
-  await signInDemo(page);
-  const owners = (await db.collection('users').get()).docs.filter(row => !before.has(row.id));
-  expect(owners).toHaveLength(1);
-  const ref = owners[0].ref, createdAt = owners[0].get('createdAt');
+  const uid = await signInDemoUid(page);
+  const ref = db.collection('users').doc(uid);
+  const createdAt = (await ref.get()).get('createdAt');
   await ref.update({ sharkCoins: 25, preservedLegacy: { private: 'Retain' } });
   await page.goto('/profile');
   const biography = page.getByPlaceholder(uiMessage('en', 'profile.tell_shark_guru_about_yourself'));

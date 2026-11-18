@@ -14,15 +14,17 @@ if (!args.includes('--apply') || !args.includes('--confirm-isolated-empty-target
 const source = getAdminDb(), job = readJob((await source.collection('_accountJobs').doc(id).get()).data());
 if (job.kind !== 'backup' || job.status !== 'completed' || job.expiresAtMs <= Date.now()) throw new Error('A completed, unexpired backup is required.');
 const deleted = new Set<string>();
-let after: string | undefined;
-for (let page = 0; page < 50; page++) {
-  let query = source.collection('_deletionJournal').orderBy(FieldPath.documentId()).limit(100);
-  if (after) query = query.startAfter(after);
-  const result = await query.get(); result.docs.forEach(document => deleted.add(document.id));
-  if (result.size < 100) { after = undefined; break; }
-  after = result.docs.at(-1)!.id;
+for (const collection of ['_deletionJournal', '_accountLocks']) {
+  let after: string | undefined;
+  for (let page = 0; page < 50; page++) {
+    let query = source.collection(collection).orderBy(FieldPath.documentId()).limit(100);
+    if (after) query = query.startAfter(after);
+    const result = await query.get(); result.docs.forEach(document => deleted.add(document.id));
+    if (result.size < 100) { after = undefined; break; }
+    after = result.docs.at(-1)!.id;
+  }
+  if (after) throw new Error('Deletion history exceeds the bounded restore inventory.');
 }
-if (after) throw new Error('Deletion journal exceeds the bounded restore inventory.');
 const app = initializeApp({ projectId: target, credential: cert({ projectId: target, clientEmail: process.env.RESTORE_ADMIN_CLIENT_EMAIL,
   privateKey: process.env.RESTORE_ADMIN_PRIVATE_KEY?.replace(/\\n/g, '\n') }) }, 'isolated-restore-' + Date.now());
 try {

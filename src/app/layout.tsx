@@ -6,6 +6,7 @@ import { cookies } from 'next/headers';
 import { DEFAULT_PREFERENCES, PREFERENCE_COOKIE, parsePreferences } from '@/lib/preferences';
 import { siteOrigin, indexPublicPages } from '@/lib/site-metadata';
 import type { Metadata } from 'next';
+import './fonts.css';
 import './globals.css';
 
 

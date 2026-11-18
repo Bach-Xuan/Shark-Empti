@@ -1,11 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { getAdminAuth, getAdminDb } from '@/lib/firebase-admin';
+import { cancelGeneration, claimGeneration, createGeneration, finalizeGeneration } from '@/ai/generation-store';
+import { seedServiceConsent } from '../fixtures/service-consent';
 import { createAccountJob, claimJob, finishStep } from '@/lib/jobs/store';
 import { runJob, maintenanceSweep } from '@/lib/jobs/worker';
 import { PrivateJobStorage } from '@/lib/jobs/storage';
 import { readJob, type Artifact } from '@/lib/jobs/types';
 import { OWNED_RECORDS } from '@/lib/jobs/catalog';
+import { JOB_LIMITS } from '@/lib/jobs/config';
 import { digest } from '@/lib/jobs/crypto';
 import { enqueueJob } from '@/lib/jobs/queue';
 import { exportStep, deletionStep } from '@/lib/jobs/account-worker';
@@ -164,7 +167,7 @@ it('locks writes, removes private/Auth records and reactions, and anonymizes ret
   await db.doc('arenaExams/exam/attempts/old-linked-id').set({ userId: uid, userName: 'Learner', score: 80 });
   await db.doc('arenaExams/owned').set({ authorId: uid, authorName: 'Learner', authorPhoto: '' });
   await db.doc('_arenaAnswerKeys/owned').set({ authorId: uid, questions: [], schemaVersion: 2 });
-  await db.doc('_moderationArchives/foreign').set({ constructor: 'legacy', snapshot: { authorId: 'other' }, hiddenBy: uid, comments: [{ authorId: uid, authorName: 'Learner', authorPhoto: '' }] });
+  await db.doc('_moderationArchives/foreign').set({ constructor: 'legacy', snapshot: { authorId: 'other', likedBy: ['other'], likesCount: 9 }, hiddenBy: uid, comments: [{ authorId: uid, authorName: 'Learner', authorPhoto: '' }], ranking: { userId: uid, userName: 'Learner', userPhoto: 'old-avatar' } });
   await db.doc('_accountRequests/old').set({ uid, kind: 'deletion', status: 'pending_operator' });
   const created = await createAccountJob(uid, 'deletion', randomUUID());
   expect((await db.doc('_accountLocks/' + uid).get()).get('status')).toBe('deleting');
@@ -180,6 +183,9 @@ it('locks writes, removes private/Auth records and reactions, and anonymizes ret
   expect((await db.doc('forumPosts/own').get()).data()).toMatchObject({ authorId: '__deleted__', authorName: 'Former member', likesCount: 1, privacyVersion: 1 });
   expect((await db.doc('forumPosts/own').get()).get('likedBy')).toBeUndefined();
   expect(JSON.stringify((await db.doc('_moderationArchives/foreign').get()).data())).not.toContain(uid);
+  expect((await db.doc('_moderationArchives/foreign').get()).data()).toMatchObject({
+    snapshot: { likedBy: ['other'], likesCount: 9 }, ranking: { userId: '__deleted__', userName: 'Former member', userPhoto: '' },
+  });
   expect((await db.collection('arenaExams/exam/attempts').where('userId', '==', uid).get()).empty).toBe(true);
   expect((await db.doc('users/foreign/comments/private').get()).data()).toEqual(foreignComment);
   expect((await db.doc('users/foreign/attempts/private').get()).data()).toEqual(foreignAttempt);
@@ -190,6 +196,65 @@ it('locks writes, removes private/Auth records and reactions, and anonymizes ret
   expect(await status.json()).toMatchObject({ id: created.id, kind: 'deletion', status: 'completed' });
   expect((await db.doc('_accountLocks/' + uid).get()).get('status')).toBe('deleted');
   expect((await db.doc('_arenaAnswerKeys/owned').get()).data()).toEqual({ authorId: '__deleted__', questions: [], schemaVersion: 2 });
+});
+it('erases ready and in-flight AI work under the deletion lease while preserving another owner’s running attempt', async () => {
+  const db = getAdminDb(), other = 'other-learner';
+  await seedServiceConsent(uid, other);
+  const ready = randomUUID(), running = randomUUID(), foreign = randomUUID();
+  for (const [id, owner] of [[ready, uid], [running, uid], [foreign, other]]) {
+    await createGeneration(id, owner, 'academic-validation', { topic: 'Algebra', language: 'en' });
+  }
+  const attempt = await claimGeneration(running, uid);
+  expect(attempt.kind).toBe('claimed');
+  expect((await claimGeneration(foreign, other)).kind).toBe('claimed');
+  const created = await createAccountJob(uid, 'deletion', randomUUID());
+  await expect(cancelGeneration(ready, uid)).rejects.toMatchObject({ code: 'ACCOUNT-DELETING' });
+  const job = (await claimJob(created.id))!;
+  await expect(deletionStep(created.id, { ...job, lease: { ...job.lease!, id: 'obsolete' } })).rejects.toMatchObject({ code: 'ACCOUNT-JOB-LEASE' });
+  const lock = db.doc('_accountLocks/' + uid);
+  await lock.update({ jobId: 'different-job' });
+  await expect(deletionStep(created.id, job)).rejects.toMatchObject({ code: 'ACCOUNT-DELETING' });
+  await lock.update({ jobId: created.id });
+  expect((await db.doc('_aiGenerations/' + running).get()).get('status')).toBe('running');
+  const progress = await deletionStep(created.id, job);
+  expect(progress).toEqual({ cursor: { phase: 1 }, processed: 2 });
+  expect(await deletionStep(created.id, job)).toEqual({ cursor: progress.cursor, processed: 0 });
+  for (const id of [ready, running]) expect((await db.doc('_aiGenerations/' + id).get()).exists).toBe(false);
+  expect((await db.doc('_aiQuota/user_' + uid).get()).get('active')).toEqual([]);
+  expect((await db.doc('_aiQuota/global').get()).get('active').map((slot: { generationId: string }) => slot.generationId)).toEqual([foreign]);
+  expect((await db.doc('_aiGenerations/' + foreign).get()).get('status')).toBe('running');
+  if (attempt.kind === 'claimed') await expect(finalizeGeneration(running, uid, attempt.leaseId, attempt.attempt, 10, { data: {} })).rejects.toMatchObject({ status: 404 });
+  await finishStep(created.id, job, progress);
+  expect((await complete(created.id)).status).toBe('completed');
+});
+it('continues an AI deletion page after its cursor document is erased and resumes the legacy owner phase', async () => {
+  const db = getAdminDb(), generations = db.collection('_aiGenerations');
+  const ids = Array.from({ length: JOB_LIMITS.pageSize + 2 }, (_, index) => 'ai-' + String(index).padStart(3, '0'));
+  const batch = db.batch();
+  for (const id of ids) batch.set(generations.doc(id), { ownerUid: uid, status: 'ready', expiresAt: new Date(0) });
+  await batch.commit();
+  const created = await createAccountJob(uid, 'deletion', randomUUID());
+  const first = (await claimJob(created.id))!;
+  const page = await deletionStep(created.id, first);
+  const boundary = generations.doc(ids[JOB_LIMITS.pageSize - 1]);
+  expect(page).toEqual({ cursor: { phase: 0, after: boundary.path }, processed: JOB_LIMITS.pageSize });
+  expect((await boundary.get()).exists).toBe(false);
+  await finishStep(created.id, first, page);
+  const second = (await claimJob(created.id))!;
+  const last = await deletionStep(created.id, second);
+  expect(last).toEqual({ cursor: { phase: 1 }, processed: 2 });
+  await finishStep(created.id, second, last);
+  expect((await generations.where('ownerUid', '==', uid).get()).empty).toBe(true);
+
+  // Older workers requested cancellation in phase zero and left the record for this checkpoint.
+  await generations.doc('legacy-running').set({ ownerUid: uid, status: 'cancel_requested' });
+  await db.doc('_aiQuota/global').set({ active: [{ generationId: 'legacy-running', expiresAtMs: Date.now() + 40_000 }] });
+  const ownerPhase = 2 + OWNED_RECORDS.findIndex(source => source.collection === '_aiGenerations');
+  await db.doc('_accountJobs/' + created.id).update({ cursor: { phase: ownerPhase } });
+  const resumed = (await claimJob(created.id))!;
+  await finishStep(created.id, resumed, await deletionStep(created.id, resumed));
+  expect((await generations.doc('legacy-running').get()).exists).toBe(false);
+  expect((await db.doc('_aiQuota/global').get()).get('active')).toEqual([]);
 });
 it('fences duplicate/expired leases and reports quota waiting without losing the cursor', async () => {
   const { id } = await createAccountJob(uid, 'export', randomUUID());
@@ -294,14 +359,54 @@ it('exposes provider quota waiting while retaining the durable cursor', async ()
   const job = readJob((await getAdminDb().doc('_accountJobs/' + id).get()).data());
   expect(job.status).toBe('waiting_quota'); expect(job.cursor.phase).toBe(0);
 });
+it('grants one worker lease under contention and leaves each waiting checkpoint intact', async () => {
+  const ids = [];
+  for (let index = 0; index < 4; index++) {
+    const { id } = await createAccountJob('lease-fixture-' + index, 'export', randomUUID());
+    ids.push(id);
+  }
+  const start = performance.now();
+  const claims = await Promise.all(ids.map(id => claimJob(id)));
+  const winners = claims.flatMap((claim, index) => claim ? [index] : []);
+  expect(winners).toHaveLength(1);
+  const winner = winners[0];
+  const snapshots = await getAdminDb().getAll(...ids.map(id => getAdminDb().doc('_accountJobs/' + id)));
+  snapshots.forEach((doc, index) => {
+    expect(doc.get('status')).toBe(index === winner ? 'running' : 'queued');
+    expect(doc.get('processed')).toBe(0);
+    expect(doc.get('cursor')).toEqual({ phase: 0 });
+  });
+  const lease = await getAdminDb().doc('_jobWorkerState/lease').get();
+  expect(lease.get('jobId')).toBe(ids[winner]);
+  console.info(JSON.stringify({ fixture: 'four-worker-claims', milliseconds: Math.round(performance.now() - start), granted: winners.length }));
+});
+
+it('retains an unfinished deletion journal past the normal retention window', async () => {
+  const db = getAdminDb();
+  await createAccountJob(uid, 'deletion', randomUUID());
+  const ref = db.doc('_deletionJournal/' + uid);
+  expect((await ref.get()).get('expiresAt')).toBeUndefined();
+  // A legacy record with an expiry still has its active deletion lock.
+  await ref.update({ expiresAt: Timestamp.fromMillis(1) });
+  await maintenanceSweep();
+  expect((await ref.get()).exists).toBe(true);
+  expect((await db.doc('_accountLocks/' + uid).get()).get('status')).toBe('deleting');
+});
+
 it('restores encrypted Firestore/Auth parts into an empty isolated target and applies a newer deletion journal', async () => {
   const db = getAdminDb(), removedUid = 'removed-after-backup';
   await db.doc('_serviceConsents/' + uid).set({ policyVersion: '2', minimumAge: 16, acceptedAt: Timestamp.fromMillis(1) });
+  await db.doc('_accountLocks/legacy-stalled').set({ status: 'deleting', jobId: 'older-job' });
+  await db.doc('users/legacy-stalled/notes/one').set({ text: 'Protected by legacy lock alone' });
+  await db.doc('_aiGenerations/erased-owner').set({ $type: 'retained legacy field', ownerUid: removedUid });
   await db.doc('_serviceConsents/' + removedUid).set({ policyVersion: '2', minimumAge: 16, acceptedAt: Timestamp.fromMillis(1) });
   await getAdminAuth().createUser({ uid: removedUid, displayName: 'Removed later' });
   await db.doc('users/' + removedUid + '/notes/one').set({ text: 'Must not resurrect' });
   await db.doc('users/' + uid + '/notes/missing/deep/one').set({ text: 'Restore an owned orphan' });
-  const retained = { constructor: 'legacy', title: 'Retained post', content: 'Body', subject: 'math', commentsCount: 0, createdAt: Timestamp.now(), authorId: removedUid, authorName: 'Removed later', authorPhoto: '', likedBy: [removedUid, uid], likesCount: 2 };
+  const privateCopy = { authorId: removedUid, authorName: 'Original attribution', likedBy: [uid], likesCount: 9 };
+  await db.doc('users/' + uid + '/comments/private').set(privateCopy);
+  await db.doc('_arenaAnswerKeys/retained').set({ schemaVersion: 2, authorId: removedUid, questions: [] });
+  const retained = { $type: 'legacy-map', constructor: 'legacy', title: 'Retained post', content: 'Body', subject: 'math', commentsCount: 0, createdAt: Timestamp.now(), authorId: removedUid, authorName: 'Removed later', authorPhoto: '', likedBy: [removedUid, uid], likesCount: 2 };
   await db.doc('posts/retained').set(retained);
   await db.doc('forumPosts/retained').set(projectForumMetadata(retained, 'post')!);
   await getAdminAuth().setCustomUserClaims(uid, { moderator: true });
@@ -313,8 +418,28 @@ it('restores encrypted Firestore/Auth parts into an empty isolated target and ap
   const targetId = 'demo-restore-' + randomUUID().slice(0, 8), app = initializeApp({ projectId: targetId }, targetId);
   try {
     const targetDb = getFirestore(app), targetAuth = getAuth(app), storage = new PrivateJobStorage();
+    const manifestFile = job.artifacts.at(-1)!;
+    const manifest = JSON.parse((await storage.get(manifestFile)).toString());
+    for (const started of [0, Date.now() + 86_400_000]) {
+      await expect(restoreBackup({ db: targetDb, auth: targetAuth, artifacts: job.artifacts,
+        read: async artifact => artifact.fileId === manifestFile.fileId
+          ? Buffer.from(JSON.stringify({ ...manifest, writeWindowStartedAtMs: started })) : storage.get(artifact),
+        currentDeletedUids: new Set([removedUid]) })).rejects.toMatchObject({ code: 'APP-DATA-INVALID' });
+      expect(await targetDb.listCollections()).toHaveLength(0);
+    }
     const result = await restoreBackup({ db: targetDb, auth: targetAuth, artifacts: job.artifacts, read: artifact => storage.get(artifact), currentDeletedUids: new Set([removedUid]) });
-    expect(result.appliedDeletions).toBe(1);
+    expect(result.appliedDeletions).toBe(2);
+    for (const deletedUid of ['legacy-stalled', removedUid]) {
+      const lock = (await targetDb.doc('_accountLocks/' + deletedUid).get()).data();
+      expect(lock).toEqual({ status: 'deleted', expiresAt: expect.any(Timestamp) });
+      expect(lock!.expiresAt.toMillis()).toBeGreaterThan(Date.now());
+      const journal = (await targetDb.doc('_deletionJournal/' + deletedUid).get()).data();
+      expect(journal!.expiresAt.toMillis()).toBeGreaterThan(lock!.expiresAt.toMillis());
+    }
+    expect((await targetDb.doc('_arenaAnswerKeys/retained').get()).data()).toEqual({ schemaVersion: 2, authorId: '__deleted__', questions: [] });
+    expect((await targetDb.doc('users/' + uid + '/comments/private').get()).data()).toEqual(privateCopy);
+    expect((await targetDb.doc('users/legacy-stalled/notes/one').get()).exists).toBe(false);
+    expect((await targetDb.doc('_aiGenerations/erased-owner').get()).exists).toBe(false);
     expect(result.community.blocked).toBe(0);
     expect((await targetDb.doc('forumPosts/retained').get()).data()).toMatchObject({ authorId: '__deleted__', authorName: 'Former member', likesCount: 1, privacyVersion: 1 });
     expect((await targetDb.doc('forumPosts/retained').get()).get('likedBy')).toBeUndefined();

@@ -1,5 +1,5 @@
 import { expect, test } from './fixtures';
-import { signInDemo } from './auth';
+import { signInDemoUid } from './auth';
 import { getApps, initializeApp } from 'firebase-admin/app';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 import { translations } from '../../src/lib/translations';
@@ -10,11 +10,7 @@ for (const mode of ['flashcards', 'practice'] as const) {
   test(`${mode} restores progress without another generation or archive`, async ({ page }) => {
     test.setTimeout(180000);
     const db = getFirestore(getApps()[0] ?? initializeApp({ projectId: 'demo-shark-empti' }));
-    const ownersBefore = new Set((await db.collection('users').get()).docs.map(document => document.id));
-    await signInDemo(page);
-    const owners = (await db.collection('users').get()).docs.filter(document => !ownersBefore.has(document.id));
-    expect(owners).toHaveLength(1);
-    const uid = owners[0].id;
+    const uid = await signInDemoUid(page);
     await db.doc(`users/${uid}/history/recovery-source`).set({
       ...history, date: Timestamp.fromMillis(history.date), userId: uid, schemaVersion: 2,
       quizResults: [{ ...history.quizResults[0], userAnswer: '3', isCorrect: false }],

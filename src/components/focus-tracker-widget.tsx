@@ -1,6 +1,6 @@
 "use client";
 import { learningNotices } from '@/lib/i18n/learning-notices';
-import { useLanguageState } from '@/components/app-preferences';
+import { useHydrated, useLanguageState } from '@/components/app-preferences';
 import { UiText } from "@/components/ui-text";
 import { uiMessage } from '@/lib/i18n';
 
@@ -43,6 +43,7 @@ export default function FocusTrackerWidget() {
     pathname === "/register";
 
   const [lang] = useLanguageState();
+  const hydrated = useHydrated();
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [showPreview, setShowPreview] = useState(true);
@@ -51,8 +52,8 @@ export default function FocusTrackerWidget() {
   const sessionRef = useRef<FocusTrackerSession | null>(null);
   const isActive = state.phase === 'active';
   const isModelLoading = state.phase === 'starting';
-  const focusScore = state.score;
-  const status = focusScore > 65 ? 'focused' : focusScore > 15 ? 'unfocused' : 'no-person';
+  const focusScore = isActive ? state.score : null;
+  const status = focusScore === null ? 'pending' : focusScore > 65 ? 'focused' : 'unfocused';
   const copy = focusRecoveryCopy[lang];
   const modelError = state.error ? copy[state.error] : null;
   const t: TranslationSet = translations[lang];
@@ -106,7 +107,7 @@ export default function FocusTrackerWidget() {
         : "bottom-24 right-4 md:bottom-32 md:right-6 items-end"
     )}>
       {isOpen && !isMinimized && (
-        <Card className="card-duo w-[300px] md:w-[350px] max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-14rem)] overflow-y-auto animate-in slide-in-from-bottom-8 duration-500 pointer-events-auto border-[3px] shadow-2xl bg-card mb-2">
+        <Card className="card-duo w-[300px] md:w-[350px] max-w-[calc(100vw-2rem)] focus-panel overflow-y-auto animate-in slide-in-from-bottom-8 duration-500 pointer-events-auto border-[3px] shadow-2xl bg-card mb-2">
           <div className="bg-primary p-4 flex items-center justify-between text-primary-foreground border-b-4 border-black/10">
             <div className="flex items-center gap-2">
               <Zap className="w-5 h-5 fill-current animate-pulse" />
@@ -164,7 +165,7 @@ export default function FocusTrackerWidget() {
                   <UserCheck className="w-4 h-4" />
                   <span className="text-[8px] font-black uppercase tracking-widest">{t.focusedStatus}</span>
                 </div>
-                <div className={cn("p-3 rounded-xl border-2 flex flex-col gap-1 transition-all", status !== 'focused' && isActive ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-muted border-border opacity-50")}>
+                <div className={cn("p-3 rounded-xl border-2 flex flex-col gap-1 transition-all", status === 'unfocused' ? "bg-amber-50 border-amber-200 text-amber-700" : "bg-muted border-border opacity-50")}>
                   <UserX className="w-4 h-4" />
                   <span className="text-[8px] font-black uppercase tracking-widest">{t.distractedStatus}</span>
                 </div>
@@ -172,10 +173,10 @@ export default function FocusTrackerWidget() {
 
               <div className="space-y-2">
                 <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                  <span><UiText id="focusIndex" /></span>
-                  <span className="text-primary">{focusScore}%</span>
+                  <span id="focus-index-label"><UiText id="focusIndex" /></span>
+                  <span className="text-primary">{focusScore === null ? '—' : focusScore + '%'}</span>
                 </div>
-                <Progress value={focusScore} className="h-3 border-2" />
+                <Progress aria-labelledby="focus-index-label" value={focusScore} className="h-3 border-2" />
               </div>
             </div>
 
@@ -190,13 +191,14 @@ export default function FocusTrackerWidget() {
       {(!isOpen || isMinimized) && (
         <Button
           aria-label={t.focusShield}
+          disabled={!hydrated}
           onClick={() => {
             setIsOpen(true);
             setIsMinimized(false);
           }}
           className={cn(
             "h-14 w-14 md:h-20 md:w-20 rounded-2xl md:rounded-[2rem] shadow-duo btn-duo pointer-events-auto transition-all bg-card border-[3px] border-border group",
-            isActive && status === 'focused' ? "border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]" : isActive ? "border-amber-500" : ""
+            isActive && status === 'focused' ? "border-green-500 shadow-[0_0_20px_rgba(34,197,94,0.4)]" : status === 'unfocused' ? "border-amber-500" : ""
           )}
         >
           <div className="relative">
@@ -205,7 +207,7 @@ export default function FocusTrackerWidget() {
             ) : (
               <ScanEye className={cn("w-7 h-7 md:w-10 md:h-10 text-primary transition-transform group-hover:scale-110", isActive && "animate-pulse")} />
             )}
-            {isActive && !modelError && (
+            {focusScore !== null && !modelError && (
               <div className={cn("absolute -top-1 -right-1 w-3 h-3 md:w-4 md:h-4 rounded-full border-2 border-white", status === 'focused' ? "bg-green-500" : "bg-amber-500")} />
             )}
           </div>

@@ -10,9 +10,10 @@ test('responsive utilities and named keyboard controls work in both themes and l
       await page.evaluate(({ lang, theme }) => {
         localStorage.setItem('shark_lang', lang); localStorage.setItem('shark_theme', theme);
         window.dispatchEvent(new StorageEvent('storage', { key: 'shark_lang', newValue: lang }));
-      window.dispatchEvent(new StorageEvent('storage', { key: 'shark_theme', newValue: theme }));
+        window.dispatchEvent(new StorageEvent('storage', { key: 'shark_theme', newValue: theme }));
       }, { lang, theme });
       await expect(page.locator('html')).toHaveAttribute('lang', lang);
+      await expect.poll(() => page.locator('html').evaluate(el => el.classList.contains('dark'))).toBe(theme === 'dark');
       const language = page.getByRole('button', { name: lang === 'en' ? 'Language' : 'Ngôn ngữ', exact: true });
       const toggle = page.getByRole('button', { name: lang === 'en' ? 'Toggle theme' : 'Đổi giao diện sáng tối', exact: true });
       for (const width of [320, 390, 640, 768, 1280]) {
