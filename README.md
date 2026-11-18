@@ -56,7 +56,7 @@ Install browser engines with `npx --no-install playwright install chromium webki
 ## 📚 Documentation
 
 - [Configuration](docs/CONFIGURATION.md): environment, Firebase, OpenRouter, timestamp migration, deployment and troubleshooting.
-- [Interface design](docs/design.md) covers navigation, interaction states, accessibility, responsive layout and print.
+- [Interface design](docs/DESIGN.md) covers navigation, interaction states, accessibility, responsive layout and print.
 - [Technical documentation](docs/TECHNICAL_DOCUMENTATION.md): architecture, data ownership and security contracts.
 - [Backend data map](docs/backend.json): descriptive entities, storage paths and interfaces; executable code, schemas and Rules remain authoritative.
 - [Audit register](docs/AUDIT_REPORT.md): finding statuses and unresolved verification boundaries.

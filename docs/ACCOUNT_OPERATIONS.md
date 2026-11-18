@@ -1,6 +1,6 @@
 # 🔐 Account Jobs and Spark Operations · Shark Empti v2.0.0 **β**
 
-Export/deletion and backup require `ACCOUNT_JOBS_ENABLED=true` and valid server settings; local tests do not establish operational readiness. See [configuration](CONFIGURATION.md) and [validation](VALIDATION.md). The [interface design guide](design.md) covers learner-facing states and interactions.
+Export/deletion and backup require `ACCOUNT_JOBS_ENABLED=true` and valid server settings; local tests do not establish operational readiness. See [configuration](CONFIGURATION.md) and [validation](VALIDATION.md). The [interface design guide](DESIGN.md) covers learner-facing states and interactions.
 
 ## Provision separate environments
 

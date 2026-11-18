@@ -4,7 +4,7 @@
   "x-authority": {
     "description": "Actual contracts: Firestore Rules, AI/API Zod schemas, history/profile readers and server-api.ts. Updating this file changes no validation, migration or access policy.",
     "documentation": "TECHNICAL_DOCUMENTATION.md",
-    "design": "design.md",
+    "design": "DESIGN.md",
     "configuration": "CONFIGURATION.md",
     "audit": "AUDIT_REPORT.md",
     "validation": "VALIDATION.md"

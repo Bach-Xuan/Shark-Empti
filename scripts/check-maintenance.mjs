@@ -88,25 +88,25 @@ for (const file of docs) {
   }
 }
 
-// Finding summaries and detailed evidence must remain navigable as the register grows.
+// Keep each finding in exactly one status table and reconcile the published totals.
 const audit = fs.readFileSync(path.join(root, 'docs/AUDIT_REPORT.md'), 'utf8');
-const summaryIds = [...audit.matchAll(/^\| ([MFDSNPV]\d+) \|/gm)].map(match => match[1]);
-const detailIds = [...audit.matchAll(/^### ([MFDSNPV]\d+) - /gm)].map(match => match[1]);
-if (!summaryIds.length || new Set(summaryIds).size !== summaryIds.length ||
-    new Set(detailIds).size !== detailIds.length || summaryIds.sort().join() !== detailIds.sort().join()) {
-  problems.push('Audit summary rows and detailed finding IDs must agree and be unique.');
-}
-const dispositions = new Map([...audit.matchAll(/^\| ([MFDSNPV]\d+) \| [^|\n]+ \| ([^|\n]+) \|/gm)]
-  .map(([, id, status]) => [id, status.split(' · ')[0].trim()]));
-for (const [, id, status] of audit.matchAll(/^### ([MFDSNPV]\d+) - [^\n]+\r?\n\s*\*\*Status:\*\* ([^\r\n]+)/gm)) {
-  if (status.split(' · ')[0].replace(/\.$/, '').trim() !== dispositions.get(id)) problems.push('Audit status mismatch: ' + id);
-  dispositions.delete(id);
-}
-for (const id of dispositions.keys()) problems.push('Missing detailed audit status: ' + id);
-for (const [, sources] of audit.matchAll(/^\*\*Implementation and verification sources:\*\* (.+)$/gm)) {
-  for (const [, source] of sources.matchAll(/`([^`]+)`/g)) {
-    if (!fs.existsSync(path.join(root, source))) problems.push('Missing audit evidence path: ' + source);
+const findingIds = new Set();
+const counts = { Open: 0, Resolved: 0 };
+let sectionStatus;
+for (const line of audit.split(/\r?\n/)) {
+  if (line.startsWith('## ')) {
+    sectionStatus = line.endsWith('Unresolved Findings') ? 'Open' : line.endsWith('Resolved Findings') ? 'Resolved' : undefined;
   }
+  if (!/^\| [MFDSNPV]\d+ \|/.test(line)) continue;
+  const [, id, title, status, date] = line.split('|').map(cell => cell.trim());
+  if (findingIds.has(id) || !title || !date || status !== sectionStatus || !Object.hasOwn(counts, status)) {
+    problems.push('Invalid or duplicate audit finding: ' + id);
+  } else counts[status]++;
+  findingIds.add(id);
+}
+const totals = audit.match(/\*\*(\d+) findings\*\*.*?\*\*(\d+) are resolved and (\d+) remain open\.\*\*/);
+if (!totals || Number(totals[1]) !== findingIds.size || Number(totals[2]) !== counts.Resolved || Number(totals[3]) !== counts.Open) {
+  problems.push('Audit totals must agree with the finding tables.');
 }
 
 const directories = [...new Set([...Object.values(CLEANUP_TARGETS).flat(), 'reports', '.tools', 'tmp', 'out', 'build', 'dist', 'playwright/.cache', '.firebase', 'emulator-data'])];

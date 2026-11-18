@@ -1,6 +1,6 @@
 # ⚙️ Configuration, Dependencies and Troubleshooting · Shark Empti v2.0.0 **β**
 
-This guide configures the application and its release environment. See [README](../README.md), [architecture](TECHNICAL_DOCUMENTATION.md), [validation](VALIDATION.md), [account operations](ACCOUNT_OPERATIONS.md), the [data map](backend.json) and [audit register](AUDIT_REPORT.md). Runtime behavior is determined by source, Rules and configuration, not this guide alone. The [interface design guide](design.md) covers learner-facing states and interactions.
+This guide configures the application and its release environment. See [README](../README.md), [architecture](TECHNICAL_DOCUMENTATION.md), [validation](VALIDATION.md), [account operations](ACCOUNT_OPERATIONS.md), the [data map](backend.json) and [audit register](AUDIT_REPORT.md). Runtime behavior is determined by source, Rules and configuration, not this guide alone. The [interface design guide](DESIGN.md) covers learner-facing states and interactions.
 
 ## 🧰 Runtime and dependencies
 
@@ -12,7 +12,7 @@ npx --no-install playwright install chromium firefox webkit
 
 Use [validation](VALIDATION.md) to select tests and interpret results. Package versions and peer requirements belong to the manifest/lockfile. Dependency assessment queries npm and applies `config/dependency-audit-policy.json`; maintenance checks declarations/lock agreement but does not assess advisories.
 
-The Firebase CLI is pinned to `15.36.0`. Its Pub/Sub dependency, the legacy gaxios UUID dependency, glob and the TypeScript parser’s minimatch use reviewed overrides. Recheck their consumer interfaces when changing parent versions. Keep the npm lockfile and use its installed CLI for Emulators; do not restore the removed get-uri/basic-ftp override. The separate Firestore/gRPC override remains intentional. Compatible-parent upgrades and unresolved advisory paths are recorded in the [audit register](AUDIT_REPORT.md#v04-dependency-risk-assessment-is-not-current).
+The Firebase CLI is pinned to `15.36.0`. Its Pub/Sub dependency, the legacy gaxios UUID dependency, glob and the TypeScript parser’s minimatch use reviewed overrides. Recheck their consumer interfaces when changing parent versions. Keep the npm lockfile and use its installed CLI for Emulators; do not restore the removed get-uri/basic-ftp override. The separate Firestore/gRPC override remains intentional. The [audit register](AUDIT_REPORT.md) tracks the remaining dependency findings D32 and V04.
 
 Tailwind CSS 3.4 and Autoprefixer compile the stylesheet for the Browserslist targets in `package.json`. The installed browser dataset resolves the Android queries to its latest mobile entries. The desktop queries also select Chrome 100 and Firefox 102, and the historical engine suite exercises mobile user agents and touch input at those floors. Keep a conventional viewport-height fallback before dynamic units. Review generated CSS and run the minimum-engine tests after changes to Next.js, React, Firebase or the CSS toolchain. Next.js documents a newer browser baseline, so this project owns validation at its lower floors. [Next.js browser support](https://nextjs.org/docs/architecture/supported-browsers) · [Tailwind compatibility guidance](https://tailwindcss.com/docs/upgrade-guide#browser-requirements)
 
