@@ -122,11 +122,17 @@ test('Forum comment and Arena submission use real demo APIs', async ({ page, fau
   expect(attempts.docs[0].get('duration')).toBeGreaterThanOrEqual(1);
 });
 for (const language of ['en', 'vi']) {
-  test(`auth pages retain ${language} across navigation without loading TensorFlow`, async ({ page }) => {
+  test(`auth pages retain ${language} across navigation without loading Firestore or TensorFlow`, async ({ page }) => {
     await page.addInitScript(lang => localStorage.setItem('shark_lang', lang), language);
     const requested: string[] = [];
     page.on('request', request => requested.push(request.url()));
-    await page.goto('/login');
+    const login = await page.goto('/login');
+    if (!login?.ok()) throw new Error('Login did not return the guest form.');
+    const ageStartsDisabled = await page.evaluate(html => {
+      const form = new DOMParser().parseFromString(html, 'text/html');
+      return form.querySelector<HTMLInputElement>('input[type="checkbox"]')?.disabled;
+    }, await login.text());
+    expect(ageStartsDisabled).toBe(true);
     await expect(page.locator('html')).toHaveAttribute('lang', language);
     await expect(page.getByRole('button', { name: /Google/i })).toBeVisible();
     await page.goto('/register');
@@ -135,6 +141,16 @@ for (const language of ['en', 'vi']) {
     const eligibility = page.getByRole('checkbox');
     await eligibility.click({ delay: 350 });
     await expect(eligibility).toBeChecked();
+    expect(requested.some(url => url.includes('/google.firestore.v1.Firestore/'))).toBe(false);
+    if (process.env.E2E_PRODUCTION === 'true') {
+      const chunks = [...new Set(requested.filter(url => url.startsWith('http://127.0.0.1:9002/_next/static/') && new URL(url).pathname.endsWith('.js')))];
+      expect(chunks.length).toBeGreaterThan(0);
+      for (const url of chunks) {
+        const script = await page.request.get(url);
+        expect(script.ok()).toBe(true);
+        expect((await script.body()).includes('google.firestore.v1.Firestore')).toBe(false);
+      }
+    }
     expect(requested.filter(url => /model\.json|\.bin(?:\?|$)/i.test(url))).toEqual([]);
     // Turbopack dev emits a small async-loader manifest, not the TF runtime.
     for (const url of requested.filter(url => /tensorflow/i.test(url))) {

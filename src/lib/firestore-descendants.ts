@@ -1,6 +1,7 @@
 import 'server-only';
 import { z } from 'zod';
 import type { DocumentReference, Firestore } from 'firebase-admin/firestore';
+import type { Auth } from 'firebase-admin/auth';
 import { getAdminAuth, getAdminDb } from './firebase-admin';
 import { ApiError } from './server-api';
 import { readLimitedJson } from './server-json';
@@ -11,6 +12,13 @@ export async function readDescendantPage(db: Firestore, root: DocumentReference,
   if (!Number.isInteger(limit) || limit < 1 || limit > 100 || root.firestore !== db) throw new Error('Invalid descendant query.');
   const auth = getAdminAuth(), project = auth.app.options.projectId;
   if (!project || db !== getAdminDb() || db.databaseId !== '(default)') throw new ApiError('APP-CONFIG-MISSING', 503, 'Descendant inventory is not configured.');
+  return readDocumentPaths(auth, root.path, limit);
+}
+
+/** Name-only pages for the isolated restore audit, including orphaned subcollections. */
+export async function readDocumentPaths(auth: Auth, root: string, limit: number, after?: string): Promise<string[]> {
+  const project = auth.app.options.projectId;
+  if (!project || !Number.isInteger(limit) || limit < 1 || limit > 100) throw new Error('Invalid inventory parameters.');
   const emulator = process.env.FIRESTORE_EMULATOR_HOST;
   if (emulator && (!project.startsWith('demo-') || !/^(127\.0\.0\.1|localhost):\d+$/.test(emulator)
     || !/^(127\.0\.0\.1|localhost):\d+$/.test(process.env.FIREBASE_AUTH_EMULATOR_HOST ?? ''))) {
@@ -19,13 +27,14 @@ export async function readDescendantPage(db: Firestore, root: DocumentReference,
   const token = emulator ? 'owner' : (await auth.app.options.credential?.getAccessToken())?.access_token;
   if (!token) throw new ApiError('APP-CONFIG-MISSING', 503, 'Descendant inventory is not configured.');
   const resource = `projects/${project}/databases/(default)/documents/`;
-  const parent = resource + root.path;
+  const parent = root ? resource + root : resource.slice(0, -1);
   const origin = emulator ? 'http://' + emulator : 'https://firestore.googleapis.com';
   const url = origin + '/v1/' + parent.split('/').map(encodeURIComponent).join('/') + ':runQuery';
   const signal = AbortSignal.timeout(10_000);
   const response = await fetch(url, { method: 'POST', signal, redirect: 'error', headers: { Authorization: 'Bearer ' + token, 'Content-Type': 'application/json' },
     body: JSON.stringify({ structuredQuery: { from: [{ allDescendants: true }], select: { fields: [{ fieldPath: '__name__' }] },
-      orderBy: [{ field: { fieldPath: '__name__' }, direction: 'ASCENDING' }], limit } }),
+      orderBy: [{ field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
+      ...(after ? { startAt: { values: [{ referenceValue: resource + after }], before: false } } : {}), limit } }),
   });
   if (!response.ok) throw new ApiError('APP-UNAVAILABLE', 503, 'Descendant inventory is unavailable.');
   const request = new Request('https://inventory.invalid/body', { method: 'POST', body: response.body, signal, duplex: 'half' } as RequestInit);

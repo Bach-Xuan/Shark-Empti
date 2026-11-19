@@ -51,6 +51,8 @@ Run `npm run check:configuration` before starting or releasing a configured envi
 
 The server accepts literal `\n` escapes or actual newlines inside the quoted PEM value. Keep the surrounding header/footer and match both project IDs; an illustrative template is already in `.env.example`. Web values are configuration, not proof of authorization. [Firebase Web setup](https://firebase.google.com/docs/web/setup) and [Admin setup](https://firebase.google.com/docs/admin/setup) describe the console flows.
 
+Login and registration use the existing Web configuration for Auth. The Firestore client connects on first data use, sharing the same Firebase App and the configured emulator or WebKit transport. The optimized HTTP smoke enforces per-route compressed script limits in [bundle budgets](../config/bundle-budgets.json) and checks guest authentication scripts for the Firestore transport.
+
 For an explicitly identified target, the CLI workflow is:
 
 ```powershell
@@ -73,7 +75,7 @@ Bounds in `src/lib/data-limits.ts`, producer schemas, persistence schemas, UI in
 
 ## Timestamp migration
 
-New learning APIs persist Firestore Timestamp values; direct SDK creation/update of history, Flashcards and Practice is denied. History accepts bounded epoch milliseconds at the API boundary, preserving the completion instant across retries, while Flashcard/Practice timestamps are server-derived. History remains correctly paged while Timestamp values coexist with fixed-width UTC ISO strings produced by the original writer. Other ISO representations, including offsets and date-only strings, must be migrated before they appear in the history feed; until then they count as invalid records. Inventory and migrate these records before rollout to avoid temporarily hiding them.
+New learning APIs persist Firestore Timestamp values; direct SDK creation/update of history, Flashcards and Practice is denied. History accepts bounded epoch milliseconds at the API boundary, preserving the completion instant across retries, while Flashcard/Practice timestamps are server-derived. Deploy the single-query history reader only after every supported collection passes the timestamp inventory. Firestore sorts mixed field types in separate groups. Keep the currently deployed reader available until conversion finishes and privileged legacy writers are stopped.
 
 Inventory the exact target before converting existing `users/{uid}/history.date`, `flashcards.createdAt` and `practice.createdAt`:
 
@@ -85,9 +87,10 @@ This command reads existing records but makes no writes by default. Its output c
 
 ```powershell
 npm run migrate:timestamps -- --project=YOUR_FIREBASE_PROJECT_ID --apply --confirm-timestamp-migration
+npm run migrate:timestamps -- --project=YOUR_FIREBASE_PROJECT_ID --verify
 ```
 
-The configured Admin project must match the explicit project. The conversion scans pages of 100 and commits at most 20 candidates per transaction, sharing maintenance and distinct-owner lock reads while rereading every record. It preserves original instants and unrelated fields, skips invalid/concurrently removed or already canonical dates, includes records below missing user profiles and refuses deletion locks or an active backup barrier. A protected owner aborts the entire current chunk; previous chunks may already be committed. It can be repeated after interruption. Rerun the inventory to verify zero convertible records; invalid dates require separate review. Do not run conversion concurrently with a legacy restore or older ISO-writing clients. No new index definition is needed for the type-specific single-field history queries; confirm the target has not disabled the normal `date` index. Application epoch milliseconds, numeric `*Ms` protocol/lease fields, durations, local calendar-day keys and external JSON metadata have distinct purposes and are not converted by this command. Emulator operation counts do not establish remote duration or cost.
+The configured Admin project must match the explicit project. The conversion scans pages of 100 and commits at most 20 candidates per transaction, sharing maintenance and distinct-owner lock reads while rereading every record. It preserves original instants and unrelated fields, skips invalid/concurrently removed or already canonical dates, includes records below missing user profiles and refuses deletion locks or an active backup barrier. A protected owner aborts the entire current chunk; previous chunks may already be committed. It can be repeated after interruption. The independent read-only `--verify` command exits unsuccessfully while any convertible or invalid records remain. Resolve invalid data from its original source before rollout. Do not run conversion concurrently with a legacy restore or older ISO-writing clients. The single `date` query uses the existing descending single-field index. Confirm that the target has it enabled. Application epoch milliseconds, numeric `*Ms` protocol/lease fields, durations, local calendar-day keys and external JSON metadata have distinct purposes and are not converted by this command. Emulator operation counts do not establish remote duration or cost.
 
 ## 🤖 OpenRouter setup
 
@@ -117,13 +120,15 @@ Open [localhost:9002](http://localhost:9002). Client and Admin Firebase project 
 
 ## 🧪 Tests and environment isolation
 
-The app normally uses port 9002; Firestore, Auth and AI fixture use 8080, 9099 and 9098. `npm run test:rules`, `npm run test:integration` and `npm run test:e2e` use demo Firebase/Emulators; do not run concurrent suites on the same ports. E2E uses a fake AI provider and blocks external requests. Production browser checks require the verified `npm run build:demo` artifact and `E2E_PRODUCTION=true`; source/assets/lock/config changes invalidate its fingerprint. The [validation guide](VALIDATION.md) provides the complete commands, browser/print checks and interpretation.
+The app normally uses port 9002; Firestore, Auth and AI fixture use 8080, 9099 and 9098. `npm run test:rules`, `npm run test:integration` and `npm run test:e2e` use demo Firebase/Emulators; do not run concurrent suites on the same ports. E2E uses a local AI fixture. The browser network policy permits the Google popup SDK bootstrap scripts on apis.google.com. Auth and application data use the local Emulators. Production browser checks require the verified `npm run build:demo` artifact and `E2E_PRODUCTION=true`; source/assets/lock/config changes invalidate its fingerprint. The [validation guide](VALIDATION.md) provides the complete commands, browser/print checks and interpretation.
 
 Community, moderator and account APIs have separate pre-query traffic admission and transactional business quotas. Policies in `src/lib/request-budget.ts` define token capacities and refill durations. New UID scopes are covered by attributable export/deletion automatically; receipt-only status uses a global bucket and persists no credential identifier. These document-addressed controls need no additional composite index. Calibrate normal polling, retry bursts, moderation preview reads, storage downloads and authentication/admission overhead in staging; no hosting WAF or daily spending bound is assumed. Deploy matching APIs before relying on the limits.
 
 Account polling recovery is defined in `src/lib/account-polling.ts`: four transient retries, distinct per-request deadlines and throttled online/visible-focus recovery. No additional flag enables automatic mutations. Forum cleanup uses the configured default Firestore database and existing Admin query/delete permissions; parent-scoped name-only descendant queries need no new application index. Every cleanup batch and tombstone finalization honor write guards transactionally. Verify runtime duration, Admin REST authorization and interruption/resumption in the intended staging project before deployed acceptance.
 
 ## CI action governance
+
+Pushes and pull requests run unit tests and the optimized desktop Chromium project. Manually dispatch the full workflow on the release candidate before promotion. A `v*` tag also runs both full browser matrices, Rules/integration, the native Emulator restore drill, coverage and cross-engine print checks. Both tiers build the application and check bundle budgets, smoke tests and dependency policy.
 
 [The validation workflow](../.github/workflows/ci.yml) pins every external action to a full commit SHA with its reviewed release in a comment, following [GitHub's immutable-reference guidance](https://docs.github.com/en/actions/reference/security/secure-use#using-third-party-actions). Its token has `contents: read` and checkout does not persist credentials for later build/test steps. The reviewed action manifests are:
 
@@ -158,7 +163,7 @@ The application sets a same-origin camera policy, disables microphone and geoloc
 
 Identify the candidate revision, dependency lock, target, configuration and owner. Run the relevant local checks in [validation](VALIDATION.md). Confirm expected live origin, Rules/indexes, signed retention, hosting runtime and access; compare deployed assets with the candidate. Before AI canary, establish account scope, duration and measurable error/latency/quota stop criteria; test response loss, cancellation, lease expiry and all seven operations with non-sensitive correlation IDs. Stop on incorrect authorization, data loss/duplication or breached attempt limits. Disabling creation does not cancel already dispatched requests or reverse persisted writes.
 
-Account jobs/backups remain disabled until their provider and recovery gates in [account operations](ACCOUNT_OPERATIONS.md) are satisfied. The [audit register](AUDIT_REPORT.md) records the current finding counts, the item-by-item reference-report reconciliation and each acceptance boundary. Actual production/camera/hosted CI/provider validation remains distinct from local tests.
+Account jobs/backups remain disabled until their provider and recovery gates in [account operations](ACCOUNT_OPERATIONS.md) are satisfied. The [audit register](AUDIT_REPORT.md) records finding counts and current statuses. The [validation guide](VALIDATION.md) describes local, hosted and device evidence.
 
 <a id="retention-operations"></a>
 ## 🧾 Retention and index operations

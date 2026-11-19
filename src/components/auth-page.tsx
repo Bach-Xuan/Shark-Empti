@@ -14,7 +14,7 @@ DropdownMenuContent,
 DropdownMenuItem,
 DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useUser } from '@/firebase';
+import { useUser } from '@/firebase/auth/use-user';
 import { translations,TranslationSet } from '@/lib/translations';
 import { Language } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -116,7 +116,11 @@ export default function AuthPage({ register = false }: { register?: boolean }) {
             </p>
           </div>
 
-          <label className="mb-4 flex items-start gap-3 text-sm leading-relaxed"><input type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-primary" checked={ageConfirmed} onChange={event => setAgeConfirmed(event.target.checked)} /><span>{publicMessages[lang].age}</span></label>
+          <label className="mb-4 flex items-start gap-3 text-sm leading-relaxed">
+            <input type="checkbox" className="mt-1 h-5 w-5 shrink-0 accent-primary" disabled={loading || isSigningIn}
+              checked={ageConfirmed} onChange={event => setAgeConfirmed(event.target.checked)} />
+            <span>{publicMessages[lang].age}</span>
+          </label>
           <Button
             onClick={handleGoogleSignIn}
             disabled={isSigningIn || loading || !ageConfirmed}

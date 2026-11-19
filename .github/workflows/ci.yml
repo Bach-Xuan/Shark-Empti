@@ -1,11 +1,12 @@
 name: Validate
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 permissions:
   contents: read
 jobs:
   verify:
     runs-on: ubuntu-latest
     env:
+      FULL_VALIDATION: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') }}
       NEXT_PUBLIC_USE_EMULATORS: 'true'
       NEXT_PUBLIC_FIREBASE_API_KEY: test-api-key
       NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-shark-empti
@@ -31,19 +32,37 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run check:maintenance
+      - run: npx --no-install playwright install --with-deps chromium
+        if: env.FULL_VALIDATION != 'true'
       - run: npx --no-install playwright install --with-deps chromium webkit firefox
+        if: env.FULL_VALIDATION == 'true'
+      - run: npm test
+        if: env.FULL_VALIDATION != 'true'
+        env:
+          REPORT_PRINT_BROWSER: chromium
       - run: npm run test:coverage
+        if: env.FULL_VALIDATION == 'true'
         env:
           REPORT_PRINT_BROWSER: chromium
       - name: Check bilingual report printing in Firefox and WebKit
+        if: env.FULL_VALIDATION == 'true'
         run: |
           for browser in firefox webkit; do
             REPORT_PRINT_BROWSER="$browser" npx --no-install vitest run tests/report-print.browser.test.tsx
           done
       - run: npm run test:integration
+        if: env.FULL_VALIDATION == 'true'
+      - run: npm run test:restore
+        if: env.FULL_VALIDATION == 'true'
       - run: npm run build
       - run: npm run test:e2e
+        if: env.FULL_VALIDATION == 'true'
       - run: npm run test:e2e
+        if: env.FULL_VALIDATION == 'true'
+        env:
+          E2E_PRODUCTION: true
+      - run: npm run test:e2e:chromium
+        if: env.FULL_VALIDATION != 'true'
         env:
           E2E_PRODUCTION: true
       - run: node scripts/bundle-report.mjs

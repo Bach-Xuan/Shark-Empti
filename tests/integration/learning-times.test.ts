@@ -27,15 +27,23 @@ it('converts legacy timestamps with missing parents, preserves instants/content 
   expect((await migrateLearningTimes(db, true)).converted).toBe(0);
 });
 
-it('type-specific queries include only their format and merge by normalized chronology', async () => {
+it('pages all migrated records in chronological order with a single query and a snapshot cursor across tied dates', async () => {
   const db = getAdminDb(), source = db.collection('users/learner/history');
-  const data = { config: { topic: 'Time' }, quizResults: [] };
-  await source.doc('old').set({ ...data, date: '2026-09-01T00:00:00.000Z' });
-  await source.doc('new').set({ ...data, date: Timestamp.fromDate(new Date('2026-09-03T00:00:00Z')) });
-  const current = await source.where('date', '<=', Timestamp.fromMillis(253_402_300_799_999)).orderBy('date', 'desc').get();
-  const legacy = await source.where('date', '>=', '').orderBy('date', 'desc').get();
-  expect(current.docs.map(doc => doc.id)).toEqual(['new']); expect(legacy.docs.map(doc => doc.id)).toEqual(['old']);
-  expect([...current.docs, ...legacy.docs].map(doc => readHistoryItem(doc.id, doc.data())!).sort((a, b) => b.date - a.date).map(item => item.id)).toEqual(['new', 'old']);
+  const batch = db.batch();
+  const ids = Array.from({ length: 120 }, (_, i) => String(i).padStart(3, '0'));
+  for (const [i, id] of ids.entries()) {
+    const date = new Date(1_750_000_000_000 + Math.floor(i / 3) * 1000);
+    batch.set(source.doc(id), { date: i % 2 ? date.toISOString() : Timestamp.fromDate(date) });
+  }
+  await batch.commit();
+  expect((await migrateLearningTimes(db, true)).converted).toBe(60);
+  expect(await migrateLearningTimes(db)).toMatchObject({ canonical: 120, convertible: 0, invalid: 0 });
+  const query = source.orderBy('date', 'desc').limit(50);
+  const first = await query.get();
+  const second = await query.startAfter(first.docs.at(-1)!).get();
+  const third = await query.startAfter(second.docs.at(-1)!).get();
+  expect([first.size, second.size, third.size]).toEqual([50, 50, 20]);
+  expect([...first.docs, ...second.docs, ...third.docs].map(doc => doc.id)).toEqual(ids.reverse());
 });
 
 it('converts an offset ISO instant before it enters the chronologically ordered history feed', async () => {

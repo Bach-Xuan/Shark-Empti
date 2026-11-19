@@ -1,2 +1,2 @@
 'use client';
-export { useAuthState as useUser } from '../provider';
+export { useAuthState as useUser } from '../auth-provider';

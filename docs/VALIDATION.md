@@ -8,7 +8,9 @@ Use Node 24 and the npm lockfile, JDK 21, and installed Playwright Chromium, Fir
 
 When reusing the browser runtimes already installed under this checkout's `.tools/playwright`, set `$env:PLAYWRIGHT_BROWSERS_PATH=(Resolve-Path '.tools/playwright').Path` in the test shell. The installed revisions must match the current Playwright package. Without that setting, the runner uses its standard browser-cache location and can report missing executables even when the checkout-local runtimes are present.
 
-Integration/browser tests use Firebase Auth and Firestore Emulators under `demo-shark-empti`, with the deterministic AI fixture. App, Firestore, Auth and AI fixture normally use ports 9002, 8080, 9099 and 9098. Avoid concurrent suites on those ports. Integration requires both Emulators; browser tests block external network calls and do not establish live provider quality or cost.
+Integration/browser tests use Firebase Auth and Firestore Emulators under `demo-shark-empti`, with the deterministic AI fixture. App, Firestore, Auth and AI fixture normally use ports 9002, 8080, 9099 and 9098. Avoid concurrent suites on those ports. Integration requires both Emulators; browser tests permit read-only Google popup bootstrap scripts on apis.google.com. A network interruption during bootstrap can cause the popup wait to expire before the Emulator receives a sign-in request. Application data and AI fixtures stay local.
+
+Push and pull-request validation runs `npm test` and the optimized `npm run test:e2e:chromium` project. Manually dispatch the full workflow for release candidates. Version tags also run both complete browser matrices, coverage, Rules/integration, a native Emulator export/import drill and cross-engine print checks.
 
 CI's SHA-pinned actions run on Node 24 independently of the application runtime. See [action governance](CONFIGURATION.md#ci-action-governance) for reviewed manifests, minimum runner, supported inputs and update review. Local YAML/manifest inspection and application tests do not prove hosted runner startup, action post steps, cache or artifact service behavior.
 
@@ -37,11 +39,11 @@ npm run test:rules
 npm run test:integration
 ```
 
-Lint checks project code and typecheck validates the TypeScript program. Maintenance checks declared imports, package/lock agreement, documented npm scripts, local files and Markdown section links, audit table/detail status agreement, compiler/lint scope and ignored generated paths. Unit and component coverage uses the source set in the Vitest configuration. The integration suite exercises Rules and emulator-backed workflows. Its V8 percentages cover the AI and server API files selected in the integration configuration. V8 writes the separate reports under `coverage/`.
+Lint checks project code and typecheck validates the TypeScript program. Maintenance checks declared imports, package/lock agreement, documented npm scripts, local files and Markdown section links, agreement between audit totals and the two finding tables, compiler/lint scope and ignored generated paths. Unit and component coverage uses the source set in the Vitest configuration. The integration suite exercises Rules and emulator-backed workflows. Its V8 percentages cover the AI and server API files selected in the integration configuration. V8 writes the separate reports under `coverage/`.
 
 The configuration preflight expects a deliberately configured Web/Admin environment. It checks structure offline and is independent of demo-only tests/builds, which do not need real Admin secrets. Passing it does not verify IAM, credential validity at the provider or deployed service readiness.
 
-Integration includes expiry-denial, renewed-quota cleanup and Firestore-only retention cases. Timestamp regressions cover canonical API writes, direct SDK write denial, mixed ISO/Timestamp history pagination, retry-stable completion dates, and repeatable migration across missing parents and multiple pages. Migration tests verify dry-run isolation, preservation of original instants/content and refusal during deletion or backup barriers. Rules and integration commands start demo Emulators. Check the first failing assertion and emulator log before retrying; fixture and Emulator results are not proof that deployed Rules, indexes, IAM or production data match. See [timestamp migration](CONFIGURATION.md#timestamp-migration) before converting a remote dataset.
+Integration includes expiry-denial, renewed-quota cleanup and Firestore-only retention cases. Timestamp regressions cover canonical API writes, direct SDK write denial, three-page single-query history pagination after mixed ISO/Timestamp migration, including tied dates, retry-stable completion dates, and repeatable migration across missing parents and multiple pages. Migration tests verify dry-run isolation, preservation of original instants/content and refusal during deletion or backup barriers. Rules and integration commands start demo Emulators. Check the first failing assertion and emulator log before retrying; fixture and Emulator results are not proof that deployed Rules, indexes, IAM or production data match. See [timestamp migration](CONFIGURATION.md#timestamp-migration) before converting a remote dataset.
 
 Learning-write regressions cover all three nested payloads, unknown fields, count/score/answer mismatches, body/record limits, concurrent replay and changed-payload conflicts, stable server timestamps, private ownership, final-token contention and consent/lock changes after admission. Feedback tests preserve history dates, answers, fingerprints and unknown legacy configuration keys. Rules test documented profile/notes/activity shapes, field boundaries, real leap dates, append-only day updates, growth limits, unknown-path denial and owner legacy reads/deletion. Component checks retain drafts after errors, bound transport retries and preserve long legacy notes/analysis for reading. Optimized browser recovery checks include two lost responses after a real commit, a locale change and reload without regeneration, plus biography writes that retain coins/creation/legacy fields. HTTP smoke verifies unauthenticated PUT/PATCH denial. These checks do not accept deployed Rules or old-tab rollout.
 
@@ -76,7 +78,9 @@ The ordinary E2E command uses the development server; production mode requires `
 
 The default Playwright matrix includes desktop Chromium, Firefox and WebKit and a touch viewport for each engine. The product targets Chrome 100+ and Firefox 102+ on desktop and Android, and Safari 15.4+ on macOS and iOS. A Firefox touch viewport uses the desktop Gecko engine.
 
-For the historical matrix, install trusted matching binaries and Playwright drivers outside the application dependency graph. Supply a UTF-8 JSON object with keys `chromium`, `firefox` and `webkit`. Each contains an absolute `driver` path to the extracted playwright-core package and an absolute `executable` path. The runner checks the engine version before exercising language, theme, layout, sign-in and a persisted quiz. The touch cases also check the Android Chrome, Android Firefox or iPhone Safari user agent and require a trusted touch event on the sign-in control.
+On the optimized single-query build, 106 of the 144 E2E cases passed on the first run. The remaining 38 timed out while waiting for the Google sign-in popup during a network interruption. All 38 passed when rerun on the same build. The six minimum-engine flows, 510 unit/component tests and 188 Rules/integration cases also passed locally.
+
+For the historical matrix, install trusted matching binaries and Playwright drivers outside the application dependency graph. Supply a UTF-8 JSON object with keys `chromium`, `firefox` and `webkit`. Each contains an absolute `driver` path to the extracted playwright-core package and an absolute `executable` path. The runner checks the engine version before exercising language, theme, layout, sign-in, a persisted quiz and its on-demand Profile report through print readiness. The touch cases also check the Android Chrome, Android Firefox or iPhone Safari user agent and require a trusted touch event on the sign-in control.
 
 | Windows engine | Historical installation | Matching driver |
 |---|---|---|
@@ -92,6 +96,8 @@ $env:BROWSER_FLOOR_CONFIG = (Resolve-Path (Join-Path $env:LOCALAPPDATA 'SharkEmp
 try { npm run test:e2e } finally { Remove-Item Env:BROWSER_FLOOR_CONFIG }
 ```
 
+The historical flow opens Profile using the application's navigation button and selects the quiz it just saved. A separate hard-navigation probe on Windows WebKit 15.4 recorded a cancelled emulator watch and an inspector access-control diagnostic as the outgoing document unloaded. The destination opened successfully both with and without request interception. The instrumented page received no window error or unhandled rejection event. The browser test retains its page-error assertions on the in-app flow.
+
 Keep the machine-specific installation file in a private local directory. Windows WebKit, Chromium and Gecko results cover those engine builds. Native iOS Safari, Android browsers, permissions and camera hardware require separate device evidence. Inspect pass/fail/skip counts and traces for the exact run; a retry or isolated pass is not a stable repeated-matrix result. Current engines do not prove the exact documented minimum browser versions, physical devices, screen readers or camera permission behavior. Confirm locale/theme, responsive layouts, keyboard/focus, accessible names, reduced motion, loading/error/retry and print where relevant. Axe supplements manual accessibility review; a passing sample is not a full WCAG certification.
 
 For a physical-camera check, open Arena on the local demo, select **Focus Shield** and enable **Tracking Mode**. Confirm that the video plays and a focus measurement appears. Keep a reference to the active video track in browser developer tools, then use **Stop camera and close** and confirm its `readyState` is `ended`. Record the browser, device, frame dimensions and track states. Run with local model assets, recording disabled and external requests blocked. On Windows, Chrome acquired the HP Wide Vision camera at 640 × 480 and released the track after local inference. Native Apple and Android devices, permission revocation and sustained use still require device testing.
@@ -104,9 +110,9 @@ node node_modules/vitest/vitest.mjs run tests/report-print.browser.test.tsx
 Remove-Item Env:REPORT_PRINT_BROWSER
 ```
 
-With `BROWSER_FLOOR_CONFIG` set, the print tests use the configured historical engine. They render the report and locally served KaTeX fonts. The CI workflow installs all three current engines, enables Chromium print during coverage, and runs the bilingual fixtures again in Firefox and WebKit. Local unit runs select a browser with `REPORT_PRINT_BROWSER`. Chromium can write PDFs to `tmp/pdfs/`. Physical printers and native print dialogs need separate verification.
+With `BROWSER_FLOOR_CONFIG` set, the print tests use the configured historical engine. They render the report and locally served KaTeX fonts. The release workflow installs all three current engines, enables Chromium print during coverage and runs the bilingual fixtures in Firefox and WebKit. The push and pull-request workflow installs Chromium. Local unit runs select a browser with `REPORT_PRINT_BROWSER`. Chromium can write PDFs to `tmp/pdfs/`. Physical printers and native print dialogs need separate verification.
 
-Production HTTP smoke checks public HTML, metadata, API authentication and six existing gzip script budgets. It checks the application response headers and requires a current fingerprinted demo artifact and does not test the deployed origin or real user traffic.
+Production HTTP smoke checks public HTML, metadata, response headers, API authentication and the six route budgets for compressed scripts. It checks the scripts referenced by the login and registration HTML for the Firestore transport. Optimized browser tests also inspect the same-origin scripts requested during guest interaction. Both use a fingerprinted local demo build.
 
 ## Performance and dependency checks
 
@@ -121,13 +127,52 @@ Production HTTP smoke checks public HTML, metadata, API authentication and six e
 
 For comparisons, keep Node, dependency graph, fixture data, viewport, cache state and sampling method consistent. Report sample count, font transfer and regressions. Small-sample p95 can be the largest sample; navigation load is not LCP, and CDP node counts alone do not prove a memory leak. Refresh dependency data before making current advisory claims.
 
-Dependency compatibility checks retain the scoped Firestore/gRPC API regression and exercise CSV parsing plus Firebase CLI's own ESM streaming JSON adapter. The obsolete FTP check/override was retired when the compatible CLI parent removed that dependency path. The audit register preserves baseline, interim and current registry inventories and residual parent constraints. Package instance counts, advisory counts and runtime reachability are separate; inspect lockfile changes and used parent APIs before imposing transitive-major overrides.
+### Authentication, history, Forum and camera measurements
+
+Optimized demo builds on Windows used Chromium 151, local Auth and Firestore Emulators, the same lockfile and five fresh browser contexts per build. The baseline at `ddd489e` used 120 sessions split evenly between original ISO strings and native timestamps. The updated fixture represents those 120 sessions after conversion. The builds were measured in separate runs. Differences in small-sample wall-clock times also reflect local scheduling.
+
+Each run signs in through the local Google popup, confirms consent, opens Setup and restores the saved Auth session in another fresh context. It watches an idle Profile for one second, opens the report and records the first selectable row. Separate navigation opens a populated Dashboard and a selectable Playground topic. The network trace counts unique delivered history documents and distinct watch targets.
+
+| Median browser timing | Original | Updated single-query build |
+|---|---:|---:|
+| First usable sign-in | 754 ms | 633 ms |
+| Sign-in control to editable Setup, including the popup | 3,184 ms | 2,691 ms |
+| Consent confirmation to editable Setup | 1,267 ms | 1,298 ms |
+| Returning learner to editable Setup | 1,383 ms | 1,297 ms |
+| Open report to first selectable row | 388 ms | 398 ms |
+| Setup to populated Dashboard | 665 ms | 727 ms |
+| Dashboard to selectable Playground topic | 497 ms | 467 ms |
+
+Every original Profile visit opened two watches and received 100 history documents before report selection. Every updated Profile visit received zero history documents before selection and exactly 50 documents on one watch after opening the report. The first-page delivery count fell by 50% on this fixture. Production billing depends on data, cache state and traffic.
+
+Initial login and registration scripts fell from 481,389 to 282,758 gzip bytes (41.3%). The original guest scripts included the Firestore transport in every run. The updated scripts excluded it in every run. The root route fell from 427,792 to 395,752 bytes, and Profile fell from 517,089 to 516,757 bytes. Forum and Arena increased by 1,191 and 990 bytes. The six [route budgets](../config/bundle-budgets.json) allow 10% headroom rounded up to 1 KiB.
+
+A separate five-pair experiment measured the effect of overlapping profile provisioning with consent checks and reusing one date formatter per report dialog. Median new sign-in fell from 3,190 to 2,898 ms, returning sign-in from 1,383 to 1,254 ms and report opening from 429 to 413 ms. Those paired samples preceded the timestamp migration.
+
+The [report regression](../tests/profile-report.test.tsx) removes a selected session, changes live history after report generation and switches learners. It checks the captured preview and a fresh selection on reopen. The [browser regression](../tests/e2e/feedback-recovery.spec.ts) checks both themes, text contrast, visibility of the Generate button at 320 CSS pixels and keyboard focus after closing.
+
+The [Forum regression](../tests/forum-reactions.test.tsx) uses 61 distinct post/comment targets and a duplicate. Ten rotations of the same IDs previously opened 33 listeners, closed 30 and calculated 682 hashes. The changed reader opens three, closes none during sorting and calculates 61 hashes. The original listeners continue to receive live updates. Cases for switching UID, changing targets, replacing the database, cache-only snapshots and retry exercise invalidation.
+
+The Focus Shield comparison uses a synthetic Chromium camera, the bundled TensorFlow model and software WebGL. After warm-up, a five-minute visible session counts processing callbacks and video frames read for inference. CDP reports CPU seconds summed across the same browser processes. Stop latency runs from activating the close control to observing the track in the ended state. These measurements cover local scheduling and resource release. Device battery life, hardware-accelerated CPU use and physical camera timing require device measurements.
+
+| Five-minute camera session | Original scheduler | New scheduler, first run | New scheduler, repeat |
+|---|---:|---:|---:|
+| Processing callbacks | 8,975 | 372 | 372 |
+| Frames sampled for inference | 371 | 372 | 372 |
+| Aggregate browser CPU time | 1,196.1 s | 1,259.6 s | 1,200.1 s |
+| Close to ended track | 3.0 ms | 2.7 ms | 2.8 ms |
+
+The new scheduler eliminated 95.9% of polling callbacks. Both repeat runs retained the sampling cadence. Aggregate CPU use on this software-rendered setup ranged from 0.3% to 5.3% above baseline. The [session tests](../tests/focus-tracker-session.test.ts) also cover suspension and resumption, cancellation of pending work, permission loss, playback failures and tensor disposal.
+
+The installed dependency graph passed `npm ls --all` on Node 24.22.3. TypeScript 6.0.3 falls within the installed TypeScript ESLint parser range of `>=4.8.4 <6.1.0`. The optimized HTTP smoke identifies the TensorFlow and Recharts chunks by content and excludes them from the initial scripts for all six measured routes. Dependency compatibility checks exercise the Firestore/gRPC API, CSV parsing and Firebase CLI's ESM streaming JSON adapter. The Firebase CLI parent upgrade also retired the obsolete FTP check and override. The full lockfile inventory returned zero active advisories across 1,412 package instances after the picomatch advisory was withdrawn. The four locked picomatch installations use 2.3.2 or 4.0.7. The release check still blocks active high or critical findings. Refresh the inventory for each release. [Advisory withdrawal](https://github.com/advisories/GHSA-fc5q-39xc-vjpf) · [Dependency policy](../config/dependency-audit-policy.json)
 
 ## Live and operational verification
 
+The configured Firestore project's learning-date inventory contained 58 convertible records. The backfill converted all 58, and an independent scan found 58 native timestamps, zero legacy values and zero invalid dates. Each stored instant matched its original value in the encrypted, field-only recovery snapshot. Other projects require their own inventory.
+
 `npm run ai:health` authenticates the OpenRouter key and inspects model availability; it does not prove inference or quota. `npm run ai:smoke` invokes real quiz/chat generation and may consume quota; it does not validate the full authenticated ledger/recovery workflow. Both require the intended credentials and network.
 
-Account export/deletion, signed queue delivery, expiry, backup and isolated restore have separate provider, permission and cost boundaries. Use the built-in `npm run jobs:storage:check` and `npm run jobs:restore` only with their explicit confirmation flags and an identified authorized target as described in [account operations](ACCOUNT_OPERATIONS.md). Verify signatures, duplicate/expired leases, interrupted delivery, ownership, download expiry and deletion journal before enabling the service. A synthetic Emulator restore is not proof of an encrypted cloud restore or RPO/RTO target.
+Account export/deletion, signed queue delivery, expiry, backup and isolated restore have separate provider, permission and cost boundaries. Use the built-in `npm run jobs:storage:check` and `npm run jobs:restore` only with their explicit confirmation flags and an identified authorized target as described in [account operations](ACCOUNT_OPERATIONS.md). Verify signatures, duplicate/expired leases, interrupted delivery, ownership, download expiry and deletion journal before enabling the service. The account integration fixture interrupts Auth import after the first Firestore writes, rejects reuse of the partial target and restores on a fresh target. It admits a late source deletion, finalizes twice and checks target Auth, orphan private documents, public projections and reopening of source admission. A separate scheduler fixture verifies that five expired backups reserve no internal credits while a due deletion receives four. Hosted recovery timing and provider billing require staging evidence.
 
 For educational evaluation, sample Vietnamese and English items by subject, difficulty and answer type. Have two reviewers independently mark factual correctness, answerability and agreement between feedback and the submitted work, then reconcile disagreements. Record the sample sizes, model IDs, failure categories and uncertainty before changing score labels. For Focus Shield, use consented, separately labelled sessions across lighting and device conditions. Split evaluation by participant, report missing predictions and compare false-positive and false-negative rates per condition. Product owners must agree on acceptable error rates before interpreting results as calibrated.
 

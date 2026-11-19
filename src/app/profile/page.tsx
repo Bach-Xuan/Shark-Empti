@@ -95,13 +95,25 @@ export default function ProfilePage() {
   const [printStatus, setPrintStatus] = useState<'loading' | 'ready' | 'error'>('loading');
 
   const t: TranslationSet = translations[lang];
-  const { historyPage, history, isReportSelectOpen, setIsReportSelectOpen, isReportViewOpen, setIsReportViewOpen, selectedSessionIds, setSelectedSessionIds, roadmapStatus, reportSearchQuery, setReportSearchQuery, reportSortOrder, setReportSortOrder, reportStats, filteredReportHistory } = useProfileReport(user, t, lang);
+  const {
+    historyPage, isReportSelectOpen, isReportViewOpen, openSelection, closeReport, generateReport,
+    selectedCount, selectedSessionIds, setSelectedSessionIds, roadmapStatus, reportSearchQuery,
+    setReportSearchQuery, reportSortOrder, setReportSortOrder, reportStats, filteredReportHistory,
+  } = useProfileReport(user, t, lang);
+  const sessionDateFormatter = useMemo(() => isReportSelectOpen
+    ? new Intl.DateTimeFormat(lang === 'vi' ? 'vi-VN' : 'en-US', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    }) : null, [isReportSelectOpen, lang]);
+  const reportHasNoHistory = historyPage.items.length === 0 && !historyPage.hasMore && historyPage.invalidRecords === 0;
+  const showReportEmpty = !historyPage.loading && !historyPage.error && filteredReportHistory.length === 0
+    && (reportHasNoHistory || historyPage.items.length > 0);
 
   // Search States
   const [searchUid, setSearchUid] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResult, setSearchResult] = useState<LearnerProfile | null>(null);
   const searching = useRef(false);
+  const reportTrigger = useRef<HTMLButtonElement>(null);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
 
   useEffect(() => {
@@ -109,10 +121,6 @@ if (!authLoading && !user) {
       router.push('/login');
     }
   }, [user, authLoading, router, setLang, setTheme]);
-
-
-  // Fetch History for Report
-
 
   const handleSignOut = async () => {
     try {
@@ -188,16 +196,14 @@ if (!authLoading && !user) {
   };
 
   const handleGenerateReport = () => {
-    setPrintStatus('loading');
-    if (selectedSessionIds.length === 0) {
+    if (!generateReport()) {
       toast({
         variant: "destructive",
         title: t.noTopicsSelected,
       });
       return;
     }
-    setIsReportSelectOpen(false);
-    setIsReportViewOpen(true);
+    setPrintStatus('loading');
   };
 
   const handlePrintReport = () => {
@@ -241,16 +247,6 @@ if (!authLoading && !user) {
     ? new Date(user.metadata.creationTime).toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })
     : '---';
 
-  const formatSessionDate = (millis: number) => {
-    return new Date(millis).toLocaleString(lang === 'vi' ? 'vi-VN' : 'en-US', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
   const searchMemberSince = searchResult?.createdAt != null
     ? formatStoredDate(searchResult.createdAt, lang, { day: 'numeric', month: 'long', year: 'numeric' }) : '---';
 
@@ -286,7 +282,6 @@ if (!authLoading && !user) {
 
       <main className="flex-1 main-container pt-24 md:pt-36 space-y-8 pb-20">
         <AccountDataControls lang={lang} />
-      <PageControls lang={lang} {...historyPage} />
         <div className="text-center mb-8">
           <h1 className="text-4xl md:text-6xl font-headline font-black text-primary uppercase tracking-tighter">
             {uiMessage(lang, "profile.academic_profile")}
@@ -366,18 +361,14 @@ if (!authLoading && !user) {
 
               <div className="pt-4 border-t-4 border-dashed border-border/50">
                 <Button
-                  onClick={() => setIsReportSelectOpen(true)}
-                  disabled={history.length === 0}
+                  ref={reportTrigger}
+                  aria-haspopup="dialog"
+                  onClick={openSelection}
                   className="w-full h-16 rounded-2xl btn-duo bg-card text-primary font-black text-base md:text-lg uppercase tracking-[0.2em] flex items-center justify-center gap-4 border-4 border-primary/30 hover:bg-primary/5 group"
                 >
                   <FileText className="w-6 h-6 group-hover:scale-110 transition-transform" />
                   {t.exportReport}
                 </Button>
-                {history.length === 0 && (
-                   <p className="text-center text-[10px] font-black uppercase text-muted-foreground mt-3 ">
-                     {t.noHistory}
-                   </p>
-                )}
               </div>
             </div>
           </CardContent>
@@ -422,8 +413,11 @@ if (!authLoading && !user) {
       </main>
 
       {/* Report Selection Dialog */}
-      <Dialog open={isReportSelectOpen} onOpenChange={setIsReportSelectOpen}>
-        <DialogContent className="max-w-3xl w-[95vw] rounded-[2.5rem] border-[4px] shadow-2xl p-6 md:p-10 bg-card overflow-hidden flex flex-col max-h-[90vh]">
+      <Dialog open={isReportSelectOpen} onOpenChange={open => { if (!open) closeReport(); }}>
+        <DialogContent onCloseAutoFocus={event => {
+          event.preventDefault();
+          if (!isReportViewOpen) reportTrigger.current?.focus();
+        }} className="max-w-3xl w-[95vw] rounded-[2.5rem] border-[4px] shadow-2xl p-6 md:p-10 bg-card overflow-hidden flex flex-col max-h-[90vh]">
           <DialogHeader className="shrink-0 mb-4">
             <DialogTitle className="text-2xl md:text-3xl font-headline font-black text-primary uppercase tracking-tight flex items-center gap-3">
               <FileText className="w-8 h-8" /> {t.selectSessions}
@@ -458,7 +452,8 @@ if (!authLoading && !user) {
 
             <ScrollArea className="flex-1 border-4 border-border rounded-3xl p-4 bg-muted/5 shadow-inner">
               <div className="grid grid-cols-1 gap-3">
-                {filteredReportHistory.map((item) => {
+                {sessionDateFormatter && filteredReportHistory.map((item) => {
+                  const date = sessionDateFormatter.format(item.date);
                   const topic = lang === 'vi' ? (item.config.topicVi || item.config.topic) : (item.config.topicEn || item.config.topic);
                   const isSelected = selectedSessionIds.includes(item.id!);
 
@@ -467,7 +462,7 @@ if (!authLoading && !user) {
                       key={item.id}
                       checked={isSelected}
                       onToggle={() => toggleSessionSelection(item.id!)}
-                      label={`${topic} — ${formatSessionDate(item.date)}`}
+                      label={`${topic} — ${date}`}
                       className={cn(
                         "flex items-center gap-4 p-4 md:p-6 rounded-2xl border-2 transition-all cursor-pointer group/item",
                         isSelected ? "bg-primary/10 border-primary shadow-xs translate-x-1" : "bg-card border-border/50 hover:border-primary/30 hover:translate-x-0.5"
@@ -480,7 +475,7 @@ if (!authLoading && !user) {
                         <div className="flex items-center gap-3 text-muted-foreground">
                            <div className="flex items-center gap-1.5 text-[8px] md:text-[10px] font-black uppercase tracking-widest">
                              <Clock className="w-3 h-3" />
-                             {formatSessionDate(item.date)}
+                             {date}
                            </div>
                            <div className="flex items-center gap-1.5 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-primary">
                              <CheckCircle2 className="w-3 h-3" />
@@ -491,25 +486,26 @@ if (!authLoading && !user) {
                     </ReportSelectionRow>
                   );
                 })}
-                {filteredReportHistory.length === 0 && (
-                  <div className="text-center py-20 opacity-40 flex flex-col items-center gap-4">
-                    <Search className="w-12 h-12" />
-                    <p className="font-black uppercase tracking-widest text-xs md:text-sm">{t.noHistory}</p>
+                {showReportEmpty && (
+                  <div className="text-center py-20 text-muted-foreground flex flex-col items-center gap-4">
+                    <Search aria-hidden="true" className="w-12 h-12" />
+                    <p className="font-black uppercase tracking-widest text-xs md:text-sm" role="status">{reportHasNoHistory ? t.noHistory : uiMessage(lang, 'profile.no_matching_sessions')}</p>
                   </div>
                 )}
               </div>
+              <PageControls lang={lang} {...historyPage} />
             </ScrollArea>
 
             <div className="flex flex-col sm:flex-row gap-4 pt-4 shrink-0">
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground/80 px-2 flex-1">
-                {selectedSessionIds.length} {uiMessage(lang, "profile.items_selected")}
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground px-2 flex-1">
+                {selectedCount} {uiMessage(lang, "profile.items_selected")}
               </div>
-              <div className="flex gap-4">
-                <Button variant="ghost" onClick={() => setIsReportSelectOpen(false)} className="btn-duo h-14 px-8 rounded-xl font-black uppercase text-xs tracking-widest bg-card">{t.cancel}</Button>
+              <div className="flex flex-wrap gap-2 sm:gap-4">
+                <Button variant="ghost" onClick={closeReport} className="btn-duo h-14 px-4 sm:px-8 rounded-xl font-black uppercase text-xs tracking-widest bg-card">{t.cancel}</Button>
                 <Button
                   onClick={handleGenerateReport}
-                  disabled={selectedSessionIds.length === 0}
-                  className="btn-duo min-w-[200px] h-14 rounded-xl bg-primary text-primary-foreground font-black uppercase text-xs tracking-widest border-4 border-primary/20 shadow-duo"
+                  disabled={historyPage.loading || Boolean(historyPage.error) || selectedCount === 0}
+                  className="btn-duo sm:min-w-[200px] h-14 rounded-xl bg-primary text-primary-foreground font-black uppercase text-xs tracking-widest border-4 border-primary/20 shadow-duo"
                 >
                   {t.generateReport} <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
@@ -525,8 +521,8 @@ if (!authLoading && !user) {
         issued={new Date().toLocaleDateString(lang === 'vi' ? 'vi-VN' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
         t={t} lang={lang} onStatus={setPrintStatus}
       />}
-      <Dialog open={isReportViewOpen} onOpenChange={setIsReportViewOpen}>
-        <DialogContent className="max-w-5xl w-[95vw] report-panel flex flex-col rounded-[2.5rem] border-[4px] shadow-2xl p-0 overflow-hidden bg-background">
+      <Dialog open={isReportViewOpen} onOpenChange={open => { if (!open) closeReport(); }}>
+        <DialogContent onCloseAutoFocus={event => { event.preventDefault(); reportTrigger.current?.focus(); }} className="max-w-5xl w-[95vw] report-panel flex flex-col rounded-[2.5rem] border-[4px] shadow-2xl p-0 overflow-hidden bg-background">
           <div className="flex flex-wrap gap-3 items-center justify-between p-6 md:p-8 bg-card border-b-4 border-border shrink-0">
             <DialogTitle className="text-xl md:text-3xl font-headline font-black text-primary uppercase tracking-tight flex items-center gap-4">
               <FileText className="w-8 h-8" /> {t.academicReport}
@@ -534,7 +530,7 @@ if (!authLoading && !user) {
             <div className="flex gap-2 md:gap-4 no-print">
               <Button variant="outline" size="icon" aria-label={t.copy} onClick={copyReportToClipboard} className="h-12 w-12 rounded-xl border-2 hover:bg-primary/10 hover:border-primary/30 transition-all"><Copy className="w-5 h-5 text-primary" /></Button>
               <Button variant="outline" size="icon" aria-label={t.printReport} onClick={handlePrintReport} disabled={printStatus !== 'ready'} className="h-12 w-12 rounded-xl border-2 hover:bg-primary/10 hover:border-primary/30 transition-all"><Download className="w-5 h-5 text-primary" /></Button>
-              <Button variant="ghost" size="icon" aria-label={t.back} onClick={() => setIsReportViewOpen(false)} className="h-12 w-12 rounded-xl border-2"><X className="w-5 h-5" /></Button>
+              <Button variant="ghost" size="icon" aria-label={t.back} onClick={closeReport} className="h-12 w-12 rounded-xl border-2"><X className="w-5 h-5" /></Button>
             </div>
           </div>
 

@@ -4,25 +4,35 @@ import { collection, documentId, onSnapshot, query, where, type Firestore } from
 import { FORUM_REACTIONS_COLLECTION, forumReactionId, ownForumReactionSchema, type ForumReactionTarget } from '@/lib/community-privacy';
 
 const logicalKey = (target: ForumReactionTarget) => JSON.stringify([target.postId, target.commentId ?? null]);
-type ReactionState = { scope: string; loading: boolean; error: boolean; liked: Set<string> };
+// Display order is independent of membership in a Firestore listener.
+function targetSignature(targets: readonly ForumReactionTarget[]) {
+  const unique = new Map<string, ForumReactionTarget>();
+  for (const { postId, commentId } of targets) {
+    const target = { postId, commentId };
+    unique.set(logicalKey(target), target);
+  }
+  return JSON.stringify([...unique.keys()].sort().map(key => unique.get(key)));
+}
+type ReactionState = { db: Firestore; scope: string; loading: boolean; error: boolean; liked: Set<string> };
 
 /** Only own records are read. Every SDK query is bounded to 30 explicit keys;
  * changing owner/targets immediately invalidates stale values and callbacks. */
 export function useForumReactions(db: Firestore | null, uid: string | undefined, targets: readonly ForumReactionTarget[]) {
-  const signature = JSON.stringify(targets);
+  const signature = targetSignature(targets);
   const [revision, setRevision] = useState(0);
   const scope = JSON.stringify([uid ?? null, signature, revision]);
-  const [state, setState] = useState<ReactionState>({ scope: '', loading: false, error: false, liked: new Set() });
+  const [state, setState] = useState<ReactionState | null>(null);
   useEffect(() => {
     let disposed = false, failed = false;
     const unsubscribers: (() => void)[] = [];
     const selected: ForumReactionTarget[] = JSON.parse(signature);
+    setState(null);
     if (!db || !uid || selected.length === 0) return;
     const fail = () => {
       if (disposed || failed) return;
       failed = true; clearTimeout(timer);
       unsubscribers.splice(0).forEach(unsubscribe => unsubscribe());
-      setState({ scope, loading: false, error: true, liked: new Set() });
+      setState({ db, scope, loading: false, error: true, liked: new Set() });
     };
     let timer: ReturnType<typeof setTimeout> | undefined = setTimeout(fail, 15_000);
     void (async () => {
@@ -38,7 +48,7 @@ export function useForumReactions(db: Firestore | null, uid: string | undefined,
           if (snapshot.metadata.fromCache) {
             ready.delete(index);
             if (!timer) timer = setTimeout(fail, 15_000);
-            setState({ scope, loading: true, error: false, liked: new Set(liked) });
+            setState({ db, scope, loading: true, error: false, liked: new Set(liked) });
             return;
           }
           const next: string[] = [];
@@ -49,7 +59,7 @@ export function useForumReactions(db: Firestore | null, uid: string | undefined,
           }
           chunk.forEach(id => liked.delete(logicalKey(byId.get(id)!)));
           next.forEach(key => liked.add(key)); ready.add(index);
-          if (ready.size === chunks.length) { clearTimeout(timer); timer = undefined; setState({ scope, loading: false, error: false, liked: new Set(liked) }); }
+          if (ready.size === chunks.length) { clearTimeout(timer); timer = undefined; setState({ db, scope, loading: false, error: false, liked: new Set(liked) }); }
         }, fail);
         if (disposed || failed) unsubscribe(); else unsubscribers.push(unsubscribe);
       });
@@ -57,7 +67,7 @@ export function useForumReactions(db: Firestore | null, uid: string | undefined,
     return () => { disposed = true; clearTimeout(timer); unsubscribers.splice(0).forEach(unsubscribe => unsubscribe()); };
   }, [db, uid, signature, scope]);
   const selected = !!uid && targets.length > 0;
-  const current = state.scope === scope ? state : null;
+  const current = state && state.db === db && state.scope === scope ? state : null;
   return {
     loading: selected && !!db && (!current || current.loading), error: selected && (!db || (current?.error ?? false)),
     isLiked: (target: ForumReactionTarget) => selected && !!current?.liked.has(logicalKey(target)),

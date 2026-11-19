@@ -13,6 +13,7 @@ import { digest } from '@/lib/jobs/crypto';
 import { enqueueJob } from '@/lib/jobs/queue';
 import { exportStep, deletionStep } from '@/lib/jobs/account-worker';
 import { restoreBackup } from '@/lib/jobs/restore';
+import { finalizeRestoredDeletions, releaseDeletionCutover, RESTORE_MARKER } from '@/lib/jobs/restore-cutover';
 import { backupStep } from '@/lib/jobs/backup';
 import { forumReactionId } from '@/lib/community-privacy';
 import { projectForumMetadata } from '@/lib/community-projections';
@@ -261,11 +262,34 @@ it('fences duplicate/expired leases and reports quota waiting without losing the
   const claim = await claimJob(id); expect(claim).not.toBeNull(); expect(await claimJob(id)).toBeNull();
   await getAdminDb().doc('_accountJobs/' + id).update({ 'lease.id': randomUUID() });
   await expect(finishStep(id, claim!, { cursor: { phase: 1 }, processed: 1 })).rejects.toMatchObject({ code: 'ACCOUNT-JOB-LEASE' });
-  await getAdminDb().doc('_accountJobs/' + id).update({ status: 'queued', nextRunAtMs: 0 });
+  await getAdminDb().doc('_accountJobs/' + id).update({ status: 'queued', nextRunAtMs: 0, 'lease.expiresAtMs': 1 });
   const day = new Date().toISOString().slice(0, 10);
   await getAdminDb().doc('_jobBudgets/production_' + day).set({ reserved: 500 });
   expect(await enqueueJob(id)).toBe(false);
   expect((await getAdminDb().doc('_accountJobs/' + id).get()).get('status')).toBe('waiting_quota');
+});
+it('dispatches a due deletion behind five expired backups without reserving their delivery credits', async () => {
+  const db = getAdminDb(), now = Date.now();
+  const deletion = await createAccountJob(uid, 'deletion', randomUUID());
+  const jobs = db.collection('_accountJobs');
+  await jobs.doc(deletion.id).update({ expiresAtMs: now - 1, nextRunAtMs: now });
+  const backups = Array.from({ length: 5 }, () => jobs.doc(randomUUID()));
+  for (const ref of backups) {
+    await ref.set({ kind: 'backup', status: 'queued', environment: 'production', cursor: { phase: 0 },
+      artifacts: [], processed: 0, createdAtMs: now - 10000, updatedAtMs: now - 10000,
+      expiresAtMs: now - 1000, nextRunAtMs: now - 2000 });
+  }
+  const budget = db.doc('_jobBudgets/production_' + new Date(now).toISOString().slice(0, 10));
+  expect(await enqueueJob(backups[0].id)).toBe(false);
+  expect(await claimJob(backups[0].id)).toBeNull();
+  expect((await budget.get()).exists).toBe(false);
+  await db.doc('_serviceState/maintenance').set({ active: true, jobId: backups[0].id, expiresAtMs: now + 60_000 });
+  await maintenanceSweep();
+  expect((await db.doc('_serviceState/maintenance').get()).get('active')).toBe(false);
+  expect((await budget.get()).get('reserved')).toBe(4);
+  expect((await jobs.doc(deletion.id).get()).get('nextRunAtMs')).toBeGreaterThan(now);
+  expect((await Promise.all(backups.map(ref => ref.get()))).every(doc => !doc.exists || doc.get('status') === 'failed')).toBe(true);
+  expect(await claimJob(deletion.id)).not.toBeNull();
 });
 it('sweeps expired server records with Spark queries rather than native TTL', async () => {
   await getAdminDb().doc('_arenaSessions/expired').set({ uid, expiresAt: new Date(0) });
@@ -409,6 +433,12 @@ it('restores encrypted Firestore/Auth parts into an empty isolated target and ap
   const retained = { $type: 'legacy-map', constructor: 'legacy', title: 'Retained post', content: 'Body', subject: 'math', commentsCount: 0, createdAt: Timestamp.now(), authorId: removedUid, authorName: 'Removed later', authorPhoto: '', likedBy: [removedUid, uid], likesCount: 2 };
   await db.doc('posts/retained').set(retained);
   await db.doc('forumPosts/retained').set(projectForumMetadata(retained, 'post')!);
+  const rankingId = randomUUID(), stamp = Timestamp.now();
+  await db.doc('arenaExams/exam').set({ schemaVersion: 2, title: 'Exam', authorId: 'remaining-author', authorName: 'Author', authorPhoto: '', questionCount: 1, createdAt: stamp,
+    totalAttempts: 1, config: { topic: 'Addition', subject: 'math', grade: 'none', type: 'Mixed', difficulty: 'Easy', numQuestions: '1' } });
+  await db.doc('arenaExams/exam/attempts/' + uid).set({ examId: 'exam', userId: uid, userName: 'Learner', userPhoto: '', score: 100, duration: 3,
+    timingVersion: 1, rankingVersion: 2, createdAt: stamp, publicId: rankingId });
+  await db.doc('users/remaining-author/history/session').set({ date: '2026-09-03T19:00:00+07:00', content: 'Retain this session' });
   await getAdminAuth().setCustomUserClaims(uid, { moderator: true });
   vi.stubEnv('ACCOUNT_BACKUPS_ENABLED', 'true'); await maintenanceSweep();
   const jobs = await db.collection('_accountJobs').where('kind', '==', 'backup').get();
@@ -416,8 +446,15 @@ it('restores encrypted Firestore/Auth parts into an empty isolated target and ap
   const job = await complete(jobs.docs[0].id); expect(job.status).toBe('completed');
   expect((await Promise.all(job.artifacts.map(artifact => new PrivateJobStorage().get(artifact)))).map(value => value.toString()).join()).toContain('Must not resurrect');
   const targetId = 'demo-restore-' + randomUUID().slice(0, 8), app = initializeApp({ projectId: targetId }, targetId);
+  const partialId = 'demo-restore-' + randomUUID().slice(0, 8), partialApp = initializeApp({ projectId: partialId }, partialId);
   try {
     const targetDb = getFirestore(app), targetAuth = getAuth(app), storage = new PrivateJobStorage();
+    const partialDb = getFirestore(partialApp), partialAuth = getAuth(partialApp);
+    const partial = { db: partialDb, auth: partialAuth, artifacts: job.artifacts, read: (artifact: Artifact) => storage.get(artifact), currentDeletedUids: new Set([removedUid]) };
+    vi.spyOn(partialAuth, 'importUsers').mockRejectedValueOnce(new Error('Interrupted Auth import'));
+    await expect(restoreBackup(partial)).rejects.toThrow('Interrupted Auth import');
+    expect((await partialDb.doc('posts/retained').get()).exists).toBe(true);
+    await expect(restoreBackup(partial)).rejects.toMatchObject({ code: 'APP-RESTORE-TARGET' });
     const manifestFile = job.artifacts.at(-1)!;
     const manifest = JSON.parse((await storage.get(manifestFile)).toString());
     for (const started of [0, Date.now() + 86_400_000]) {
@@ -453,7 +490,39 @@ it('restores encrypted Firestore/Auth parts into an empty isolated target and ap
     expect((await targetAuth.getUser(uid)).metadata.creationTime).toBe((await getAdminAuth().getUser(uid)).metadata.creationTime);
     expect((await targetDb.doc('posts/retained').get()).data()).toMatchObject({ authorId: '__deleted__', authorName: 'Former member', likedBy: [uid], likesCount: 1 });
     await expect(restoreBackup({ db: targetDb, auth: targetAuth, artifacts: job.artifacts, read: artifact => storage.get(artifact), currentDeletedUids: new Set() })).rejects.toMatchObject({ code: 'APP-RESTORE-TARGET' });
-  } finally { await deleteApp(app); }
+    const backupId = jobs.docs[0].id, sourceProject = getAdminAuth().app.options.projectId!;
+    const finalize = () => finalizeRestoredDeletions(db, targetDb, targetAuth, backupId, sourceProject);
+    await expect(finalize()).rejects.toThrow('matching completed initial restore');
+    await targetDb.doc(RESTORE_MARKER).create({ sourceProject, jobId: backupId, phase: 'restored' });
+    const extraPage = targetDb.batch();
+    for (let i = 0; i < 105; i++) extraPage.set(targetDb.doc('users/' + uid + '/notes/item' + i), { text: 'Owned row' });
+    await extraPage.commit();
+    const requestId = randomUUID();
+    const late = await createAccountJob(uid, 'deletion', requestId);
+    vi.spyOn(targetAuth, 'deleteUsers').mockRejectedValueOnce(new Error('Temporary Auth outage'));
+    await expect(finalize()).rejects.toThrow('Temporary Auth outage');
+    expect((await targetDb.doc(RESTORE_MARKER).get()).get('phase')).toBe('reconciling');
+    await expect(createAccountJob('another-learner', 'deletion', randomUUID())).rejects.toMatchObject({ status: 503 });
+    await expect(finalize()).resolves.toMatchObject({ verified: true });
+    expect((await targetDb.doc(RESTORE_MARKER).get()).get('phase')).toBe('verified');
+    await expect(createAccountJob('another-learner', 'deletion', randomUUID())).rejects.toMatchObject({ status: 503 });
+    expect((await createAccountJob(uid, 'deletion', requestId)).id).toBe(late.id);
+    await expect(targetAuth.getUser(uid)).rejects.toMatchObject({ code: 'auth/user-not-found' });
+    expect((await targetDb.doc('users/' + uid + '/notes/missing/deep/one').get()).exists).toBe(false);
+    expect((await targetDb.doc('_serviceConsents/' + uid).get()).exists).toBe(false);
+    expect((await targetDb.doc('posts/retained').get()).get('likedBy')).toEqual([]);
+    expect((await targetDb.doc('forumPosts/retained').get()).get('likesCount')).toBe(0);
+    expect((await targetDb.collection('users/' + uid + '/notes').limit(1).get()).empty).toBe(true);
+    expect((await targetDb.doc('arenaExams/exam/attempts/' + uid).get()).exists).toBe(false);
+    expect((await targetDb.doc('arenaExams/exam/rankings/' + rankingId).get()).data()).toMatchObject({ formerMember: true, userName: 'Former member', score: 100 });
+    const retainedSession = (await targetDb.doc('users/remaining-author/history/session').get()).data()!;
+    expect(retainedSession.content).toBe('Retain this session');
+    expect(retainedSession.date.toMillis()).toBe(Date.parse('2026-09-03T12:00:00Z'));
+    await expect(finalize()).resolves.toMatchObject({ verified: true, changed: 0 });
+    await expect(releaseDeletionCutover(db, backupId, partialId)).rejects.toThrow('another restore');
+    await releaseDeletionCutover(db, backupId, targetId);
+    await expect(createAccountJob('another-learner', 'deletion', randomUUID())).resolves.toHaveProperty('id');
+  } finally { await Promise.all([deleteApp(app), deleteApp(partialApp)]); }
 });
 
 it('keeps the backup write barrier until the final checkpoint commits and recovers a lost completion response', async () => {

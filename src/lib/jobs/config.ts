@@ -1,6 +1,8 @@
 import 'server-only';
 import { ApiError } from '../server-api';
 
+export const DELETION_CUTOVER = '_serviceState/deletionCutover';
+
 export const JOB_LIMITS = {
   pageSize: 10, partBytes: 2_000_000, objectBytes: 10_000_000,
   leaseMs: 60_000, stepMs: 20_000, stepsPerInvocation: 2, exportLifetimeMs: 24 * 60 * 60 * 1000,

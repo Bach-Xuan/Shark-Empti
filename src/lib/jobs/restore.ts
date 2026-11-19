@@ -4,11 +4,10 @@ import { GeoPoint, Timestamp, type Firestore } from 'firebase-admin/firestore';
 import type { Auth, UserImportRecord } from 'firebase-admin/auth';
 import { z } from 'zod';
 import { ApiError } from '../server-api';
-import { digest } from './crypto';
-import { anonymizeContributions, isCommunityRecordPath, OWNED_RECORDS, userBudgetPaths } from './catalog';
+import { retainedRecord } from './restored-record';
+import { userBudgetPaths } from './catalog';
 import { JOB_LIMITS } from './config';
 import type { Artifact } from './types';
-import { SERVICE_CONSENT_COLLECTION } from '../service-policy';
 import { isCommunityProjectionPath, isManagedCommunityProjection, rebuildRestoredCommunity } from '../community-privacy-migration';
 
 export function importValue(value: unknown, db: Firestore): unknown {
@@ -63,19 +62,9 @@ export async function restoreBackup(options: {
     if (data.kind === 'firestore') {
       const batch = db.batch(); let count = 0;
       for (const item of z.array(z.object({ path: z.string().min(1), data: z.record(z.string(), z.unknown()) })).max(100).parse(data.documents)) {
-        const [collection, id] = item.path.split('/');
-        if (isCommunityProjectionPath(item.path)) continue;
-        if (excluded.has(collection) || (['users', SERVICE_CONSENT_COLLECTION].includes(collection) && deleted.has(id)) || deletedBudgetPaths.has(item.path)
-          || (collection === '_aiQuota' && id.startsWith('user_') && deleted.has(id.slice(5)))) continue;
-        const decoded = importValue(item.data, db) as Record<string, unknown>;
-        const rule = OWNED_RECORDS.find(source => source.collection === collection);
-        const owner = rule?.field.split('.').reduce<unknown>((value, field) => value && typeof value === 'object' ? (value as Record<string, unknown>)[field] : undefined, decoded);
-        if (rule && ['delete', 'job'].includes(rule.action) && typeof owner === 'string' && deleted.has(owner)) continue;
-        if (collection === '_requestReceipts' && typeof decoded.ownerUid !== 'string') continue;
-        let path = item.path;
-        if (isCommunityRecordPath(path, 'attempts') && typeof decoded.userId === 'string' && deleted.has(decoded.userId)) path = path.split('/').slice(0, -1).join('/') + '/' + digest(operationId + path);
-        const restored = collection === 'users' ? decoded : anonymizeContributions(decoded, deleted) as Record<string, unknown>;
-        batch.set(db.doc(path), restored); count++;
+        if (isCommunityProjectionPath(item.path) || excluded.has(item.path.split('/')[0])) continue;
+        const record = retainedRecord(item.path, importValue(item.data, db) as Record<string, unknown>, deleted, deletedBudgetPaths, operationId);
+        if (record) { batch.set(db.doc(record.path), record.data); count++; }
       }
       if (count) { await batch.commit(); documents += count; }
     } else if (data.kind === 'auth') {

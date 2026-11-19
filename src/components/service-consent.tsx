@@ -14,7 +14,7 @@ import { useRequestScope } from '@/hooks/use-request-scope';
 const ConsentStatus = z.object({ accepted: z.boolean(), policyVersion: z.literal(SITE_INFO.policyVersion), minimumAge: z.literal(SITE_INFO.minimumAge) });
 
 /** Self-declared eligibility; this does not verify a person's age or collect DOB. */
-export function ServiceConsent({ user, children }: { user: Pick<User, 'uid' | 'getIdToken'>; children: ReactNode }) {
+export function ServiceConsent({ user, children, preparingProfile = false }: { user: Pick<User, 'uid' | 'getIdToken'>; children: ReactNode; preparingProfile?: boolean }) {
   const { lang } = useAppPreferences();
   const [state, setState] = useState<'loading' | 'required' | 'accepted' | 'error'>('loading');
   const [checked, setChecked] = useState(false), [busy, setBusy] = useState(false), [retry, setRetry] = useState(0);
@@ -30,8 +30,8 @@ export function ServiceConsent({ user, children }: { user: Pick<User, 'uid' | 'g
     }).catch(() => { if (alive) setState('error'); }).finally(() => clearTimeout(timer));
     return () => { alive = false; clearTimeout(timer); };
   }, [user, retry, requestScope]);
+  if (preparingProfile || state === 'loading') return <RouteSkeleton view="setup" />;
   if (state === 'accepted') return children;
-  if (state === 'loading') return <RouteSkeleton view="setup" />;
   const copy = publicMessages[lang];
   return <main className="mx-auto grid min-h-[65vh] max-w-2xl content-center gap-5 p-5">
     <section className="service-surface space-y-5">

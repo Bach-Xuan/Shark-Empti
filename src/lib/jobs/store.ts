@@ -3,9 +3,9 @@ import { randomUUID } from 'node:crypto';
 import { FieldValue, type Transaction } from 'firebase-admin/firestore';
 import { getAdminDb } from '../firebase-admin';
 import { ApiError, assertWritable } from '../server-api';
-import { requireJobs, JOB_LIMITS } from './config';
+import { DELETION_CUTOVER, requireJobs, JOB_LIMITS } from './config';
 import { digest, receiptFor } from './crypto';
-import { readJob, type JobRecord, type StepResult } from './types';
+import { canProcessJob, processingExpired, readJob, type JobRecord, type StepResult } from './types';
 import { prepareRequestBudget } from '../request-budget';
 
 export function jobIdFor(value: string) {
@@ -26,6 +26,9 @@ export async function createAccountJob(uid: string, kind: 'export' | 'deletion',
       const old = readJob(previous.data());
       if (old.ownerUid !== uid || old.kind !== kind) throw new ApiError('APP-REQUEST-CONFLICT', 409, 'The request identifier has already been used.');
       return old;
+    }
+    if (kind === 'deletion' && (await transaction.get(db.doc(DELETION_CUTOVER))).exists) {
+      throw new ApiError('APP-MAINTENANCE', 503, 'Account deletion is paused during restore cutover. Retry after service resumes.');
     }
     await assertWritable(transaction, uid, { allowUnconsented: true });
     const commitBudget = await prepareRequestBudget(transaction, uid, 'account-request');
@@ -49,15 +52,16 @@ export async function assertJobLease(transaction: Transaction, id: string, job: 
   if (!job.lease || current.get('lease.id') !== job.lease.id || global.get('id') !== job.lease.id || current.get('lease.expiresAtMs') <= Date.now()) throw new ApiError('ACCOUNT-JOB-LEASE', 409, 'The job lease has expired.');
 }
 export async function claimJob(id: string) {
-  const db = getAdminDb(), now = Date.now(), leaseId = randomUUID();
+  const db = getAdminDb(), leaseId = randomUUID();
   const ref = db.collection('_accountJobs').doc(id), globalRef = db.collection('_jobWorkerState').doc('lease');
   return db.runTransaction(async transaction => {
     const [snapshot, global, maintenance] = await Promise.all([transaction.get(ref), transaction.get(globalRef), transaction.get(db.collection('_serviceState').doc('maintenance'))]);
     if (!snapshot.exists) return null;
     const job = readJob(snapshot.data());
-    if (job.environment !== requireJobs().environment || ['ready', 'completed', 'failed'].includes(job.status) || (job.kind !== 'deletion' && job.expiresAtMs <= now)
+    const now = Date.now();
+    if (!canProcessJob(job, requireJobs().environment, now)
       || (maintenance.get('active') === true && maintenance.get('expiresAtMs') > now && maintenance.get('jobId') !== id)
-      || (job.status === 'waiting_quota' && job.nextRunAtMs > now) || (job.lease?.expiresAtMs ?? 0) > now || global.get('expiresAtMs') > now) return null;
+      || global.get('expiresAtMs') > now) return null;
     const lease = { id: leaseId, expiresAtMs: now + JOB_LIMITS.leaseMs };
     transaction.set(globalRef, { ...lease, jobId: id });
     transaction.update(ref, { lease, status: 'running', updatedAtMs: now, nextRunAtMs: lease.expiresAtMs });
@@ -69,7 +73,7 @@ export async function finishStep(id: string, job: JobRecord, result: StepResult,
   await db.runTransaction(async transaction => {
     await assertJobLease(transaction, id, job);
     const now = Date.now();
-    const failure = job.kind === 'export' && job.createdAtMs + JOB_LIMITS.exportProcessingMs <= now
+    const failure = processingExpired(job, now) || (job.kind === 'export' && job.createdAtMs + JOB_LIMITS.exportProcessingMs <= now)
       ? 'ACCOUNT-JOB-EXPIRED' : error;
     const completed = result.complete === true && !failure;
     const maintenance = db.collection('_serviceState').doc('maintenance');

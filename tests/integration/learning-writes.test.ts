@@ -46,6 +46,10 @@ it.each(['history', 'flashcards', 'practice'] as const)('persists validated %s o
   const changed = kind === 'flashcards' ? { ...bodies.flashcards, sourceValue: 'Changed' }
     : kind === 'history' ? { ...bodies.history, totalTime: 2 } : { ...bodies.practice, concept: 'Changed' };
   expect((await PUT(request(changed), context(kind, id))).status).toBe(409);
+  const legacy = saved[field].toDate().toISOString();
+  await ref.update({ [field]: legacy });
+  expect((await PUT(request(input), context(kind, id))).status).toBe(200);
+  expect((await ref.get()).get(field).toMillis()).toBe(Date.parse(legacy));
 });
 it.each([
   ['history', { ...bodies.history, userId: 'forged' }], ['history', { ...bodies.history, date: '2026-09-03' }],
@@ -72,6 +76,7 @@ it('attaches feedback without changing completion, answers or creation identity,
   expect((await PUT(request(initial), context('history', id))).status).toBe(201);
   const ref = getAdminDb().doc(`users/${uid}/history/${id}`), before = (await ref.get()).data()!;
   const feedback = { analysis, topicEn: 'Addition', topicVi: 'Phép cộng' };
+  await ref.update({ date: before.date.toDate().toISOString() });
   expect((await PATCH(request(feedback, 'PATCH'), context('history', id))).status).toBe(200);
   expect((await PATCH(request(feedback, 'PATCH'), context('history', id))).status).toBe(200);
   expect((await PUT(request(initial), context('history', id))).status).toBe(200);
@@ -87,7 +92,7 @@ it('keeps legacy history feedback recovery non-destructive and refuses invalid l
   await ref.set({ ...history, config: { ...history.config, preservedNested: 'Retain nested' }, date: new Date(history.date).toISOString(), preservedUnknown: 'Retain' });
   const feedback = { analysis, topicEn: 'Addition', topicVi: 'Phép cộng' };
   expect((await PATCH(request(feedback, 'PATCH'), context('history', 'legacy'))).status).toBe(200);
-  expect((await ref.get()).get('date')).toBe(new Date(history.date).toISOString());
+  expect((await ref.get()).get('date').isEqual(Timestamp.fromMillis(history.date))).toBe(true);
   expect((await ref.get()).get('preservedUnknown')).toBe('Retain');
   expect((await ref.get()).get('config.preservedNested')).toBe('Retain nested');
   await ref.update({ quizResults: [null] });

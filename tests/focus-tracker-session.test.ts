@@ -18,7 +18,7 @@ function harness() {
   const model = { predict: vi.fn(() => tf.tensor1d([0.8])), dispose: vi.fn(() => weight.dispose()) };
   const tracks = [0, 1].map(() => Object.assign(new EventTarget(), { stop: vi.fn(), readyState: 'live' }));
   const stream = { getTracks: () => tracks } as unknown as MediaStream;
-  const frames = new Map<number, FrameRequestCallback>();
+  const timers = new Map<number, () => void>();
   let id = 0;
   const runtime = {
     ...tf,
@@ -33,8 +33,8 @@ function harness() {
   const deps = {
     runtime: vi.fn(async () => runtime as typeof tf),
     camera: vi.fn(async () => stream),
-    requestFrame: vi.fn((callback: FrameRequestCallback) => { frames.set(id, callback); return id++; }),
-    cancelFrame: vi.fn((key: number) => { frames.delete(key); }),
+    scheduleSample: vi.fn((callback: () => void, _delay: number) => { timers.set(id, callback); return id++; }),
+    cancelSample: vi.fn((key: number) => { timers.delete(key); }),
   };
   const update = vi.fn<(state: FocusState) => void>();
   const session = new FocusTrackerSession(update, deps);
@@ -43,15 +43,15 @@ function harness() {
   Object.defineProperty(video, 'readyState', { value: 2, configurable: true });
   video.play = vi.fn(async () => {});
   video.pause = vi.fn();
-  const frame = (time = 1000) => {
-    const [key, callback] = [...frames.entries()][0];
-    frames.delete(key);
-    callback(time);
+  const runSample = () => {
+    const [key, callback] = [...timers.entries()][0];
+    timers.delete(key);
+    callback();
   };
   const released = () => {
     expect(model.dispose).toHaveBeenCalledTimes(1);
     for (const track of tracks) expect(track.stop).toHaveBeenCalledTimes(1);
-    expect(frames.size).toBe(0);
+    expect(timers.size).toBe(0);
     expect(video.srcObject).toBeNull();
     expect(video.onloadedmetadata).toBeNull();
     expect(video.onerror).toBeNull();
@@ -59,7 +59,7 @@ function harness() {
     expect(runtime.removeBackend).not.toHaveBeenCalled();
     expect(runtime.disposeVariables).not.toHaveBeenCalled();
   };
-  return { session, model, weight, tracks, stream, runtime, deps, update, video, frames, frame, released };
+  return { session, model, weight, tracks, stream, runtime, deps, update, video, timers, runSample, released };
 }
 
 beforeAll(async () => { await tf.setBackend('cpu'); await tf.ready(); });
@@ -102,7 +102,7 @@ describe('focus session resource ownership', () => {
     expect(h.runtime.loadGraphModel).toHaveBeenCalledOnce();
     h.session.attach(h.video);
     await flush();
-    h.frame();
+    h.runSample();
     expect(h.update).toHaveBeenLastCalledWith({ phase: 'active', score: 80 });
     h.session.stop();
     h.released();
@@ -168,7 +168,7 @@ describe('focus session resource ownership', () => {
     h.released();
   });
 
-  it.each(['pixels', 'predict', 'readback', 'invalid'] as const)('releases inference tensors, model, frames and tracks on %s failure', async stage => {
+  it.each(['pixels', 'predict', 'readback', 'invalid'] as const)('releases inference tensors, model, timers and tracks on %s failure', async stage => {
     const h = harness();
     await h.session.start();
     h.session.attach(h.video);
@@ -180,23 +180,23 @@ describe('focus session resource ownership', () => {
       if (stage === 'readback') vi.spyOn(output, 'dataSync').mockImplementation(fault);
       return output;
     });
-    h.frame();
+    h.runSample();
     expect(h.update).toHaveBeenLastCalledWith({ phase: 'error', error: 'inference', score: 0 });
     h.released();
     expect(tf.memory().numTensors).toBe(baseline);
   });
 
-  it('cancels frame zero and ignores callbacks delivered after stop; cleanup is idempotent', async () => {
+  it('cancels timer zero and ignores callbacks delivered after stop; cleanup is idempotent', async () => {
     const h = harness();
     await h.session.start();
     h.session.attach(h.video);
     await flush();
-    const stale = h.frames.get(0)!;
+    const stale = h.timers.get(0)!;
     h.session.stop();
     h.session.stop();
-    stale(1000);
+    stale();
     h.released();
-    expect(h.deps.cancelFrame).toHaveBeenCalledWith(0);
+    expect(h.deps.cancelSample).toHaveBeenCalledWith(0);
     expect(h.model.predict).toHaveBeenCalledTimes(1);
   });
 
@@ -280,7 +280,7 @@ describe('focus session resource ownership', () => {
     detach(); // Old cleanup must not detach the new binding on the same element.
     if (result === 'resolve') wait.resolve(); else wait.reject(new Error('late play'));
     await flush();
-    expect(h.frames.size).toBe(1);
+    expect(h.timers.size).toBe(1);
     expect(h.video.srcObject).toBe(h.stream);
     expect(h.model.dispose).not.toHaveBeenCalled();
     h.session.stop();
@@ -298,7 +298,7 @@ describe('focus session resource ownership', () => {
     if (result === 'resolve') wait.resolve(); else wait.reject(new Error('stopped play'));
     await flush();
     expect(h.update).toHaveBeenCalledTimes(updates);
-    expect(h.deps.requestFrame).not.toHaveBeenCalled();
+    expect(h.deps.scheduleSample).not.toHaveBeenCalled();
     h.released();
   });
 
@@ -321,11 +321,14 @@ describe('focus session resource ownership', () => {
     await h.session.start();
     h.session.attach(h.video);
     await flush();
-    h.frame(1000);
+    expect(h.timers.size).toBe(0);
     expect(h.model.predict).toHaveBeenCalledTimes(1); // Warmup only.
     hidden.mockReturnValue(false);
     h.model.predict.mockImplementationOnce(() => tf.tensor1d([0]));
-    h.frame(2000);
+    document.dispatchEvent(new Event('visibilitychange'));
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(h.timers.size).toBe(1);
+    h.runSample();
     expect(h.update).toHaveBeenLastCalledWith({ phase: 'active', score: 0 });
   });
 
@@ -339,17 +342,30 @@ describe('focus session resource ownership', () => {
     h.video.dispatchEvent(new Event('loadedmetadata'));
     h.video.dispatchEvent(new Event('loadedmetadata'));
     await flush();
-    expect(h.frames.size).toBe(1);
-    h.frame(1000);
-    h.frame(1100);
+    expect(h.timers.size).toBe(1);
+    const now = vi.spyOn(performance, 'now').mockReturnValue(1000);
+    h.runSample();
+    expect(h.deps.scheduleSample).toHaveBeenLastCalledWith(expect.any(Function), 800);
+    expect(h.model.predict).toHaveBeenCalledTimes(2);
+    const late = [...h.timers.values()][0];
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(h.timers.size).toBe(0);
+    expect(h.video.pause).not.toHaveBeenCalled();
+    hidden.mockReturnValue(false);
+    now.mockReturnValue(1100);
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(h.deps.scheduleSample).toHaveBeenLastCalledWith(expect.any(Function), 700);
+    late();
+    expect(h.timers.size).toBe(1);
     expect(h.model.predict).toHaveBeenCalledTimes(2);
     detach();
-    expect(h.frames.size).toBe(0);
+    expect(h.timers.size).toBe(0);
     expect(h.model.dispose).not.toHaveBeenCalled();
     expect(h.tracks[0].stop).not.toHaveBeenCalled();
     h.session.attach(h.video);
     await flush();
-    h.frame(1200);
+    h.runSample();
     expect(h.model.predict).toHaveBeenCalledTimes(3);
     h.session.stop();
     h.released();

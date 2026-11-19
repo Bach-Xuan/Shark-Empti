@@ -7,17 +7,18 @@ export type FocusState = { phase: 'idle' | 'starting' | 'active' | 'error'; erro
 type Dependencies = {
   runtime: () => Promise<Runtime>;
   camera: () => Promise<MediaStream>;
-  requestFrame: (callback: FrameRequestCallback) => number;
-  cancelFrame: (id: number) => void;
+  scheduleSample: (callback: () => void, delay: number) => number;
+  cancelSample: (id: number) => void;
 };
 const defaults: Dependencies = {
   runtime: () => import('@tensorflow/tfjs'),
   camera: () => navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } }),
-  requestFrame: callback => requestAnimationFrame(callback),
-  cancelFrame: id => cancelAnimationFrame(id),
+  scheduleSample: (callback, delay) => window.setTimeout(callback, delay),
+  cancelSample: id => window.clearTimeout(id),
 };
 const MODEL_URL = '/models/focus-model/model.json';
 const SIZE = 224;
+const SAMPLE_INTERVAL_MS = 800;
 
 // Cleanup is best effort per resource: one broken driver must not retain the rest.
 function release(action: () => void) { try { action(); } catch { /* Continue releasing owned resources. */ } }
@@ -133,43 +134,57 @@ export class FocusTrackerSession {
     if (this.stopped || !this.stream || !tf || !model) return () => {};
     let attached = true;
     let playing = false;
-    let frame: number | null = null;
-    let lastTime = -Infinity;
+    let timer: number | null = null;
+    let nextSampleAt = 0;
+    const cancelSample = () => {
+      const id = timer;
+      timer = null;
+      if (id !== null) release(() => this.deps.cancelSample(id));
+    };
     const current = () => attached && !this.stopped;
     const detach = () => {
       if (!attached) return;
       attached = false;
       if (this.detachVideo === detach) this.detachVideo = null;
-      if (frame !== null) release(() => this.deps.cancelFrame(frame!));
-      frame = null;
+      cancelSample();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       video.onloadedmetadata = null;
       video.onerror = null;
       release(() => video.pause());
       release(() => { video.srcObject = null; });
     };
     this.detachVideo = detach;
-    const processFrame: FrameRequestCallback = timestamp => {
-      frame = null;
-      if (!current()) return;
-      try {
-        if (!document.hidden && video.readyState >= 2 && timestamp - lastTime >= 800) {
-          lastTime = timestamp;
-          const score = tf.tidy(() => {
-            const pixels = tf.browser.fromPixels(video);
-            const input = tf.image.resizeBilinear(pixels, [SIZE, SIZE]).toFloat().div(127.5).sub(1).expandDims(0);
-            return this.probability(this.predict(model, input));
-          });
-          this.update({ phase: 'active', score });
-        }
-        if (current()) frame = this.deps.requestFrame(processFrame);
-      } catch { if (current()) this.fail('inference'); }
+    const schedule = () => {
+      if (!current() || document.hidden || timer !== null) return;
+      const delay = Math.max(0, Math.ceil(nextSampleAt - performance.now()));
+      const id = this.deps.scheduleSample(() => {
+        if (timer !== id) return;
+        timer = null;
+        if (!current() || document.hidden) return;
+        nextSampleAt = performance.now() + SAMPLE_INTERVAL_MS;
+        try {
+          if (video.readyState >= 2) {
+            const score = tf.tidy(() => {
+              const pixels = tf.browser.fromPixels(video);
+              const input = tf.image.resizeBilinear(pixels, [SIZE, SIZE]).toFloat().div(127.5).sub(1).expandDims(0);
+              return this.probability(this.predict(model, input));
+            });
+            this.update({ phase: 'active', score });
+          }
+          schedule();
+        } catch { if (current()) this.fail('inference'); }
+      }, delay);
+      timer = id;
     };
+    const onVisibilityChange = () => { if (document.hidden) cancelSample(); else schedule(); };
     const play = async () => {
       if (!current() || playing) return;
       playing = true;
       try {
         await video.play();
-        if (current()) frame = this.deps.requestFrame(processFrame);
+        if (!current()) return;
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        schedule();
       } catch { if (current()) this.fail('playback'); }
     };
     try {

@@ -104,7 +104,7 @@ for (const line of audit.split(/\r?\n/)) {
   } else counts[status]++;
   findingIds.add(id);
 }
-const totals = audit.match(/\*\*(\d+) findings\*\*.*?\*\*(\d+) are resolved and (\d+) remain open\.\*\*/);
+const totals = audit.match(/\*\*(\d+) findings\*\*.*?\*\*(\d+) are resolved and (\d+) remains? open\.\*\*/);
 if (!totals || Number(totals[1]) !== findingIds.size || Number(totals[2]) !== counts.Resolved || Number(totals[3]) !== counts.Open) {
   problems.push('Audit totals must agree with the finding tables.');
 }

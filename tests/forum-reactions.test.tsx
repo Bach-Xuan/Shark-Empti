@@ -80,6 +80,28 @@ it('rejects a mismatched record, unsubscribes once, and supports an explicit fre
   act(() => old.fail()); expect(hook.result.current.error).toBe(false); expect(old.stop).toHaveBeenCalledOnce();
 });
 
+it('requires fresh confirmation after losing or replacing the database for the same owner and targets', async () => {
+  const hook = renderHook(({ store }: { store: Firestore | null }) => useForumReactions(store, 'owner', [target]), {
+    initialProps: { store: db as Firestore | null },
+  });
+  await waitFor(() => expect(mocks.listeners).toHaveLength(1));
+  const old = mocks.listeners[0], liked = await snapshot();
+  act(() => old.next(liked));
+  expect(hook.result.current.isLiked(target)).toBe(true);
+  hook.rerender({ store: null });
+  expect(hook.result.current.error).toBe(true);
+  expect(hook.result.current.isLiked(target)).toBe(false);
+  hook.rerender({ store: db });
+  expect(hook.result.current.loading).toBe(true);
+  expect(hook.result.current.isLiked(target)).toBe(false);
+  await waitFor(() => expect(mocks.listeners).toHaveLength(2));
+  act(() => mocks.listeners[1].next(liked));
+  hook.rerender({ store: {} as Firestore });
+  act(() => old.next(liked));
+  expect(hook.result.current.loading).toBe(true);
+  expect(hook.result.current.isLiked(target)).toBe(false);
+});
+
 it('times out a hash that never finishes without leaking a later subscription', async () => {
   vi.useFakeTimers();
   let finish!: (value: ArrayBuffer) => void;
@@ -106,4 +128,26 @@ it('does not subscribe for a guest or empty target list and reports missing conf
   hook.rerender({ uid: 'owner', targets: [], store: db }); expect(hook.result.current.loading).toBe(false);
   hook.rerender({ uid: 'owner', targets: [target], store: null }); expect(hook.result.current.error).toBe(true);
   expect(mocks.listeners).toHaveLength(0);
+});
+
+it('retains all three live listeners, hashes and liked state when 61 targets reorder or repeat', async () => {
+  const targets: ForumReactionTarget[] = Array.from({ length: 60 }, (_, n) => ({ postId: 'p' + n }));
+  const comment = { postId: 'p0', commentId: 'c1' };
+  targets.push(comment);
+  const liked = await snapshot(comment);
+  const digest = vi.spyOn(webcrypto.subtle, 'digest');
+  const hook = renderHook(({ targets }) => useForumReactions(db, 'owner', targets), { initialProps: { targets: [...targets, comment] } });
+  await waitFor(() => expect(mocks.listeners).toHaveLength(3));
+  const live = mocks.listeners.find(listener => listener.source.ids.includes(liked.docs[0].id))!;
+  act(() => mocks.listeners.forEach(listener => listener.next(listener === live ? liked : empty())));
+  for (let offset = 1; offset <= 10; offset++) {
+    hook.rerender({ targets: [...targets.slice(offset), ...targets.slice(0, offset), comment] });
+    expect(hook.result.current.loading).toBe(false);
+    expect(hook.result.current.isLiked(comment)).toBe(true);
+  }
+  expect(digest).toHaveBeenCalledTimes(61);
+  expect(mocks.listeners).toHaveLength(3);
+  expect(mocks.listeners.every(listener => !listener.stop.mock.calls.length)).toBe(true);
+  act(() => live.next(empty()));
+  expect(hook.result.current.isLiked(comment)).toBe(false);
 });

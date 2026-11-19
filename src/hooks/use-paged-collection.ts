@@ -13,11 +13,11 @@ export function usePagedCollection<T>(source: Query<DocumentData> | null, read: 
  const seenIds = useRef(new Set<string>());
  const cursor = useRef<QueryDocumentSnapshot<DocumentData> | null>(null);
  const [items, setItems] = useState<T[]>([]);
- const [loading, setLoading] = useState(true), [hasMore, setHasMore] = useState(false);
+ const [activeSource, setActiveSource] = useState(source);
+ const [loading, setLoading] = useState(Boolean(source)), [hasMore, setHasMore] = useState(false);
  const [error, setError] = useState<FirestorePermissionError | null>(null);
  const [retryEpoch, setRetryEpoch] = useState(0);
  const [invalidRecords, setInvalidRecords] = useState(0);
- const [firstPageVersion, setFirstPageVersion] = useState(0);
  const report = useCallback((cause: unknown) => {
   const problem = new FirestorePermissionError({ path: 'paged-collection', operation: 'list' }, cause);
   errorEmitter.emit('permission-error', problem);
@@ -33,6 +33,7 @@ export function usePagedCollection<T>(source: Query<DocumentData> | null, read: 
  useEffect(() => {
   const lifecycle = epoch;
   const generation = ++lifecycle.current;
+  setActiveSource(source);
   busy.current = false; cursor.current = null; seenIds.current.clear(); setItems([]); setHasMore(false); setLoading(!!source); setError(null); setInvalidRecords(0);
   if (!source) return;
   const timer = setTimeout(() => {
@@ -41,7 +42,6 @@ export function usePagedCollection<T>(source: Query<DocumentData> | null, read: 
   const unsubscribe = onSnapshot(query(source, limit(PAGE_SIZE)), snapshot => {
    clearTimeout(timer);
    if (generation !== epoch.current) return;
-   setFirstPageVersion(previous => previous + 1);
    cursor.current = snapshot.docs.at(-1) ?? null;
    seenIds.current = new Set(snapshot.docs.map(doc => doc.id));
    const items = decode(snapshot.docs);
@@ -69,5 +69,7 @@ export function usePagedCollection<T>(source: Query<DocumentData> | null, read: 
   } catch (cause) { if (generation === epoch.current && cursor.current === anchor) { setError(report(cause)); setItems([]); cursor.current = null; setHasMore(false); } }
   finally { if (generation === epoch.current) { busy.current = false; setLoading(false); } }
  }, [source, hasMore, decode, report]);
- return { items, loading, hasMore, loadMore, error, retry, invalidRecords, firstPageVersion };
+ // A newly enabled reader must not briefly expose the previous query's empty state or rows.
+ if (activeSource !== source) return { items: [], loading: Boolean(source), hasMore: false, loadMore, error: null, retry, invalidRecords: 0 };
+ return { items, loading, hasMore, loadMore, error, retry, invalidRecords };
 }

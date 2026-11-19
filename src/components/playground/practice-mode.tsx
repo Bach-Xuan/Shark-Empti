@@ -41,7 +41,7 @@ Zap
 } from 'lucide-react';
 import React,{ useEffect,useMemo,useRef,useState } from 'react';
 
-export default function PracticeMode({ t, lang, weakPoints, totalAttempts, totalErrors, initialConcept, onAskGuru }: { t: TranslationSet, lang: Language, weakPoints: DashboardStats['processedGroupedInsights'], totalAttempts: number, totalErrors: number, initialConcept?: string, onAskGuru: (msg: string) => void }) {
+export default function PracticeMode({ t, lang, weakPoints, historyPending, totalAttempts, totalErrors, initialConcept, onAskGuru }: { t: TranslationSet, lang: Language, weakPoints: DashboardStats['processedGroupedInsights'], historyPending?: boolean, totalAttempts: number, totalErrors: number, initialConcept?: string, onAskGuru: (msg: string) => void }) {
   const { user } = useUser();
   const archiveRequest = useRequestScope();
   const aiRequest = useAiRequestScope();
@@ -439,7 +439,7 @@ export default function PracticeMode({ t, lang, weakPoints, totalAttempts, total
                 </Button>
               ))}
             </div>
-          ) : (
+          ) : !historyPending && (
             <div className="p-8 md:p-16 bg-muted/20 border-[2px] md:border-[3px] border-dashed border-border rounded-xl md:rounded-[2rem] text-center animate-in fade-in duration-700 flex flex-col items-center gap-3 md:gap-4">
               <div className="w-10 h-10 md:w-16 md:h-16 rounded-full bg-muted/40 flex items-center justify-center">
                 <Info className="w-5 h-5 md:w-8 md:h-8 text-muted-foreground opacity-50" />

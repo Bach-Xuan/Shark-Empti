@@ -12,6 +12,8 @@ Shark Empti helps a learner choose an activity, finish it, understand their answ
 | Forum, Arena and moderation | Discuss a topic or complete a community challenge | Show the state of the current user's reaction separately from the public count. Keep the Arena answer key private until the server accepts the submission. |
 | Profile, account data and receipt | Review learning records or exercise data rights | Data controls have their own route. Give export, deletion confirmation and receipt status distinct labels and recovery actions. |
 
+Login and registration enable the age confirmation once the guest form can receive input. The first check enables the Google button. Setup makes topic entry available before warming learning history. Dashboard and Playground share that history when the learner switches views. Resorting Forum posts retains the learner’s confirmed reaction indicators.
+
 The root layout applies the initial language and theme. Navigation, route-aware providers and feature components own the transitions inside the app. See [technical documentation](TECHNICAL_DOCUMENTATION.md) and [account operations](ACCOUNT_OPERATIONS.md).
 
 ## 🎨 Colour, typography and surfaces
@@ -35,6 +37,8 @@ The root font is 16 px on small screens and 12.8 px from 1024 px wide. The main 
 
 Keep navigation reachable while scrolling, constrain chat and Focus Shield panels within the viewport, and let long panel contents scroll. Dialogs need a readable title, an accessible close action, keyboard focus containment and focus return. Honour reduced-motion preferences for decorative animation and intentional scrolling.
 
+The Profile page offers **Export Academic Report** as soon as the profile is ready. Opening it starts a fresh selection and shows loading, retry and pagination inside the dialog. A successful empty read and a search with no matches have distinct messages. Keep the empty message and selected count legible in both themes. The dialog actions wrap on narrow screens so the full Generate button remains visible. Each session row uses a labelled native checkbox with the same keyboard and pointer selection behavior. The count includes only sessions still available to select. Generating the report captures those sessions so that preview, copy and print describe the same attempts even if history changes. [Report selection](../src/hooks/use-profile-report.ts)
+
 The profile report uses a printable article under the document body. Printing hides the surrounding application, removes viewport constraints and represents chart data as labelled tables. Keep topic headings, mathematical content and long recommendations legible across page breaks. [Print implementation](../src/components/profile-print-report.tsx)
 
 ## 🔄 Interaction and recovery
@@ -47,10 +51,10 @@ The profile report uses a printable article under the document body. Printing hi
 | Error | Describe the affected action in the active language, keep recoverable input and offer an appropriate retry. Keep credentials and provider payloads private. |
 | Recovery or completion | Resume owner-scoped work when available. Use the original save identity after response loss. Distinguish an unavailable receipt from a temporary read failure. |
 
-Focus Shield’s launcher stays disabled until the panel can open on the first activation. Tracking starts when the learner enables **Tracking Mode** and grants camera permission. Show its active state, stop control and recovery message. Describe its score as experimental. AI feedback should identify what the learner can practise and acknowledge uncertainty. [Data and AI contracts](backend.json)
+Focus Shield’s launcher stays disabled until the panel can open on the first activation. Tracking starts when the learner enables **Tracking Mode** and grants camera permission. The camera preview plays continuously between score updates. Hiding the preview keeps tracking active. Minimizing pauses sampling and keeps the camera available to resume. Closing the panel releases the camera. Show its active state, stop control and recovery message. Describe its score as experimental. AI feedback should identify what the learner can practise and acknowledge uncertainty. [Data and AI contracts](backend.json)
 
 ## 🧪 Reviewing a change
 
 Trace one complete task with keyboard and touch, in both themes and languages. Check the visible focus indicator, accessible name, error announcement, text wrapping, loading state and recovery after failure. Exercise the affected flow on the configured browser matrix, including mobile viewport constraints. Record the engine, version, environment and result for any compatibility claim.
 
-The [validation guide](VALIDATION.md) covers browser, accessibility and print checks. [Configuration](CONFIGURATION.md) describes the build environment. The [audit register](AUDIT_REPORT.md) records remaining evidence gaps. See the [project overview](../README.md) for product scope.
+The [validation guide](VALIDATION.md) covers browser, accessibility and print checks. [Configuration](CONFIGURATION.md) describes the build environment. The [audit register](AUDIT_REPORT.md) lists open and resolved findings. See the [project overview](../README.md) for product scope.

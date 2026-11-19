@@ -8,6 +8,20 @@ const user = { uid: 'learner', getIdToken: vi.fn() };
 const policy = { policyVersion: '2', minimumAge: 16 };
 function mount() { return render(<ServiceConsent user={user}><p>Learning features</p></ServiceConsent>); }
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
+
+it.each([true, false])('waits for profile readiness after an early server decision (accepted=%s)', async accepted => {
+  let finish!: (value: unknown) => void;
+  mocks.request.mockReturnValueOnce(new Promise(resolve => { finish = resolve; }));
+  const gate = (preparingProfile: boolean) => <ServiceConsent user={user} preparingProfile={preparingProfile}><p>Learning features</p></ServiceConsent>;
+  const view = render(gate(true));
+  await act(async () => finish({ ...policy, accepted }));
+  expect(screen.queryByText('Learning features')).toBeNull();
+  expect(screen.queryByRole('checkbox')).toBeNull();
+  view.rerender(gate(false));
+  if (accepted) expect(screen.getByText('Learning features')).toBeTruthy();
+  else expect(screen.getByRole('checkbox')).toBeTruthy();
+  expect(mocks.request).toHaveBeenCalledTimes(1);
+});
 it('requires an explicit eligibility checkbox and successful policy persistence before rendering learning features', async () => {
   mocks.request.mockResolvedValueOnce({ ...policy, accepted: false });
   let finish!: (value: unknown) => void;

@@ -37,12 +37,13 @@ Target
 } from 'lucide-react';
 import React,{ useEffect,useId,useRef,useState,useMemo } from 'react';
 
-export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, initialConcept }: { t: TranslationSet, lang: Language, weakPoints: DashboardStats['processedGroupedInsights'], totalAttempts: number, initialConcept?: string }) {
+export default function FlashcardGame({ t, lang, weakPoints, historyPending, totalAttempts, initialConcept }: { t: TranslationSet, lang: Language, weakPoints: DashboardStats['processedGroupedInsights'], historyPending?: boolean, totalAttempts: number, initialConcept?: string }) {
   const { user } = useUser();
   const archiveRequest = useRequestScope();
   const aiRequest = useAiRequestScope();
   const { toast } = useToast();
-  const [topic, setTopic] = useState(initialConcept || (weakPoints[0]?.topic || ""));
+  const [chosenTopic, setTopic] = useState(initialConcept);
+  const topic = chosenTopic || weakPoints[0]?.topic || "";
   const [numCards, setNumCards] = useState(10);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isValidating, setIsValidating] = useState(false);
@@ -305,7 +306,7 @@ export default function FlashcardGame({ t, lang, weakPoints, totalAttempts, init
                 </p>
               )}
             </div>
-          ) : (
+          ) : !historyPending && (
             <div className="p-8 md:p-16 bg-muted/20 border-[2px] md:border-[3px] border-dashed border-border rounded-xl md:rounded-[2rem] text-center animate-in fade-in duration-700 flex flex-col items-center gap-3 md:gap-4">
               <div className="w-10 h-10 md:w-16 md:h-16 rounded-full bg-muted/40 flex items-center justify-center">
                 <Info className="w-5 h-5 md:w-8 md:h-8 text-muted-foreground opacity-50" />

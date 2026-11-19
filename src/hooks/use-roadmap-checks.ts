@@ -6,6 +6,7 @@ const changedEvent = 'shark-roadmap-changed';
 export function useRoadmapChecks(uid: string | undefined) {
   const [snapshot, setSnapshot] = useState<{ uid?: string; checks: RoadmapChecks }>({ checks: {} });
   useEffect(() => {
+    if (!uid) return;
     const sync = () => setSnapshot({ uid, checks: readRoadmapChecks(uid) });
     sync();
     window.addEventListener('storage', sync);

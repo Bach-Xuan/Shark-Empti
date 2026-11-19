@@ -1,6 +1,6 @@
 # 📋 Consolidated Technical Audit Report · Shark Empti v2.0.0 **β**
 
-This register covers **82 findings**. **80 are resolved and 2 remain open.**
+This register covers **90 findings**. **89 are resolved and 1 remains open.**
 
 See the [technical documentation](TECHNICAL_DOCUMENTATION.md), [validation guide](VALIDATION.md), [account operations](ACCOUNT_OPERATIONS.md) and [interface design guide](DESIGN.md) for implementation and verification guidance.
 
@@ -20,8 +20,7 @@ See the [technical documentation](TECHNICAL_DOCUMENTATION.md), [validation guide
 
 | ID | Finding | Status | Last Updated |
 |---|---|---|---|
-| D32 | Four locked picomatch installations remain within the affected version range of high-severity advisory GHSA-fc5q-39xc-vjpf | Open | 18 November 2026 |
-| V04 | The refreshed npm inventory still fails the release policy because the picomatch advisory remains high severity | Open | 18 November 2026 |
+| V09 | Recovery time after an interrupted Auth import and restoration to a fresh isolated target has not been measured at staging scale against the four-hour objective | Open | 19 November 2026 |
 
 ## ✅ Resolved Findings
 
@@ -45,7 +44,7 @@ See the [technical documentation](TECHNICAL_DOCUMENTATION.md), [validation guide
 | D01 | Deliberate Arena retakes reused the previous submission identifier and could be mistaken for network retries | Resolved | 18 November 2026 |
 | D02 | Redundant escape replacement corrupted stored LaTeX before KaTeX rendered mathematical expressions | Resolved | 18 November 2026 |
 | D03 | Delayed profile snapshots or failed saves could overwrite an unsaved biography draft | Resolved | 18 November 2026 |
-| D04 | Clicking a report selection label could toggle its checkbox twice and leave the selection unchanged | Resolved | 18 November 2026 |
+| D04 | Report labels could toggle a checkbox twice, unavailable sessions could inflate the selected count and live history updates could change a generated report before printing | Resolved | 19 November 2026 |
 | D05 | Pending setup validation could launch a quiz with an obsolete language or configuration | Resolved | 18 November 2026 |
 | D06 | Forum edit dialogs closed before write acknowledgement and discarded drafts after a failed save | Resolved | 18 November 2026 |
 | D07 | Removing a Forum post could leave readable comments and no reliable way to resume interrupted cleanup | Resolved | 18 November 2026 |
@@ -53,7 +52,7 @@ See the [technical documentation](TECHNICAL_DOCUMENTATION.md), [validation guide
 | D09 | The report dialog clipped printed pages and omitted readable table equivalents for charts | Resolved | 18 November 2026 |
 | D10 | Error notifications could repeat the public error code and display English copy in Vietnamese mode | Resolved | 18 November 2026 |
 | D11 | Invalid responsive utility classes generated no CSS and left intended layout changes inactive | Resolved | 18 November 2026 |
-| D12 | Unnamed controls, incomplete keyboard interactions and an enabled pre-hydration Focus Shield button could prevent first activation | Resolved | 18 November 2026 |
+| D12 | Early interaction could lose the guest age confirmation or the first Focus Shield activation during hydration, and unnamed controls or incomplete keyboard handling impaired access | Resolved | 19 November 2026 |
 | D13 | OpenRouter’s health check could report model availability without authenticating the configured API key | Resolved | 18 November 2026 |
 | D14 | Typing a Forum draft before authentication restoration completed could discard the learner’s input | Resolved | 18 November 2026 |
 | D15 | Client-supplied Arena durations allowed leaderboard timing to diverge from the recorded server start | Resolved | 18 November 2026 |
@@ -69,12 +68,13 @@ See the [technical documentation](TECHNICAL_DOCUMENTATION.md), [validation guide
 | D25 | Deleting a profile could remove protected coin state while leaving private descendants or active AI requests behind | Resolved | 18 November 2026 |
 | D26 | Setup, runtime and stored Arena configuration applied different limits to quiz duration and question counts | Resolved | 18 November 2026 |
 | D27 | Recovered AI feedback could disappear from the original learning record or regenerate after a failed save | Resolved | 18 November 2026 |
-| D28 | Unlabelled form controls, insufficient contrast and incomplete page semantics impaired accessible navigation | Resolved | 18 November 2026 |
+| D28 | Unlabelled controls, incomplete page semantics and low-contrast text, including the empty academic report and selected-session count, impaired accessible navigation | Resolved | 19 November 2026 |
 | D29 | Failed or stalled Firestore subscriptions could appear as empty lists without an actionable retry | Resolved | 18 November 2026 |
 | D30 | Authenticated views could open before profile initialization completed and lacked recovery after bootstrap failure | Resolved | 18 November 2026 |
 | D31 | Leaving Quiz, Practice, Flashcards or Arena could discard unfinished progress before the learner resumed it | Resolved | 18 November 2026 |
+| D32 | Four locked picomatch installations were flagged by high-severity advisory GHSA-fc5q-39xc-vjpf, which the GitHub Advisory Database subsequently withdrew | Resolved | 19 November 2026 |
 | D33 | Exact-text grading rejected equivalent Practice short answers without accounting for meaning or uncertainty | Resolved | 18 November 2026 |
-| D34 | Authentication controls and expanded chat panels could overflow narrow or short mobile viewports | Resolved | 18 November 2026 |
+| D34 | Authentication controls and expanded chat panels could overflow mobile viewports, and the academic report dialog clipped its Generate button at a width of 320 CSS pixels | Resolved | 19 November 2026 |
 | D35 | Production browser tests could run against a stale build or one compiled with the wrong Firebase configuration | Resolved | 18 November 2026 |
 | D36 | Scheduled cleanup could delete a quota or budget record renewed after the expiry query selected it | Resolved | 18 November 2026 |
 | D37 | Expired AI generations could still be read, claimed, cancelled or finalized before scheduled cleanup ran | Resolved | 18 November 2026 |
@@ -83,6 +83,8 @@ See the [technical documentation](TECHNICAL_DOCUMENTATION.md), [validation guide
 | D40 | Equivalent request bodies with reordered nested fields produced different idempotency receipt fingerprints | Resolved | 18 November 2026 |
 | D41 | Public Forum reaction lists and Arena rankings exposed member identifiers beyond the intended public attribution | Resolved | 18 November 2026 |
 | D42 | Recursive Forum comment cleanup could continue outside write guards after a post was hidden | Resolved | 18 November 2026 |
+| D43 | Expired backup jobs consumed scheduler slots and reserved retry credits before the worker rejected them, delaying redispatch of pending account deletions | Resolved | 19 November 2026 |
+| D44 | A deletion accepted after the initial restore inventory could leave an identity, private descendants or stale public contributions on the target at cutover | Resolved | 19 November 2026 |
 | N01 | Inconsistent domain and file names made related modules harder to identify across features | Resolved | 18 November 2026 |
 | N02 | Shared types blurred the distinction between draft sessions, validated configurations and persisted operations | Resolved | 18 November 2026 |
 | N03 | Duplicated domain logic and insufficient unused-code checks obscured active implementation paths | Resolved | 18 November 2026 |
@@ -100,9 +102,15 @@ See the [technical documentation](TECHNICAL_DOCUMENTATION.md), [validation guide
 | P05 | Eager loading of learning views, KaTeX and TensorFlow increased initial JavaScript transfer on unrelated routes | Resolved | 18 November 2026 |
 | P06 | Shared quota documents, reaction counters, worker leases and storage inventory constrained concurrent operations | Resolved | 18 November 2026 |
 | P07 | Timestamp migration opened one sequential Firestore transaction per convertible record instead of processing bounded batches | Resolved | 18 November 2026 |
+| P08 | Guest login and registration downloaded the Firestore transport and learner consent code on arrival before a visitor initiated sign-in | Resolved | 19 November 2026 |
+| P09 | Opening Profile fetched both history pages before report selection, while Setup competed with interactive controls for the same learning-history reads | Resolved | 19 November 2026 |
+| P10 | Sorting Forum posts or comments recreated owner reaction listeners and briefly cleared confirmed likes even when the visible target IDs stayed the same | Resolved | 19 November 2026 |
+| P11 | Focus Shield polled video readiness on every animation frame between 800 ms inference samples while the camera preview was playing | Resolved | 19 November 2026 |
+| P12 | Legacy learning dates in the configured Firestore project prevented a single chronological query from paging all records in order until conversion preserved and verified every original instant | Resolved | 19 November 2026 |
 | V01 | WebKit coverage omitted Firestore transport behavior during authentication and persisted learning flows | Resolved | 18 November 2026 |
 | V02 | Minimum-version desktop and touch flows and physical camera startup and release lacked repeatable compatibility checks | Resolved | 18 November 2026 |
 | V03 | Local checks did not distinguish verified build settings from hosted CI, deployed headers and Firestore index readiness | Resolved | 18 November 2026 |
+| V04 | The picomatch advisory blocked the dependency release check until its withdrawal and a fresh registry inventory confirmed zero active advisories across the lockfile | Resolved | 19 November 2026 |
 | V05 | Browser, query and build performance comparisons lacked matched conditions, sample counts and coverage boundaries | Resolved | 18 November 2026 |
 | V06 | Optimized production builds required live Google Fonts access for the application’s Vietnamese and English typography | Resolved | 18 November 2026 |
 | V07 | Educational scores and Focus Shield estimates lacked documented uncertainty and independent calibration evidence | Resolved | 18 November 2026 |

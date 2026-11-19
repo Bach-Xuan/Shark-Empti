@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { launchMinimumBrowser } from './installation';
 import { allowedVerificationRequest } from '../e2e/network-policy';
 import { serviceMessages } from '../../src/lib/i18n/service';
+import { translations } from '../../src/lib/translations';
 
 const origin = 'http://127.0.0.1:9002';
 const mobileUserAgents = {
@@ -73,6 +74,15 @@ for (const engine of ['chromium', 'firefox', 'webkit'] as const) {
         await page.locator('button:has-text("Finish"), button:has-text("Results")').first().click();
         expect((await saved).status()).toBe(201);
         await page.locator('text=100%').first().waitFor();
+        await page.locator(`button[aria-label="${translations.en.profile}"]`).click();
+        await page.locator(`button:has-text("${translations.en.exportReport}")`).click();
+        const session = page.locator('[role="dialog"] input[type="checkbox"]').first();
+        await session.waitFor();
+        expect(await session.getAttribute('aria-label')).toContain('Addition');
+        await session.click();
+        await page.locator(`button:has-text("${translations.en.generateReport}")`).click();
+        const print = page.locator(`[role="dialog"] button[aria-label="${translations.en.printReport}"]`);
+        await expect.poll(() => print.isEnabled()).toBe(true);
         expect(errors).toEqual([]);
       } finally {
         await browser.close();

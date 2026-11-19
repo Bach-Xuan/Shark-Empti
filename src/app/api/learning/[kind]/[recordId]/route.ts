@@ -9,12 +9,18 @@ import { enforceRequestBudget, prepareRequestBudget } from '@/lib/request-budget
 import { canonicalJson } from '@/lib/canonical-json';
 import { learningKinds, learningWriteSchemas, historyFeedbackSchema } from '@/lib/learning-records';
 import { readHistoryItem } from '@/lib/history-schema';
+import { readTimeMillis } from '@/lib/time';
 import { LEARNING_LIMITS } from '@/lib/data-limits';
 import { requireDocumentId } from '@/lib/forum-deletion';
 
 export const runtime = 'nodejs';
 type Context = { params: Promise<{ kind: string; recordId: string }> };
 const headers = { 'Cache-Control': 'no-store' };
+function legacyTimestamp(value: unknown) {
+  if (value instanceof Timestamp) return null;
+  const millis = readTimeMillis(value);
+  return millis === null ? null : Timestamp.fromMillis(millis);
+}
 function checkSize(value: unknown) {
   const bytes = Buffer.byteLength(JSON.stringify(value), 'utf8');
   if (bytes > LEARNING_LIMITS.recordBytes) throw new ApiError('APP-PAYLOAD-TOO-LARGE', 413, 'The learning record exceeds the supported size.');
@@ -38,6 +44,9 @@ export async function PUT(request: Request, { params }: Context) {
       const previous = await transaction.get(ref);
       if (previous.exists) {
         if (previous.get('writeFingerprint') !== fingerprint) throw new ApiError('APP-REQUEST-CONFLICT', 409, 'This record identifier already contains another result.');
+        const field = kind === 'history' ? 'date' : 'createdAt';
+        const normalized = legacyTimestamp(previous.get(field));
+        if (normalized) transaction.update(ref, { [field]: normalized });
         return false;
       }
       const commitBudget = await prepareRequestBudget(transaction, uid, 'learning-write', bytes);
@@ -64,14 +73,18 @@ export async function PATCH(request: Request, { params }: Context) {
       await assertWritable(transaction, uid);
       const previous = await transaction.get(ref);
       if (!previous.exists) throw new ApiError('APP-NOT-FOUND', 404, 'The learning record was not found.');
-      const current = readHistoryItem(recordId, previous.data());
+      const normalized = legacyTimestamp(previous.get('date'));
+      const current = readHistoryItem(recordId, { ...previous.data(), ...(normalized ? { date: normalized } : {}) });
       if (!current) throw new ApiError('APP-DATA-INVALID', 409, 'The saved result needs review before feedback can be attached.');
       const config = { ...previous.get('config'), topicEn: feedback.topicEn, topicVi: feedback.topicVi };
-      if (canonicalJson({ analysis: previous.get('analysis'), topicEn: current.config.topicEn, topicVi: current.config.topicVi }) === canonicalJson(feedback)) return;
+      if (canonicalJson({ analysis: previous.get('analysis'), topicEn: current.config.topicEn, topicVi: current.config.topicVi }) === canonicalJson(feedback)) {
+        if (normalized) transaction.update(ref, { date: normalized });
+        return;
+      }
       const bytes = checkSize({ ...previous.data(), analysis: feedback.analysis, config });
       const commitBudget = await prepareRequestBudget(transaction, uid, 'learning-write', bytes);
       commitBudget();
-      transaction.update(ref, { analysis: feedback.analysis, 'config.topicEn': feedback.topicEn, 'config.topicVi': feedback.topicVi });
+      transaction.update(ref, { analysis: feedback.analysis, 'config.topicEn': feedback.topicEn, 'config.topicVi': feedback.topicVi, ...(normalized ? { date: normalized } : {}) });
     });
     return NextResponse.json({ recordId }, { headers });
   } catch (error) { return apiFailure(error); }

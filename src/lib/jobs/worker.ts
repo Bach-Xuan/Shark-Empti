@@ -9,7 +9,7 @@ import { backupStep } from './backup';
 import { JOB_LIMITS, requireRetention, jobsConfigured } from './config';
 import { enqueueJob } from './queue';
 import { PrivateJobStorage } from './storage';
-import { readJob } from './types';
+import { processingExpired, readJob } from './types';
 
 async function runStep(id: string): Promise<boolean> {
   const job = await claimJob(id);
@@ -82,16 +82,16 @@ async function cleanExpiredRecords(leaseId: string, now: number) {
     if (!lock.exists && typeof expiry?.toMillis === 'function' && expiry.toMillis() <= now) transaction.delete(journal.ref);
   });
   if (!jobsConfigured()) return removed;
-  // Retain a visible failure after a bounded processing window instead of silently
-  // erasing a quota-delayed export. Deletion locks/jobs never expire this way.
-  const pending = await db.collection('_accountJobs').where('kind', '==', 'export')
+  // Expired backups enter artifact cleanup. Export owners retain a failure receipt.
+  const pending = await db.collection('_accountJobs').where('kind', 'in', ['export', 'backup'])
     .where('status', 'in', ['queued', 'running', 'waiting_quota']).where('expiresAtMs', '<=', now).orderBy('expiresAtMs').limit(20).get();
   for (const snapshot of pending.docs) await maintenanceTransaction(leaseId, async transaction => {
     const current = await transaction.get(snapshot.ref);
-    if (!current.exists || !['queued', 'running', 'waiting_quota'].includes(current.get('status'))
-      || current.get('expiresAtMs') > now || current.get('lease.expiresAtMs') > now) return;
+    if (!current.exists) return;
+    const job = readJob(current.data());
+    if (!['queued', 'running', 'waiting_quota'].includes(job.status) || !processingExpired(job, now) || (job.lease?.expiresAtMs ?? 0) > now) return;
     transaction.update(snapshot.ref, { status: 'failed', errorCode: 'ACCOUNT-JOB-EXPIRED', lease: FieldValue.delete(),
-      updatedAtMs: now, expiresAtMs: now + JOB_LIMITS.exportLifetimeMs, expiresAt: new Date(now + JOB_LIMITS.exportLifetimeMs) });
+      updatedAtMs: now, ...(job.kind === 'export' ? { expiresAtMs: now + JOB_LIMITS.exportLifetimeMs, expiresAt: new Date(now + JOB_LIMITS.exportLifetimeMs) } : {}) });
   });
   // Query terminal states only, and rotate kinds so pending deletion locks and a
   // large export cannot starve unrelated receipts/backups. Part cleanup resumes.
@@ -123,34 +123,46 @@ async function cleanExpiredRecords(leaseId: string, now: number) {
 
 async function dispatchDue(now: number) {
   const db = getAdminDb();
-  const due = await db.collection('_accountJobs').where('status', 'in', ['queued', 'waiting_quota', 'running']).where('nextRunAtMs', '<=', now).orderBy('nextRunAtMs').limit(5).get();
-  for (const document of due.docs) {
-    if (document.get('status') === 'running') await db.runTransaction(async transaction => {
-      const current = await transaction.get(document.ref);
-      if (current.get('status') === 'running' && current.get('lease.expiresAtMs') <= Date.now()) {
-        transaction.update(document.ref, { status: 'queued', lease: FieldValue.delete(), nextRunAtMs: now });
-      }
-    });
-    await enqueueJob(document.id);
+  const due = db.collection('_accountJobs').where('status', 'in', ['queued', 'waiting_quota', 'running'])
+    .where('nextRunAtMs', '<=', now).orderBy('nextRunAtMs');
+  const deletions = await due.where('kind', '==', 'deletion').limit(5).get();
+  const ids = new Set(deletions.docs.map(document => document.id));
+  if (ids.size < 5) {
+    const oldest = await due.limit(5).get();
+    for (const document of oldest.docs) {
+      if (ids.size === 5) break;
+      ids.add(document.id);
+    }
   }
+  for (const id of ids) await enqueueJob(id);
 }
 
 /** Signed hourly scheduler; cleanup and business jobs share one fenced worker. */
 export async function maintenanceSweep() {
   const config = requireRetention(), db = getAdminDb(), now = Date.now();
-  const maintenance = await db.collection('_serviceState').doc('maintenance').get();
-  if (maintenance.get('active') === true && maintenance.get('expiresAtMs') > now) {
-    if (jobsConfigured() && typeof maintenance.get('jobId') === 'string') await enqueueJob(maintenance.get('jobId'));
+  const maintenance = db.collection('_serviceState').doc('maintenance');
+  const leaseId = randomUUID();
+  const admission = await db.runTransaction(async transaction => {
+    const [state, lease] = await transaction.getAll(maintenance, workerLeaseRef());
+    const clock = Date.now();
+    if (state.get('active') === true && state.get('expiresAtMs') > clock) {
+      const owner = state.get('jobId');
+      if (!jobsConfigured() || typeof owner !== 'string') return { admitted: false };
+      const backup = await transaction.get(db.collection('_accountJobs').doc(owner));
+      if (backup.get('kind') !== 'backup' || backup.get('environment') !== config.environment) return { admitted: false };
+      const job = readJob(backup.data());
+      if (!processingExpired(job, clock) && !['failed', 'completed'].includes(job.status)) return { admitted: false, resume: owner };
+      if ((job.lease?.expiresAtMs ?? 0) > clock || lease.get('expiresAtMs') > clock) return { admitted: false };
+      transaction.update(maintenance, { active: false, jobId: FieldValue.delete() });
+    }
+    if (lease.get('expiresAtMs') > clock) return { admitted: false };
+    transaction.set(workerLeaseRef(), { id: leaseId, jobId: 'maintenance', expiresAtMs: clock + JOB_LIMITS.leaseMs });
+    return { admitted: true };
+  });
+  if (!admission.admitted) {
+    if (admission.resume) await enqueueJob(admission.resume);
     return { removed: 0 };
   }
-  const leaseId = randomUUID();
-  const admitted = await db.runTransaction(async transaction => {
-    const lease = await transaction.get(workerLeaseRef());
-    if (lease.get('expiresAtMs') > now) return false;
-    transaction.set(workerLeaseRef(), { id: leaseId, jobId: 'maintenance', expiresAtMs: now + JOB_LIMITS.leaseMs });
-    return true;
-  });
-  if (!admitted) return { removed: 0 };
   let removed = 0;
   try {
     removed = await cleanExpiredRecords(leaseId, now);

@@ -20,13 +20,14 @@ interface PlaygroundViewProps {
   t: TranslationSet;
   lang: Language;
   weakPoints: DashboardStats['processedGroupedInsights'];
+  historyPending?: boolean;
   totalAttempts: number;
   totalErrors: number;
   initialConfig: { tab: 'flashcards' | 'practice'; concept?: string } | null;
   onAskGuru: (message: string) => void;
 }
 
-export default function PlaygroundView({ t, lang, weakPoints, totalAttempts, totalErrors, initialConfig, onAskGuru }: PlaygroundViewProps) {
+export default function PlaygroundView({ t, lang, weakPoints, historyPending, totalAttempts, totalErrors, initialConfig, onAskGuru }: PlaygroundViewProps) {
   const [activeTab, setActiveTab] = useState<'flashcards' | 'practice'>(initialConfig?.tab || 'flashcards');
 
   return (
@@ -73,7 +74,7 @@ export default function PlaygroundView({ t, lang, weakPoints, totalAttempts, tot
         </div>
 
         <TabsContent value="flashcards" className="w-full animate-in zoom-in-95 duration-500 outline-hidden flex flex-col items-center focus:ring-0">
-          <FlashcardGame t={t} lang={lang} weakPoints={weakPoints} totalAttempts={totalAttempts} initialConcept={initialConfig?.tab === 'flashcards' ? initialConfig.concept : undefined} />
+          <FlashcardGame historyPending={historyPending} t={t} lang={lang} weakPoints={weakPoints} totalAttempts={totalAttempts} initialConcept={initialConfig?.tab === 'flashcards' ? initialConfig.concept : undefined} />
         </TabsContent>
 
         <TabsContent value="practice" className="w-full animate-in zoom-in-95 duration-500 outline-hidden flex flex-col items-center focus:ring-0">
@@ -82,6 +83,7 @@ export default function PlaygroundView({ t, lang, weakPoints, totalAttempts, tot
             lang={lang}
             weakPoints={weakPoints}
             totalAttempts={totalAttempts}
+            historyPending={historyPending}
             totalErrors={totalErrors}
             initialConcept={initialConfig?.tab === 'practice' ? initialConfig.concept : undefined}
             onAskGuru={onAskGuru}

@@ -63,7 +63,9 @@ function HomeContent() {
     setSection(next);
   }, [reset, session.status, lang]);
   const { config: quizConfig, results: lastResults, questions: activeQuestions } = session;
-  const historyPage = useHistory();
+  const historyNeeded = view === 'dashboard' || view === 'playground';
+  const historyMode = historyNeeded ? 'immediate' : view === 'setup' ? 'idle' : 'off';
+  const historyPage = useHistory(mounted && !authLoading ? historyMode : 'off');
   const history = historyPage.items;
   const [chatbotTrigger, setChatbotTrigger] = useState<{ message: string, timestamp: number } | null>(null);
 
@@ -119,7 +121,7 @@ function HomeContent() {
   }, [setView]);
 
 
-  const stats = useMemo(() => calculateDashboardStats(history, t, lang), [history, t, lang]);
+  const stats = useMemo(() => historyNeeded ? calculateDashboardStats(history, t, lang) : null, [historyNeeded, history, t, lang]);
 
   if (!mounted || authLoading || !user) return <RouteSkeleton view="setup" />;
 
@@ -185,8 +187,8 @@ function HomeContent() {
             onRetakeNew={() => startQuiz(quizConfig!, null)}
           />
         )}
-        {view === 'dashboard' && <PageControls lang={lang} {...historyPage} />}
-        {view === 'dashboard' && !historyPage.error && (
+        {historyNeeded && <PageControls lang={lang} {...historyPage} />}
+        {view === 'dashboard' && !historyPage.error && (!historyPage.loading || history.length > 0) && (
           <ErrorBoundary><DashboardView
             t={t} lang={lang} history={history} stats={stats}
             personalNotes={personalNotes} onNotesChange={onNotesChange}
@@ -196,6 +198,7 @@ function HomeContent() {
         {view === 'playground' && (
           <PlaygroundView
             t={t} lang={lang}
+            historyPending={historyPage.loading || Boolean(historyPage.error)}
             weakPoints={stats?.processedGroupedInsights || []}
             totalAttempts={stats?.totalAttempts || 0}
             totalErrors={stats?.totalErrors || 0}

@@ -2,14 +2,14 @@
 'use client';
 
 import React,{ useMemo } from 'react';
-import { initializeFirebase } from './index';
-import { FirebaseProvider } from './provider';
+import { initializeFirebaseAuth } from './auth-client';
+import { FirebaseProvider } from './auth-provider';
 
 export const FirebaseClientProvider: React.FC<{ children: React.ReactNode; requireServiceConsent?: boolean }> = ({ children, requireServiceConsent }) => {
-  const { firebaseApp, firestore, auth } = useMemo(() => initializeFirebase(), []);
+  const { firebaseApp, auth } = useMemo(() => initializeFirebaseAuth(), []);
 
   return (
-    <FirebaseProvider firebaseApp={firebaseApp} firestore={firestore} auth={auth} requireServiceConsent={requireServiceConsent}>
+    <FirebaseProvider firebaseApp={firebaseApp} auth={auth} requireServiceConsent={requireServiceConsent}>
       {children}
     </FirebaseProvider>
   );

@@ -4,37 +4,57 @@ import { useHistory } from './use-history';
 import { useRoadmapChecks } from './use-roadmap-checks';
 import { calculateDashboardStats } from '@/lib/stats-utils';
 import type { TranslationSet } from '@/lib/translations';
-import type { Language } from '@/lib/types';
-export function useProfileReport(user: { uid: string } | null, t: TranslationSet, lang: Language) {
-  // Report States
-  const historyPage = useHistory();
-  const history = historyPage.items;
-  const [isReportSelectOpen, setIsReportSelectOpen] = useState(false);
-  const [isReportViewOpen, setIsReportViewOpen] = useState(false);
-  const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
-  const { roadmapStatus } = useRoadmapChecks(user?.uid);
+import type { Language, QuizHistoryItem } from '@/lib/types';
 
-  // Report Filter States
+type ReportDialog =
+  | { kind: 'select'; uid: string }
+  | { kind: 'preview'; uid: string; rows: QuizHistoryItem[] };
+
+export function useProfileReport(user: { uid: string } | null, t: TranslationSet, lang: Language) {
+  const [dialog, setDialog] = useState<ReportDialog | null>(null);
+  const isReportSelectOpen = dialog?.kind === 'select' && dialog.uid === user?.uid;
+  const preview = dialog?.kind === 'preview' && dialog.uid === user?.uid ? dialog : null;
+  const isReportViewOpen = preview !== null;
+  const reportOpen = isReportSelectOpen || isReportViewOpen;
+  const historyPage = useHistory(reportOpen ? 'immediate' : 'off');
+  const history = historyPage.items;
+  const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
+  const { roadmapStatus } = useRoadmapChecks(reportOpen ? user?.uid : undefined);
+
   const [reportSearchQuery, setReportSearchQuery] = useState('');
   const [reportSortOrder, setReportSortOrder] = useState<'recent' | 'alphabetical'>('recent');
 
-  // Load Roadmap Status
   useEffect(() => {
     setSelectedSessionIds([]);
-    setIsReportSelectOpen(false);
-    setIsReportViewOpen(false);
+    setDialog(null);
+    setReportSearchQuery('');
   }, [user?.uid]);
 
+  const selectedRows = useMemo(() => {
+    const ids = new Set(selectedSessionIds);
+    return history.filter(row => row.id && ids.has(row.id));
+  }, [history, selectedSessionIds]);
+  const reportStats = useMemo(() => preview ? calculateDashboardStats(preview.rows, t, lang) : null, [preview, t, lang]);
 
+  const openSelection = () => {
+    if (!user) return;
+    setSelectedSessionIds([]);
+    setReportSearchQuery('');
+    setDialog({ kind: 'select', uid: user.uid });
+  };
+  const closeReport = () => {
+    setDialog(null);
+    setSelectedSessionIds([]);
+  };
+  const generateReport = () => {
+    if (!user || !isReportSelectOpen || historyPage.loading || historyPage.error || !selectedRows.length) return false;
+    // Preview, copy and print must describe the same rows even if a live page changes.
+    setDialog({ kind: 'preview', uid: user.uid, rows: selectedRows });
+    return true;
+  };
 
-  // Logic to process report stats for SELECTED sessions only
-  const reportStats = useMemo(() => {
-    const selectedHistory = history.filter(h => h.id && selectedSessionIds.includes(h.id));
-    return calculateDashboardStats(selectedHistory, t, lang);
-  }, [history, selectedSessionIds, t, lang]);
-
-  // Filter and Sort history for the selection list
   const filteredReportHistory = useMemo(() => {
+    if (!isReportSelectOpen) return [];
     let result = history.filter(session => !!session.id);
 
     if (reportSearchQuery.trim()) {
@@ -51,13 +71,14 @@ export function useProfileReport(user: { uid: string } | null, t: TranslationSet
         const topicB = lang === 'vi' ? (b.config.topicVi || b.config.topic) : (b.config.topicEn || b.config.topic);
         return topicA.localeCompare(topicB);
       });
-    } else {
-      result.sort((a, b) => b.date - a.date);
     }
 
     return result;
-  }, [history, reportSearchQuery, reportSortOrder, lang]);
+  }, [isReportSelectOpen, history, reportSearchQuery, reportSortOrder, lang]);
 
-
-return { historyPage, history, isReportSelectOpen, setIsReportSelectOpen, isReportViewOpen, setIsReportViewOpen, selectedSessionIds, setSelectedSessionIds, roadmapStatus, reportSearchQuery, setReportSearchQuery, reportSortOrder, setReportSortOrder, reportStats, filteredReportHistory };
+  return {
+    historyPage, isReportSelectOpen, isReportViewOpen, openSelection, closeReport, generateReport, selectedCount: selectedRows.length,
+    selectedSessionIds, setSelectedSessionIds, roadmapStatus, reportSearchQuery, setReportSearchQuery,
+    reportSortOrder, setReportSortOrder, reportStats, filteredReportHistory,
+  };
 }

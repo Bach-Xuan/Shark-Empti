@@ -153,7 +153,7 @@
         },
         "date": {
           "$ref": "#/$defs/FirestoreTimestamp",
-          "description": "Canonical Firestore Timestamp; migrate:timestamps converts supported legacy ISO strings. History readers accept original fixed-width UTC strings during migration."
+          "description": "Canonical Firestore Timestamp; migrate:timestamps converts supported legacy ISO strings. Verify that all legacy dates are converted before deploying the single-query history reader."
         },
         "lang": {
           "enum": [
@@ -257,7 +257,7 @@
         },
         "createdAt": {
           "$ref": "#/$defs/FirestoreTimestamp",
-          "description": "Canonical Firestore Timestamp; migrate:timestamps converts supported legacy ISO strings. History readers accept original fixed-width UTC strings during migration."
+          "description": "Canonical Firestore Timestamp; migrate:timestamps converts supported legacy ISO strings. Verify that all legacy dates are converted before deploying the single-query history reader."
         }
       }
     },
@@ -290,7 +290,7 @@
         },
         "createdAt": {
           "$ref": "#/$defs/FirestoreTimestamp",
-          "description": "Canonical Firestore Timestamp; migrate:timestamps converts supported legacy ISO strings. History readers accept original fixed-width UTC strings during migration."
+          "description": "Canonical Firestore Timestamp; migrate:timestamps converts supported legacy ISO strings. Verify that all legacy dates are converted before deploying the single-query history reader."
         }
       }
     },
@@ -781,11 +781,11 @@
     },
     "/users/{uid}/history/{id}": {
       "schema": "QuizHistory",
-      "description": "Owner reads and explicit deletion; new writes and feedback updates require validated learning APIs. Direct SDK creation/update is denied."
+      "description": "Owner reads and explicit deletion. New writes and feedback updates require validated learning APIs. Setup, Dashboard and Playground share a single Timestamp history reader limited to 50 records per page. Profile activates it while selecting or viewing a report. Deployment requires zero remaining legacy or invalid learning dates."
     },
     "/users/{uid}/forumReactions/{hash}": {
       "schema": "OwnForumReaction",
-      "description": "One flat private collection included in existing account export/deletion/backup/restore paths without a new catalog phase. Clients read explicit target hashes in chunks of 30, requiring server confirmation and supporting bounded recovery. Public Forum documents contain metadata/counts without reaction membership."
+      "description": "One flat private collection included in existing account export/deletion/backup/restore paths without a new catalog phase. Clients subscribe to unique target hashes in groups of up to 30 per owner. Reordering the same post and comment IDs preserves subscriptions and server-confirmed reactions. Public Forum documents contain metadata/counts without reaction membership."
     },
     "/users/{uid}/notes/main": {
       "schema": "UserNotes",
@@ -901,7 +901,7 @@
       "description": "Admin-only conservative daily QStash reservation including initial delivery and retries; private ordinary expiry."
     },
     "/_serviceState/{state}": {
-      "description": "Admin-only bounded backup write barrier and rotating retention checkpoint. No browser reads or writes."
+      "description": "Admin-only backup write barrier, rotating retention checkpoint, source deletion-admission fence and isolated restore verification marker. No browser reads or writes."
     }
   },
   "localStorage": {
@@ -944,11 +944,11 @@
       "_jobBudgets",
       "_serviceState"
     ],
-    "transport": "QStash signed ID/environment messages; durable Firestore outbox, per-job/global leases and checkpoints",
+    "transport": "QStash signed ID/environment messages; durable Firestore outbox, deletion-first redispatch, transactional expiry and credit checks, per-job/global leases and checkpoints",
     "storage": "Private per-environment B2 bucket; gzip plus AES-256-GCM, filename AAD and SHA-256 integrity; 7 GB production / 1 GB staging internal ceilings",
     "retention": "AI access rejects expired records; bounded signed Firestore cleanup via RETENTION_ENABLED independently of B2/account jobs, with transactional expiry rechecks; no native TTL",
     "export": "Full attributable catalog plus discovered private descendants; live paged reads; processing at most seven days, owner download access 24 hours after ready, processing object fallback expiry eight days; failed processing remains visible 24 hours; manifest declares lifetime and status gives authoritative deadline; legacy unattributable receipts excluded pending retention",
     "deletion": "After explicit recent-auth confirmation, lock writes and erase owned AI generations with their active quota slots under the deletion worker lease. Remove private data, anonymize community records and archives, then remove Auth. Retain the receipt and tombstone for seven days and the journal for 30 days.",
-    "backup": "Daily when enabled; seven-day encrypted artifacts, bounded write barrier; isolated empty-target restore applies current deletion journal; RPO/RTO unverified"
+    "backup": "Daily when enabled; seven-day encrypted artifacts, bounded write barrier; isolated restore normalizes learning dates and reconciles source journals and locks under a cutover fence before verifying Auth, private records and public projections; hosted RPO/RTO unverified"
   }
 }

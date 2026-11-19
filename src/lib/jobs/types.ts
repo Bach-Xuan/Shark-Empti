@@ -27,6 +27,15 @@ export type JobView = {
   id: string; kind: JobKind; status: JobStatus; processed: number; parts: number;
   expiresAtMs: number; errorCode?: string;
 };
+export function processingExpired(job: Pick<JobRecord, 'kind' | 'expiresAtMs'>, now: number) {
+  return job.kind !== 'deletion' && job.expiresAtMs <= now;
+}
+
+export function canProcessJob(job: JobRecord, environment: JobMessage['environment'], now: number) {
+  return job.environment === environment && ['queued', 'waiting_quota', 'running'].includes(job.status)
+    && !processingExpired(job, now) && (job.lease?.expiresAtMs ?? 0) <= now
+    && (job.status !== 'waiting_quota' || job.nextRunAtMs <= now);
+}
 export function jobView(id: string, job: JobRecord): JobView {
   return { id, kind: job.kind, status: job.status, processed: job.processed,
     parts: job.kind === 'export' && job.status === 'ready' ? job.artifacts.length : 0,

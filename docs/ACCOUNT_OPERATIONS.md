@@ -66,6 +66,8 @@ AI/session lifetime is 24 hours; request receipts seven days; export processing 
 
 ## Backup and isolated restore
 
+The scheduler reserves four internal delivery credits per dispatch, covering the first send and up to three retries. The credit transaction and the worker both check the job's processing deadline. The sweep moves overdue backups and exports into terminal cleanup and gives due deletions first access to the five dispatch slots. Unfinished deletions remain eligible after the original deadline. Provider billing is measured separately. Deploy the account-job indexes alongside the scheduler. The expiry query combines two job kinds with three pending states, yielding six of the 30 disjunctions supported in Firestore Standard edition. [Firestore query limits](https://firebase.google.com/docs/firestore/query-data/queries#limits_on_or_queries)
+
 When `ACCOUNT_BACKUPS_ENABLED=true`, an hourly sweep creates a daily encrypted backup. A five-minute write barrier blocks business writes while Firestore and Google Auth/claims are captured; its final checkpoint/release is atomic, and expiry invalidates the backup. Freeze operator Auth/claims/Rules/data changes. Auth and Firestore lack a cross-service atomic Spark snapshot; assess consistency at scale.
 
 Backups include tagged Firestore values, Google Auth identities/claims and private controls, never passwords. Runtime leases, active maintenance state and the backup job itself are excluded. Restored outbox/jobs/budgets are not auto-resumed; reconcile them. Other Auth providers need a reviewed import strategy.
@@ -76,7 +78,23 @@ Use dedicated `RESTORE_ADMIN_*` credentials and an empty isolated target distinc
 npm run jobs:restore -- --job=<completed-backup-id> --target=<isolated-restore-project> --apply --confirm-isolated-empty-target
 ```
 
-Keep restrictive Rules and traffic disabled. The script verifies encrypted parts/manifest, merges backup and current deletion journals and account locks, excludes deleted private records/identities, anonymizes retained contributions, and restores allowed data/claims. The restore requires an empty target and a backup write-window timestamp within the seven-day retention period. It checks owner fields after decoding tagged Firestore maps. Reconcile retained user claims, a representative set of learning records, public projections, reaction counts and erased identities before enabling traffic. Keep failed targets isolated and discard/recreate them through a reviewed process. Initial objectives **RPO 24 hours / RTO four hours** remain unaccepted until a timed restore at realistic scale and quota; an Emulator drill cannot certify cloud recovery.
+Keep restrictive Rules and traffic disabled throughout recovery. The initial restore verifies the encrypted parts and manifest, imports eligible identities, converts legacy learning timestamps and rebuilds public records. The backup and write window must be within the seven-day retention period. Completion binds the isolated target to the source project and backup ID.
+
+After stopping source traffic and privileged changes, run final reconciliation while the target remains isolated. All source instances serving deletion requests must be running the admission-fence implementation.
+
+```powershell
+npm run jobs:restore -- --job=<completed-backup-id> --target=<isolated-restore-project> --finalize --apply --confirm-source-deletion-freeze
+```
+
+This step pauses new source deletion requests in the same transaction that admits them. Previously admitted pending requests can be replayed with their original request ID. It rereads both the deletion journal and account locks, removes erased identities from target Auth and private data (including orphan descendants), scrubs retained contributions and rebuilds public projections. A second target scan checks erasure and visible attribution. The command can be rerun against the same restored target. A failure after acquiring the source fence leaves it held and the target isolated. Only promote a verified target while the corresponding source fence is still held. Keep the former source offline following promotion.
+
+If abandoning the cutover and returning traffic to the source, keep the target isolated and explicitly reopen deletion admission. Finalize again before any later promotion.
+
+```powershell
+npm run jobs:restore -- --job=<completed-backup-id> --target=<isolated-restore-project> --release-deletion-freeze --apply --confirm-reopen-source
+```
+
+For a failure during the initial Firestore or Auth import, keep the partial target isolated and run the initial restore on a fresh empty target. For the staging drill, start the clock at the interruption, include fresh-target provisioning, full reimport, reconciliation and checks of retained identities, learning data and projections, then record elapsed time, dataset size and quota delays. The objectives are **RPO 24 hours and RTO four hours**. Evaluate resumable initial import if the measured recovery misses the objective. Local fixtures exercise the failure and recovery sequence. Hosted timing remains open in the [audit register](AUDIT_REPORT.md).
 
 For a stalled deletion, inspect the private job status, last successful cursor and lease expiry. Check signed delivery history, the provider quota and the worker error code. Keep the account lock in place. For queued or quota-delayed work, restore service or capacity and let the signed worker resume the same durable job after its lease and backoff expire. A terminal failed job needs operator reconciliation. Verify the job, owner, matching deletion lock, journal, cursor and original error against the source inventory. After repairing the cause, requeue that same checkpoint in a reviewed transaction that rechecks those records and any active backup barrier. Preserve the lock and receipt. Confirm the final journal entry, private-data deletion, community anonymization and Auth removal before reporting completion. Use the receipt for user-facing status. Keep identifiers and provider diagnostics out of public incident notes.
 

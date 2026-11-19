@@ -1,9 +1,23 @@
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import path from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { requireDemoBuild } from './lib/demo-build.mjs';
 requireDemoBuild(process.cwd());
 const budgets = JSON.parse(fs.readFileSync('config/bundle-budgets.json', 'utf8')).routes;
+const optionalRuntimes = { TensorFlow: 'registerBackend', Recharts: 'recharts-responsive-container' };
+const chunkDirectory = '.next/static/chunks';
+const matched = new Set();
+for (const name of fs.readdirSync(chunkDirectory, { recursive: true })) {
+  if (!name.endsWith('.js')) continue;
+  const bytes = fs.readFileSync(path.join(chunkDirectory, name));
+  for (const [library, marker] of Object.entries(optionalRuntimes)) {
+    if (bytes.includes(marker)) matched.add(library);
+  }
+}
+for (const library of Object.keys(optionalRuntimes)) {
+  if (!matched.has(library)) throw new Error('Update the optional chunk check for ' + library);
+}
 const port = 9102;
 const server = spawn(process.execPath, ['node_modules/next/dist/bin/next','start','-p',String(port),'-H','127.0.0.1'], { stdio: ['ignore','pipe','pipe'], windowsHide: true, env: { ...process.env, NEXT_TELEMETRY_DISABLED:'1' } });
 let exited = false; server.once('exit', () => { exited = true; });
@@ -21,7 +35,18 @@ try {
   if(/fonts\.googleapis\.com|fonts\.gstatic\.com/.test(html))throw new Error('Remote font request');
   const scripts=[...new Set([...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map(match=>match[1]))];
   const chunks=[];
-  for(const url of scripts){const response=await fetch(origin+url);if(!response.ok)throw new Error('Missing chunk');const bytes=Buffer.from(await response.arrayBuffer());chunks.push({url,decoded:bytes.length,gzip:gzipSync(bytes).length});}
+  for (const url of scripts) {
+    const response = await fetch(origin + url);
+    if (!response.ok) throw new Error('Missing chunk');
+    const bytes = Buffer.from(await response.arrayBuffer());
+    for (const [library, marker] of Object.entries(optionalRuntimes)) {
+      if (bytes.includes(marker)) throw new Error(route + ' downloaded optional ' + library + ' in its initial HTML scripts');
+    }
+    if ((route === '/login' || route === '/register') && bytes.includes('google.firestore.v1.Firestore')) {
+      throw new Error('Guest authentication scripts include the Firestore transport on ' + route);
+    }
+    chunks.push({ url, decoded: bytes.length, gzip: gzipSync(bytes).length });
+  }
   routes.push({route, serverResponseMs:samples, scope:'server HTML and script fetch only; no hydration or browser timing', initialScriptDecoded:chunks.reduce((n,c)=>n+c.decoded,0), initialScriptGzip:chunks.reduce((n,c)=>n+c.gzip,0),chunks});
  }
  const policy = (await fetch(origin + '/about')).headers;

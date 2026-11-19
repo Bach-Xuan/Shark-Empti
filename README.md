@@ -46,6 +46,7 @@ Open [localhost:9002](http://localhost:9002). `npm ci` may replace `node_modules
 | `npm test`, `npm run test:coverage` | Unit/component tests and optional V8 coverage |
 | `npm run test:rules`, `npm run test:integration` | Firebase Emulator Rules and API checks |
 | `npm run build:demo`, `npm run test:e2e`, `npm run test:production` | Verified demo build, browser matrix and production HTTP smoke |
+| `npm run test:e2e:chromium` | Desktop Chromium checks for pushes and pull requests. Dispatch the full workflow for each release candidate. |
 | `npm run report:bundle`, `npm run report:performance`, `npm run report:browser`, `npm run report:queries`, `npm run report:comparison` | Bundle and controlled performance reports |
 | `npm run audit:dependencies` | Registry advisory assessment; sends dependency names/versions to npm |
 | `npm run ai:health`, `npm run ai:smoke` | Live provider checks; smoke may use quota |
@@ -59,7 +60,7 @@ Install browser engines with `npx --no-install playwright install chromium webki
 - [Interface design](docs/DESIGN.md) covers navigation, interaction states, accessibility, responsive layout and print.
 - [Technical documentation](docs/TECHNICAL_DOCUMENTATION.md): architecture, data ownership and security contracts.
 - [Backend data map](docs/backend.json): descriptive entities, storage paths and interfaces; executable code, schemas and Rules remain authoritative.
-- [Audit register](docs/AUDIT_REPORT.md): finding statuses and unresolved verification boundaries.
+- The [audit register](docs/AUDIT_REPORT.md) records open and resolved findings.
 - [Validation](docs/VALIDATION.md): built-in tests, interpretation and evidence limits.
 - [Account operations](docs/ACCOUNT_OPERATIONS.md): background export/deletion, retention and encrypted backup/restore.
 
@@ -69,4 +70,4 @@ Authenticated account-data controls at `/account/data` remain accessible without
 
 Quiz, Flashcard and Practice saves use authenticated, schema-validated APIs with stable retry identity and count/byte admission. Profile, notes and activity SDK writes have bounded Rules; owner legacy reads and explicit record deletion remain available. Client/server/Rules changes require a coordinated rollout; see [configuration](docs/CONFIGURATION.md#learning-write-validation-rollout).
 
-The interface supports Vietnamese and English; preferences persist between pages and tabs. Camera access requires HTTPS or localhost and explicit permission. Lists expose 50 records per page; client-side search/statistics reflect exposed records. During timestamp migration, history merges two bounded candidate streams as described in the [data contract](docs/TECHNICAL_DOCUMENTATION.md). The browser targets are Safari 15.4+ on macOS and iOS, Chrome 100+ on desktop and Android, and Firefox 102+ on desktop and Android. The [validation guide](docs/VALIDATION.md#optimized-build-and-browser-matrix) explains the engine and device evidence. See the [audit](docs/AUDIT_REPORT.md) before release.
+The interface supports Vietnamese and English; preferences persist between pages and tabs. Camera access requires HTTPS or localhost and explicit permission. The academic report loads learning history when the learner opens its selection dialog. Lists expose 50 records per page. Client-side search and statistics reflect the exposed records. Quiz history uses one Firestore Timestamp query. Complete and verify the [timestamp migration](docs/CONFIGURATION.md#timestamp-migration) before deploying this reader. The browser targets are Safari 15.4+ on macOS and iOS, Chrome 100+ on desktop and Android, and Firefox 102+ on desktop and Android. The [validation guide](docs/VALIDATION.md#optimized-build-and-browser-matrix) explains the engine and device evidence. See the [audit](docs/AUDIT_REPORT.md) before release.

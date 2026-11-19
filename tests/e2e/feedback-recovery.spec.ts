@@ -1,4 +1,5 @@
 import { observeReaderTimeouts } from './reader-timeouts';
+import { accessibilityViolations } from './accessibility';
 import { expect, test } from './fixtures';
 import { signInDemoUid } from './auth';
 import { getApps, initializeApp } from 'firebase-admin/app';
@@ -68,4 +69,33 @@ test('recovered feedback survives a denied save, reaches the same History/Dashbo
     await expect(report.getByRole('button', { name: translations.vi.printReport, exact: true })).toBeEnabled();
     expect(readerTimeouts).toEqual([]);
   } finally { await lock.delete(); }
+});
+
+test('a learner with no sessions can open the academic report and return to Profile', async ({ page }) => {
+  await signInDemoUid(page);
+  await page.goto('/profile');
+  const start = page.getByRole('button', { name: translations.en.exportReport, exact: true });
+  await expect(start).toBeEnabled();
+  await expect(page.getByText(translations.en.noHistory, { exact: true })).toHaveCount(0);
+  for (const theme of ['light', 'dark']) {
+    if (theme === 'dark') await page.getByRole('button', { name: uiMessage('en', 'navigation.toggle_theme') }).click();
+    await expect(page.locator('html.dark')).toHaveCount(theme === 'dark' ? 1 : 0);
+    await start.click();
+    const select = page.getByRole('dialog');
+    await expect(select.getByRole('status').filter({ hasText: translations.en.noHistory })).toBeVisible();
+    const generate = select.getByRole('button', { name: translations.en.generateReport });
+    await expect(generate).toBeDisabled();
+    if (theme === 'dark') {
+      await page.setViewportSize({ width: 320, height: 740 });
+      await expect.poll(() => generate.evaluate(button => {
+        const bounds = button.getBoundingClientRect();
+        const dialog = button.closest('[role="dialog"]')!.getBoundingClientRect();
+        return bounds.left >= Math.max(dialog.left, 0) && bounds.right <= Math.min(dialog.right, window.innerWidth);
+      })).toBe(true);
+    }
+    expect(await accessibilityViolations(page, ['color-contrast']), theme).toEqual([]);
+    await select.getByRole('button', { name: translations.en.cancel, exact: true }).click();
+    await expect(select).toHaveCount(0);
+    await expect(start).toBeFocused();
+  }
 });
