@@ -1,4 +1,4 @@
-# 🦈 Shark Empti · v2.0.0 **β** <a href="https://hub.xerj.org/contributors/Bach-Xuan"><img src="https://hub.xerj.org/contributors/Bach-Xuan/badge.svg" alt="XERJ Corpus Hub contributor" height="100" align="absmiddle"></a>
+# 🦈 Shark Empti · v2.0.0 **β** <a href="https://hub.xerj.org/contributors/Bach-Xuan"><img src="https://hub.xerj.org/contributors/Bach-Xuan/badge.svg" alt="XERJ Corpus Hub contributor" align="absmiddle"></a>
 
 Shark Empti brings assessment, feedback, focused practice and peer learning into a continuous learning process. Its bilingual interface combines learning history with guidance so learners can reflect on progress and choose their next steps. AI provides educational assistance, not a substitute for independently checking knowledge.
 
