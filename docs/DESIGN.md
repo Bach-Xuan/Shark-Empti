@@ -1,4 +1,4 @@
-# 🎨 Interface Design · Shark Empti v2.0.0 **β**
+# 🎨 Interface Design · Shark Empti **β V2.1.0**
 
 Shark Empti helps a learner choose an activity, finish it, understand their answers and return to practice. A learner can move between Vietnamese and English, change theme or recover an interrupted session while keeping their work. This guide describes how those behaviors appear in the interface.
 

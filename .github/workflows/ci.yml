@@ -6,7 +6,7 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     env:
-      FULL_VALIDATION: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') }}
+      FULL_VALIDATION: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/beta-v') || startsWith(github.ref, 'refs/tags/v') }}
       NEXT_PUBLIC_USE_EMULATORS: 'true'
       NEXT_PUBLIC_FIREBASE_API_KEY: test-api-key
       NEXT_PUBLIC_FIREBASE_PROJECT_ID: demo-shark-empti

@@ -1,4 +1,4 @@
-# 📋 Consolidated Technical Audit Report · Shark Empti v2.0.0 **β**
+# 📋 Consolidated Technical Audit Report · Shark Empti **β V2.1.0**
 
 This register covers **90 findings**. **89 are resolved and 1 remains open.**
 

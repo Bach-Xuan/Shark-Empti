@@ -16,6 +16,13 @@ const problems = [];
 const declared = { ...manifest.dependencies, ...manifest.devDependencies };
 const stable = value => JSON.stringify(Object.entries(value ?? {}).sort(([a], [b]) => a.localeCompare(b)));
 
+if (!semver.valid(manifest.version) || lock.version !== manifest.version || lock.packages[''].version !== manifest.version) {
+  problems.push('npm version must be valid SemVer and match both lockfile version fields.');
+}
+if (manifest.releaseTag !== `beta-v${manifest.version}` || readJson('docs/backend.json')['x-version'] !== manifest.releaseTag) {
+  problems.push('The beta release tag must match the npm version and the backend data map.');
+}
+
 for (const field of ['dependencies', 'devDependencies', 'engines']) {
   if (stable(manifest[field]) !== stable(lock.packages[''][field])) problems.push(`Manifest/lock mismatch: ${field}`);
 }

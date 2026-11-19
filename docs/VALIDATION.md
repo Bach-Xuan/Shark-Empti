@@ -1,4 +1,4 @@
-# 🧪 Validation and Test Guide · Shark Empti v2.0.0 **β**
+# 🧪 Validation and Test Guide · Shark Empti **β V2.1.0**
 
 This guide explains how to run the repository's built-in checks and interpret their results. [Configuration](CONFIGURATION.md) covers setup, [technical documentation](TECHNICAL_DOCUMENTATION.md) describes behavior, [account operations](ACCOUNT_OPERATIONS.md) covers operational drills, and the [audit register](AUDIT_REPORT.md) records outstanding concerns. A local pass applies to the tested source, configuration and environment; it does not establish deployed, live-provider or physical-device behavior. The [interface design guide](DESIGN.md) covers learner-facing states and interactions.
 
@@ -10,7 +10,7 @@ When reusing the browser runtimes already installed under this checkout's `.tool
 
 Integration/browser tests use Firebase Auth and Firestore Emulators under `demo-shark-empti`, with the deterministic AI fixture. App, Firestore, Auth and AI fixture normally use ports 9002, 8080, 9099 and 9098. Avoid concurrent suites on those ports. Integration requires both Emulators; browser tests permit read-only Google popup bootstrap scripts on apis.google.com. A network interruption during bootstrap can cause the popup wait to expire before the Emulator receives a sign-in request. Application data and AI fixtures stay local.
 
-Push and pull-request validation runs `npm test` and the optimized `npm run test:e2e:chromium` project. Manually dispatch the full workflow for release candidates. Version tags also run both complete browser matrices, coverage, Rules/integration, a native Emulator export/import drill and cross-engine print checks.
+Push and pull-request validation runs `npm test` and the optimized `npm run test:e2e:chromium` project. Manually dispatch the full workflow for release candidates. Version tags beginning with `beta-v` or `v` also run both complete browser matrices, coverage, Rules/integration, a native Emulator export/import drill and cross-engine print checks.
 
 CI's SHA-pinned actions run on Node 24 independently of the application runtime. See [action governance](CONFIGURATION.md#ci-action-governance) for reviewed manifests, minimum runner, supported inputs and update review. Local YAML/manifest inspection and application tests do not prove hosted runner startup, action post steps, cache or artifact service behavior.
 

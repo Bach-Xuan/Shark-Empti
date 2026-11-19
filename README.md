@@ -1,4 +1,4 @@
-# 🦈 Shark Empti · v2.0.0 **β**
+# 🦈 Shark Empti · **β V2.1.0**
 
 [![XERJ Corpus Hub contributor](https://hub.xerj.org/contributors/Bach-Xuan/badge.svg)](https://hub.xerj.org/contributors/Bach-Xuan)
 
