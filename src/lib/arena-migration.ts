@@ -30,6 +30,12 @@ export async function migrateLegacyArena(db: Firestore, apply = false) {
         if (key.exists || previous.exists) throw new Error('Conflicting Arena migration state; operator review required.');
         const exam = readArenaExam(row.id, fresh.data());
         if (!exam || !isTrustedArenaExam(exam.questions) || Buffer.byteLength(JSON.stringify(fresh.data())) > 800_000) throw new Error('Arena record changed during migration; inspect again.');
+        const [lock, maintenance] = await transaction.getAll(
+          db.collection('_accountLocks').doc(exam.authorId), db.doc('_serviceState/maintenance'),
+        );
+        if (lock.exists || (maintenance.get('active') === true && maintenance.get('expiresAtMs') > Date.now())) {
+          throw new Error('Migration cannot run during deletion or a backup write barrier.');
+        }
         const { id: _id, questions, ...metadata } = exam;
         transaction.create(backup, { snapshot: fresh.data(), backedUpAt: FieldValue.serverTimestamp() });
         transaction.create(keys, { schemaVersion: 2, authorId: exam.authorId, questions, createdAt: FieldValue.serverTimestamp() });

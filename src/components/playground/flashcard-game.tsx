@@ -69,6 +69,7 @@ export default function FlashcardGame({ t, lang, weakPoints, historyPending, tot
     }
 
     pending.current = true;
+    setTopic(topic);
     setIsValidating(true);
     try {
       const validation = await validateAcademicTopic({
@@ -288,6 +289,7 @@ export default function FlashcardGame({ t, lang, weakPoints, historyPending, tot
                 <Button
                   key={i}
                   variant={topic === wp.topic ? "default" : "outline"}
+                  disabled={isValidating || isGenerating}
                   onClick={() => setTopic(wp.topic)}
                   aria-pressed={topic === wp.topic}
                   className={cn(
@@ -330,7 +332,7 @@ export default function FlashcardGame({ t, lang, weakPoints, historyPending, tot
               onChange={handleNumChange}
               onBlur={handleNumBlur}
               min={1} max={50}
-              disabled={isFlashcardsDisabled}
+              disabled={isFlashcardsDisabled || isValidating || isGenerating}
               className="h-12 md:h-20 rounded-xl md:rounded-[1.5rem] border-[3px] border-border font-black text-lg md:text-4xl bg-muted/10 text-center w-24 md:w-40 shadow-inner focus:ring-4 md:ring-8 focus:ring-primary/10 transition-all focus:border-primary disabled:opacity-30"
             />
             <span className="text-muted-foreground font-black uppercase text-[9px] md:text-xs tracking-[0.2em]">{uiMessage(lang, "playgroundview.cards")}</span>

@@ -1,8 +1,28 @@
-# 🧪 Validation and Test Guide · Shark Empti **β V2.1.0**
+# 🧪 Validation and Test Guide · Shark Empti **v2.2.0**
 
 This guide explains how to run the repository's built-in checks and interpret their results. [Configuration](CONFIGURATION.md) covers setup, [technical documentation](TECHNICAL_DOCUMENTATION.md) describes behavior, [account operations](ACCOUNT_OPERATIONS.md) covers operational drills, and the [audit register](AUDIT_REPORT.md) records outstanding concerns. A local pass applies to the tested source, configuration and environment; it does not establish deployed, live-provider or physical-device behavior. The [interface design guide](DESIGN.md) covers learner-facing states and interactions.
 
+## Flow regression coverage
+
+The following checks exercise the [application flows](FLOW.md) recorded in the audit.
+
+| Finding | Regression checked | Local evidence |
+|---|---|---|
+| D45, D46 | Export redaction, moderator erasure during deletion and restore, and resuming a failed deletion with the original receipt, lock and checkpoint | [Account job integration tests](../tests/integration/account-jobs.test.ts) |
+| D47 | Refusing early writes before a confirmed owner read, recovering a failed listener and rejecting an old owner’s save callback | [Notes subscription tests](../tests/notes.test.tsx) |
+| D48, D54 | Enforcing backup and deletion barriers during migration, and preventing a duplicate report from restoring another report’s archive | [Community integration tests](../tests/integration/community.test.ts) |
+| D49–D51, D53, D55 | Starting the personal timer after generation, bounding answer and feedback sizes, validating confidence, freezing topic selection and fitting multibyte chat context | [Quiz lifecycle](../tests/quiz-lifecycle.test.tsx), [Playground](../tests/playground.test.tsx), [AI flows](../tests/ai-flows.test.ts) |
+| D52 | Losing an Arena submit response after the server commits, reloading, replaying the original answers and receiving a single recorded attempt | [Arena component tests](../tests/arena-detail.test.tsx), [browser flow](../tests/e2e/app.spec.ts) |
+
+For D46, the [owner controls](../tests/account-job-polling.test.tsx) and [receipt view](../tests/account-receipt.test.tsx) check the recovery instructions available to each reader. For D51, [draft recovery tests](../tests/learning-drafts.test.tsx) cover the feedback size boundary in active Quiz progress and pending save payloads.
+
+The local D45–D55 verification passed 524 unit/component tests, 189 Rules/integration tests and six desktop Chromium cases covering account controls, polling and draft recovery. All six browser cases passed together on a fresh Emulator instance. The optimized demo build also passed the HTTP smoke checks and all six route bundle budgets.
+
+Firebase Emulator tests exercise local transactions. Hosted provider delivery, deployed Rules and indexes, and the staging recovery time require environment-specific verification.
+
 ## Prerequisites and isolation
+
+Run the integration and browser suites in separate Emulator invocations, as the npm scripts do. Integration tests deliberately exhaust shared request budgets. Reusing that database for a browser run can make consent return HTTP 429 before the flow under test starts.
 
 Use Node 24 and the npm lockfile, JDK 21, and installed Playwright Chromium, Firefox and WebKit. `npm ci` reinstalls dependencies and may replace `node_modules`; keep credentials out of test fixtures and output. Install engines with `npx --no-install playwright install chromium firefox webkit`.
 
@@ -10,7 +30,7 @@ When reusing the browser runtimes already installed under this checkout's `.tool
 
 Integration/browser tests use Firebase Auth and Firestore Emulators under `demo-shark-empti`, with the deterministic AI fixture. App, Firestore, Auth and AI fixture normally use ports 9002, 8080, 9099 and 9098. Avoid concurrent suites on those ports. Integration requires both Emulators; browser tests permit read-only Google popup bootstrap scripts on apis.google.com. A network interruption during bootstrap can cause the popup wait to expire before the Emulator receives a sign-in request. Application data and AI fixtures stay local.
 
-Push and pull-request validation runs `npm test` and the optimized `npm run test:e2e:chromium` project. Manually dispatch the full workflow for release candidates. Version tags beginning with `beta-v` or `v` also run both complete browser matrices, coverage, Rules/integration, a native Emulator export/import drill and cross-engine print checks.
+Push and pull-request validation runs `npm test` and the optimized `npm run test:e2e:chromium` project. Manually dispatch the full workflow for release candidates. Version tags beginning with `v` also run both complete browser matrices, coverage, Rules/integration, a native Emulator export/import drill and cross-engine print checks.
 
 CI's SHA-pinned actions run on Node 24 independently of the application runtime. See [action governance](CONFIGURATION.md#ci-action-governance) for reviewed manifests, minimum runner, supported inputs and update review. Local YAML/manifest inspection and application tests do not prove hosted runner startup, action post steps, cache or artifact service behavior.
 

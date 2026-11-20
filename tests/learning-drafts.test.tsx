@@ -52,6 +52,20 @@ it('restores generated questions and the original stable history identity withou
   expect(mocks.write.mock.calls[0].slice(1, 3)).toEqual(['history', id]);
   expect(readDraft('learner', 'quiz-session', parseWith(sessionDraftSchema))).toBeNull();
 });
+it.each([20000, 20001])('recovers legacy quiz progress and both completion checkpoints with %i feedback characters', length => {
+  const id = crypto.randomUUID();
+  const aiFeedback = 'x'.repeat(length);
+  const expected = length === 20000 ? aiFeedback : null;
+  const answer = { ...history.quizResults[0], aiFeedback };
+  const payload = { ...history, schemaVersion: 2, quizResults: [answer] };
+  const session = sessionDraftSchema.parse({ id, completion: payload });
+  expect(session).toMatchObject({ id, completion: { ...payload, quizResults: [{ ...answer, aiFeedback: expected }] } });
+  const progress = quizDraftSchema.parse({ id, index: 0, answers: [answer], feedback: answer, input: '',
+    startedAtMs: 1, questionStartedAtMs: 1, completion: { results: payload } });
+  expect(progress.answers[0]).toEqual({ ...answer, aiFeedback: expected });
+  expect(progress.feedback).toEqual(progress.answers[0]);
+  expect(progress.completion?.results.quizResults[0]).toEqual(progress.answers[0]);
+});
 it('resumes the current question and failed completion, preserving feedback without another paid analysis', async () => {
   const id = crypto.randomUUID();
   const second = { ...question, question: '3+3?', correct: '6', options: ['6', '5', '4', '3'] };

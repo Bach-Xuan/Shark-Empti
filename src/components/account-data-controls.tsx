@@ -85,6 +85,8 @@ export function AccountDataControls({ lang }: { lang: Language }) {
     </div>
     <ul className="space-y-3" aria-live="polite">{jobs.map(job => <li className="rounded-2xl border-2 p-4 text-sm" key={job.id}>
       <p className="font-bold">{job.kind === 'export' ? copy.export : copy.deletion}: {copy.status[job.status]}</p>
+      {job.kind === 'deletion' && job.status === 'failed' && <p>{enabled && !receiptOnly ? copy.resumeDeletion : copy.receiptRecovery}</p>}
+      {job.kind === 'export' && job.status === 'failed' && job.errorCode !== 'ACCOUNT-JOB-EXPIRED' && <p>{copy.exportRecovery}</p>}
       {job.errorCode === 'ACCOUNT-JOB-EXPIRED' && <p>{copy.processingExpired}</p>}
       {job.status === 'ready' && <div className="mt-3 flex flex-wrap gap-2">{Array.from({ length: job.parts }, (_, part) => <button key={part} className="service-link border-2" disabled={busy} onClick={() => void download(job.id, part)}>{part === job.parts - 1 ? copy.manifest : copy.part + ' ' + (part + 1)}</button>)}</div>}
     </li>)}</ul>

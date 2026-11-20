@@ -128,6 +128,8 @@ it('exports private, community and server records through durable parts; duplica
   await db.doc('users/foreign/attempts/private').set({ userId: uid, content: 'Foreign private attempt' });
   await db.doc('posts/own').set({ authorId: uid, content: 'Own contribution', likedBy: ['foreign'], likesCount: 1 });
   await db.doc('_aiGenerations/own').set({ ownerUid: uid, status: 'succeeded', result: { text: 'Own AI feedback' } });
+  await db.doc('_communityReports/mine').set({ reporterId: uid, decidedBy: 'private-moderator' });
+  await db.doc('_communityReports/decision').set({ reporterId: 'private-reporter', decidedBy: uid, reason: 'private-report-text', decisionReason: 'My moderation decision' });
   const requestId = randomUUID(), created = await createAccountJob(uid, 'export', requestId);
   expect((await createAccountJob(uid, 'export', requestId)).id).toBe(created.id);
   await expect(createAccountJob(uid, 'deletion', requestId)).rejects.toMatchObject({ status: 409 });
@@ -137,6 +139,8 @@ it('exports private, community and server records through durable parts; duplica
   expect(JSON.parse(output[0]).serviceConsent).toMatchObject({ policyVersion: '2', minimumAge: 16, acceptedAt: { $type: 'timestamp' } });
   expect(output.join()).toContain('Owned private note'); expect(output.join()).toContain('Own contribution'); expect(output.join()).toContain('Own AI feedback');
   expect(output.join()).not.toContain('Foreign secret'); expect(output.join()).not.toContain('"likedBy":["foreign"]');
+  expect(output.join()).toContain('My moderation decision');
+  for (const other of ['private-moderator', 'private-reporter', 'private-report-text']) expect(output.join()).not.toContain(other);
   expect(output.join()).toContain('Owned orphan note');
   expect(output.join()).toContain(ownReaction);
   expect(output.join()).not.toContain('Foreign private comment');
@@ -169,11 +173,18 @@ it('locks writes, removes private/Auth records and reactions, and anonymizes ret
   await db.doc('arenaExams/owned').set({ authorId: uid, authorName: 'Learner', authorPhoto: '' });
   await db.doc('_arenaAnswerKeys/owned').set({ authorId: uid, questions: [], schemaVersion: 2 });
   await db.doc('_moderationArchives/foreign').set({ constructor: 'legacy', snapshot: { authorId: 'other', likedBy: ['other'], likesCount: 9 }, hiddenBy: uid, comments: [{ authorId: uid, authorName: 'Learner', authorPhoto: '' }], ranking: { userId: uid, userName: 'Learner', userPhoto: 'old-avatar' } });
+  await db.doc('_communityReports/decision').set({ reporterId: 'other', decidedBy: uid });
+  await db.doc('_communityReports/hidden').set({ reporterId: uid, reason: 'private text', target: { kind: 'post', id: 'other' }, status: 'hidden', createdAt: Timestamp.now() });
   await db.doc('_accountRequests/old').set({ uid, kind: 'deletion', status: 'pending_operator' });
   const created = await createAccountJob(uid, 'deletion', randomUUID());
   expect((await db.doc('_accountLocks/' + uid).get()).get('status')).toBe('deleting');
   await expect(createAccountJob(uid, 'export', randomUUID())).rejects.toMatchObject({ code: 'ACCOUNT-DELETING' });
   expect((await complete(created.id)).status).toBe('completed');
+  expect((await db.doc('_communityReports/decision').get()).get('decidedBy')).toBe('__deleted__');
+  const control = await db.doc('_communityReports/hidden').get();
+  expect(control.get('status')).toBe('hidden');
+  expect(control.get('reason')).toBe('');
+  expect(control.get('reporterId')).toBeUndefined();
   expect((await db.doc('users/' + uid + '/history/one').get()).exists).toBe(false);
   expect((await db.doc(ownReaction).get()).exists).toBe(false);
   expect((await db.doc('users/' + uid + '/notes/missing/deep/one').get()).exists).toBe(false);
@@ -495,6 +506,7 @@ it('restores encrypted Firestore/Auth parts into an empty isolated target and ap
     await expect(finalize()).rejects.toThrow('matching completed initial restore');
     await targetDb.doc(RESTORE_MARKER).create({ sourceProject, jobId: backupId, phase: 'restored' });
     const extraPage = targetDb.batch();
+    extraPage.set(targetDb.doc('_communityReports/retained-decision'), { reporterId: 'other', decidedBy: uid });
     for (let i = 0; i < 105; i++) extraPage.set(targetDb.doc('users/' + uid + '/notes/item' + i), { text: 'Owned row' });
     await extraPage.commit();
     const requestId = randomUUID();
@@ -505,6 +517,7 @@ it('restores encrypted Firestore/Auth parts into an empty isolated target and ap
     await expect(createAccountJob('another-learner', 'deletion', randomUUID())).rejects.toMatchObject({ status: 503 });
     await expect(finalize()).resolves.toMatchObject({ verified: true });
     expect((await targetDb.doc(RESTORE_MARKER).get()).get('phase')).toBe('verified');
+    expect((await targetDb.doc('_communityReports/retained-decision').get()).get('decidedBy')).toBe('__deleted__');
     await expect(createAccountJob('another-learner', 'deletion', randomUUID())).rejects.toMatchObject({ status: 503 });
     expect((await createAccountJob(uid, 'deletion', requestId)).id).toBe(late.id);
     await expect(targetAuth.getUser(uid)).rejects.toMatchObject({ code: 'auth/user-not-found' });
@@ -609,4 +622,20 @@ it('cleans Firestore with retention enabled while account jobs and B2 are disabl
   const ref = getAdminDb().doc('_arenaSessions/expired'); await ref.set({ expiresAt: new Date(0) });
   await maintenanceSweep();
   expect((await ref.get()).exists).toBe(false);
+});
+
+it('resumes a terminal deletion with the original lock, receipt and cursor after a fresh confirmation', async () => {
+  const db = getAdminDb();
+  const original = await createAccountJob(uid, 'deletion', randomUUID());
+  const job = (await claimJob(original.id))!;
+  await finishStep(original.id, job, { cursor: { phase: 1 }, processed: 2 }, 'APP-EXPORT-LIMIT');
+  const barrier = db.doc('_serviceState/maintenance');
+  await barrier.set({ active: true, expiresAtMs: Date.now() + 60_000 });
+  await expect(createAccountJob(uid, 'deletion', randomUUID())).rejects.toMatchObject({ code: 'APP-MAINTENANCE' });
+  await barrier.delete();
+  const resumed = await createAccountJob(uid, 'deletion', randomUUID());
+  expect(resumed).toMatchObject({ id: original.id, receipt: original.receipt, job: { status: 'queued', cursor: { phase: 1 }, processed: 2 } });
+  expect((await db.doc('_accountLocks/' + uid).get()).get('jobId')).toBe(original.id);
+  expect((await db.doc('_deletionJournal/' + uid).get()).get('jobId')).toBe(original.id);
+  expect((await db.collection('_accountJobs').get()).size).toBe(1);
 });

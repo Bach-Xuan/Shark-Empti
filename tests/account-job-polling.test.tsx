@@ -1,13 +1,24 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { AccountDataControls } from '@/components/account-data-controls';
+import * as accountStatus from '@/lib/account-status-client';
+import { jobMessages } from '@/lib/i18n/jobs';
 
 const mocks = vi.hoisted(() => ({ request: vi.fn(), user: { uid: 'owner' } }));
 vi.mock('@/firebase', () => ({ useUser: () => ({ user: mocks.user }) }));
 vi.mock('@/lib/forum-client', () => ({ communityRequest: mocks.request }));
-afterEach(() => { cleanup(); vi.useRealTimers(); vi.resetAllMocks(); });
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); vi.resetAllMocks(); });
 const job = { id: 'ed259772-c4b5-4dbb-9787-4311d5a4a736', kind: 'export', status: 'ready', processed: 1, parts: 1, expiresAtMs: 9_000_000_000_000 };
 
+it.each([true, false])('shows deletion recovery appropriate to receipt-only access (%s)', async receiptOnly => {
+  vi.spyOn(accountStatus, 'readAccountStatus').mockResolvedValue({
+    enabled: !receiptOnly, receiptOnly, jobs: [{ ...job, kind: 'deletion', status: 'failed' }],
+  });
+  await act(async () => { render(<AccountDataControls lang="vi" />); });
+  const copy = jobMessages.vi;
+  expect(screen.getByText(receiptOnly ? copy.receiptRecovery : copy.resumeDeletion)).toBeTruthy();
+  expect(screen.queryByText(receiptOnly ? copy.resumeDeletion : copy.receiptRecovery)).toBeNull();
+});
 it('recovers a transient status-read failure automatically without replaying a mutation', async () => {
   vi.useFakeTimers();
   mocks.request.mockRejectedValueOnce(new TypeError('Offline')).mockResolvedValue({ enabled: true, jobs: [job] });

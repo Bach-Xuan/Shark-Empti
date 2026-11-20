@@ -1,6 +1,8 @@
-# 🛠️ Technical Documentation · Shark Empti **β V2.1.0**
+# 🛠️ Technical Documentation · Shark Empti **v2.2.0**
 
 This guide describes runtime ownership and contracts. See [configuration](CONFIGURATION.md), the [backend data map](backend.json), [validation](VALIDATION.md), [account operations](ACCOUNT_OPERATIONS.md) and the [audit register](AUDIT_REPORT.md). Executable source, schemas, Rules and configuration take precedence over descriptive documentation. The [interface design guide](DESIGN.md) covers learner-facing states and interactions.
+
+The [application flow guide](FLOW.md) traces entry points, server decisions, persistence and recovery for each feature.
 
 ## 🧭 Sources of truth
 

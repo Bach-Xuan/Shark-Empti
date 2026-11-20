@@ -48,12 +48,17 @@ export function continuation(query: Query, after?: string) {
   return after ? query.startAfter(getAdminDb().doc(after)) : query;
 }
 
+/** Retain only the queue fields needed to reverse an active moderation decision. */
+export function hiddenReportControl(data: Record<string, unknown>) {
+  return { target: data.target, status: 'hidden', createdAt: data.createdAt, reason: '' };
+}
+
 /** Preserve Firestore values and schema shape in retained contributions and archives. */
 export function anonymizeContributions(value: unknown, deleted: ReadonlySet<string>): unknown {
   if (Array.isArray(value)) return value.map(item => anonymizeContributions(item, deleted));
   if (!value || typeof value !== 'object' || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) return value;
   const record = { ...value as Record<string, unknown> };
-  for (const field of ['authorId', 'userId', 'actorId', 'hiddenBy', 'reporterId', 'uid', 'ownerUid']) {
+  for (const field of ['authorId', 'userId', 'actorId', 'hiddenBy', 'decidedBy', 'reporterId', 'uid', 'ownerUid']) {
     const owner = record[field];
     if (typeof owner !== 'string' || !deleted.has(owner)) continue;
     record[field] = '__deleted__';
@@ -81,7 +86,7 @@ export function redactExport(value: unknown, uid: string): unknown {
   const result: Record<string, unknown> = Object.create(null);
   for (const [key, child] of Object.entries(value)) {
     if (/^(passwordHash|passwordSalt|tokens|refreshToken|accessToken|authorization|receiptHash|lease|inFlight|comments)$/.test(key)) continue;
-    if (['authorId', 'reporterId', 'actorId', 'hiddenBy', 'userId', 'ownerUid', 'uid'].includes(key) && typeof child === 'string' && child !== uid) continue;
+    if (['authorId', 'reporterId', 'actorId', 'hiddenBy', 'decidedBy', 'userId', 'ownerUid', 'uid'].includes(key) && typeof child === 'string' && child !== uid) continue;
     if (key === 'likedBy' && Array.isArray(child)) { result[key] = child.filter(id => id === uid); continue; }
     result[key] = redactExport(child, uid);
   }

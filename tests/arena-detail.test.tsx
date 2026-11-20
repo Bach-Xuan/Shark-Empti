@@ -54,7 +54,7 @@ beforeEach(() => {
     return new Response(JSON.stringify({ ...JSON.parse(init.body as string), questions: [prompt], startedAtMs: Date.now() }));
   });
   mocks.chat.mockResolvedValue({ ok: true, data: { aiResponse: 'Review explanation' } });
-  localStorage.clear(); vi.stubGlobal('fetch', (url: string, init: RequestInit) => url.endsWith('/start') ? mocks.startRequest(url, init) : mocks.request(url, init));
+  sessionStorage.clear(); localStorage.clear(); vi.stubGlobal('fetch', (url: string, init: RequestInit) => url.endsWith('/start') ? mocks.startRequest(url, init) : mocks.request(url, init));
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
@@ -236,4 +236,18 @@ it('disables competitive Guru and enables the existing chatbot with completed re
 
 it('does not expose arbitrary payload messages or sensitive diagnostic values', () => {
   expect(arenaResponseError({ code: 'APP-CONFIG-MISSING', error: 'secret', values: { operation: 'Bearer token', lastFailure: 'https://private', providerCode: 'sk-secret', retryAfterSeconds: 3 } }, 503)).toEqual({ code: 'APP-CONFIG-MISSING', message: '', values: { retryAfterSeconds: 3, httpStatus: 503 } });
+});
+
+it('replays the submitted answers after a lost response and reload without starting another attempt', async () => {
+  const view = render(<ArenaDetailPage />);
+  await start();
+  mocks.request.mockRejectedValueOnce(new Error('response lost'));
+  expect(await finish()).toBe(false);
+  const original = mocks.request.mock.calls[0][1].body;
+  view.unmount();
+  render(<ArenaDetailPage />);
+  await start();
+  expect(mocks.startRequest).toHaveBeenCalledTimes(1);
+  expect(mocks.request.mock.calls[1][1].body).toBe(original);
+  expect(screen.getByRole('button', { name: 'Retake same' })).toBeTruthy();
 });

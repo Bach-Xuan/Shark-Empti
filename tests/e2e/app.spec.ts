@@ -107,14 +107,29 @@ test('Forum comment and Arena submission use real demo APIs', async ({ page, fau
   await expect(page.getByRole('button', { name: '4', exact: true })).toBeVisible();
   page.once('dialog', dialog => dialog.accept());
   await page.reload();
-  await expect(page.getByText(/An unfinished attempt is available/)).toBeVisible();
+  await expect(page.getByText(/Resume the saved attempt/)).toBeVisible();
   await page.getByRole('button', { name: 'Start Challenge', exact: true }).click();
   await page.getByRole('button', { name: '4', exact: true }).click({ delay: 350 });
   await expect(page.getByText('Answer recorded. The server grades your answers after submission.', { exact: true })).toBeVisible();
   expect(starts).toHaveLength(2);
   expect(starts[0]).toBe(starts[1]);
+  const submissions: string[] = [];
+  faultRoutes.set(`/api/arena/${id}/submit`, async route => {
+    submissions.push(route.request().postData()!);
+    if (submissions.length === 1) {
+      const committed = await route.fetch();
+      expect(committed.ok()).toBe(true);
+      await route.abort('failed');
+    } else await route.continue();
+  });
   await page.getByRole('button', { name: /finish|results/i }).click();
+  await expect(page.getByRole('alert').getByRole('button', { name: /retry/i })).toBeVisible();
+  page.once('dialog', dialog => dialog.accept());
+  await page.reload();
+  await page.getByRole('button', { name: 'Start Challenge', exact: true }).click();
   await expect(page.getByRole('heading', { name: /100%/ })).toBeVisible();
+  expect(starts).toHaveLength(2);
+  expect(submissions).toEqual([submissions[0], submissions[0]]);
   expect((await db.doc(`arenaExams/${id}`).get()).get('totalAttempts')).toBe(1);
   const attempts = await db.collection(`arenaExams/${id}/attempts`).get();
   expect(attempts.size).toBe(1);

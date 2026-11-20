@@ -1,4 +1,5 @@
 import 'server-only';
+import { AI_IO_LIMITS } from './config/limits';
 import { buildAcademicValidationRequest,AcademicValidationInputSchema,AcademicValidationOutputSchema } from './flows/academic-validation-flow';
 import { buildAiCoachingChatbotRequest,AiCoachingChatbotInputSchema,AiCoachingChatbotOutputSchema } from './flows/ai-coaching-chatbot-flow';
 import { buildGenerateFlashcardsRequest,GenerateFlashcardsInputSchema,GenerateFlashcardsOutputSchema } from './flows/generate-flashcards-flow';
@@ -26,7 +27,7 @@ const registry = {
   'generate-practice': { inputSchema: GeneratePracticeInputSchema, outputSchema: GeneratePracticeOutputSchema, buildRequest: buildGeneratePracticeRequest, costWeight: 2, inputLimits: { maxSerializedBytes: 16_384 } },
   'short-answer-analysis': { inputSchema: ShortAnswerAnalysisInputSchema, outputSchema: ShortAnswerAnalysisOutputSchema, buildRequest: buildShortAnswerAnalysisRequest, costWeight: 1, inputLimits: { maxSerializedBytes: 16_384 } },
   'personalized-quiz-feedback': { inputSchema: PersonalizedQuizFeedbackInputSchema, outputSchema: PersonalizedQuizFeedbackOutputSchema, buildRequest: buildPersonalizedQuizFeedbackRequest, costWeight: 4, inputLimits: { maxSerializedBytes: 131_072 } },
-  'ai-coaching-chatbot': { inputSchema: AiCoachingChatbotInputSchema, outputSchema: AiCoachingChatbotOutputSchema, buildRequest: buildAiCoachingChatbotRequest, costWeight: 3, inputLimits: { maxSerializedBytes: 131_072 } },
+  'ai-coaching-chatbot': { inputSchema: AiCoachingChatbotInputSchema, outputSchema: AiCoachingChatbotOutputSchema, buildRequest: buildAiCoachingChatbotRequest, costWeight: 3, inputLimits: { maxSerializedBytes: AI_IO_LIMITS.coachingInputBytes } },
 } satisfies Record<AiOperation, AiOperationDefinition>;
 
 export function getAiOperationDefinition(operation: AiOperation): AiOperationDefinition {

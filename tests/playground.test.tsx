@@ -38,6 +38,18 @@ function view(tab: 'flashcards' | 'practice') {
   return render(<PlaygroundView t={translations.en} lang="en" weakPoints={weakPoints} totalAttempts={1} totalErrors={1} initialConfig={{ tab, concept: 'Addition' }} onAskGuru={() => {}} />);
 }
 for (const tab of ['flashcards', 'practice'] as const) {
+  it(tab + ' keeps the selected topic and count fixed until validation settles', async () => {
+    let resolve!: (value: unknown) => void;
+    mocks.validate.mockImplementationOnce(() => new Promise(done => { resolve = done; }));
+    const other = { ...weakPoints[0], topic: 'Geometry', topicId: 'geometry' };
+    render(<PlaygroundView t={translations.en} lang="en" weakPoints={[...weakPoints, other]} totalAttempts={1} totalErrors={1} initialConfig={{ tab, concept: 'Addition' }} onAskGuru={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: tab === 'practice' ? translations.en.startPractice : translations.en.startLearning }));
+    const topic = screen.getByRole('button', { name: /Geometry/i });
+    expect(topic.hasAttribute('disabled')).toBe(true);
+    expect(screen.getByRole('spinbutton').hasAttribute('disabled')).toBe(true);
+    await act(async () => resolve({ ok: false, error: { code: 'AI-TRANSPORT-FAILED' } }));
+    expect(topic.hasAttribute('disabled')).toBe(false);
+  });
   it(`${tab} unlocks validation after a recoverable failure`, async () => {
     mocks.validate.mockResolvedValue({ ok: false, error: { code: 'AI-TRANSPORT-FAILED' } });
     view(tab);
@@ -67,7 +79,12 @@ it.each(['en', 'vi'] as const)('semantically grades a supported free-text equiva
   mocks.write.mockResolvedValue(undefined);
   render(<PlaygroundView t={translations[lang]} lang={lang} weakPoints={weakPoints} totalAttempts={1} totalErrors={1} initialConfig={{ tab: 'practice', concept: 'Velocity' }} onAskGuru={() => {}} />);
   fireEvent.click(screen.getByRole('button', { name: translations[lang].startPractice }));
-  fireEvent.change(await screen.findByPlaceholderText(translations[lang].typeYourAnswer), { target: { value: lang === 'vi' ? 'Độ nhanh kèm hướng' : 'Rate of motion including direction' } });
+  const input = await screen.findByPlaceholderText(translations[lang].typeYourAnswer) as HTMLInputElement;
+  expect(input.maxLength).toBe(2000);
+  fireEvent.change(input, { target: { value: 'x'.repeat(2001) } });
+  fireEvent.click(screen.getByRole('button', { name: translations[lang].submitAnswer }));
+  expect(mocks.grade).not.toHaveBeenCalled();
+  fireEvent.change(input, { target: { value: lang === 'vi' ? 'Độ nhanh kèm hướng' : 'Rate of motion including direction' } });
   fireEvent.click(screen.getByRole('button', { name: translations[lang].submitAnswer }));
   await waitFor(() => expect(mocks.grade).toHaveBeenCalledTimes(1));
   fireEvent.click(await screen.findByRole('button', { name: /finish|results|hoàn|kết/i }));

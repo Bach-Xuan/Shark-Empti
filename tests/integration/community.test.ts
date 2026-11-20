@@ -171,6 +171,12 @@ it('keeps reports private, requires current moderator authority, and supports at
   expect((await moderate(request(decision))).status).toBe(200);
   expect((await moderate(request(decision))).status).toBe(200);
   expect((await getAdminDb().doc('posts/post').get()).exists).toBe(false);
+  const duplicate = getAdminDb().doc('_communityReports/duplicate');
+  await duplicate.set({ ...input, status: 'open', reporterId: uid, createdAt: Timestamp.now() });
+  for (const action of ['hide', 'restore']) {
+    expect((await moderate(request({ ...decision, reportId: duplicate.id, action, requestId: crypto.randomUUID() }))).status).toBe(409);
+  }
+  expect((await duplicate.get()).get('status')).toBe('open');
   expect((await getAdminDb().collection('_moderationActions').get()).size).toBe(1);
   expect((await moderate(request({ ...decision, action: 'restore', requestId: crypto.randomUUID() }))).status).toBe(200);
   expect((await getAdminDb().doc('posts/post').get()).get('content')).toBe('Body');
@@ -227,6 +233,16 @@ it('migrates legacy answer exposure atomically into non-rewarded practice and ne
   expect((await start(request({ requestId: crypto.randomUUID() }), examParams)).status).toBe(409);
   expect((await migrateLegacyArena(db)).eligible).toBe(1);
   expect((await db.doc('arenaExams/exam').get()).get('questions')).toEqual(questions);
+  for (const [path, state] of [
+    ['_serviceState/maintenance', { active: true, expiresAtMs: Date.now() + 60_000 }],
+    ['_accountLocks/' + uid, { status: 'deleting' }],
+  ] as const) {
+    await db.doc(path).set(state);
+    await expect(migrateLegacyArena(db, true)).rejects.toThrow('write barrier');
+    expect((await db.doc('_arenaAnswerKeys/exam').get()).exists).toBe(false);
+    expect((await db.doc('_arenaLegacyBackups/exam').get()).exists).toBe(false);
+    await db.doc(path).delete();
+  }
   expect((await migrateLegacyArena(db, true)).migrated).toBe(1);
   expect((await migrateLegacyArena(db, true)).migrated).toBe(0);
   const metadata = (await db.doc('arenaExams/exam').get()).data()!;

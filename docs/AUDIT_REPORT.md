@@ -1,8 +1,8 @@
-# 📋 Consolidated Technical Audit Report · Shark Empti **β V2.1.0**
+# 📋 Consolidated Technical Audit Report · Shark Empti **v2.2.0**
 
-This register covers **90 findings**. **89 are resolved and 1 remains open.**
+This register covers **101 findings**. **100 are resolved and 1 remains open.**
 
-See the [technical documentation](TECHNICAL_DOCUMENTATION.md), [validation guide](VALIDATION.md), [account operations](ACCOUNT_OPERATIONS.md) and [interface design guide](DESIGN.md) for implementation and verification guidance.
+See the [application flow guide](FLOW.md), [technical documentation](TECHNICAL_DOCUMENTATION.md), [validation guide](VALIDATION.md), [account operations](ACCOUNT_OPERATIONS.md) and [interface design guide](DESIGN.md) for implementation and verification guidance.
 
 ## 🧭 Finding-Code Legend
 
@@ -85,6 +85,17 @@ See the [technical documentation](TECHNICAL_DOCUMENTATION.md), [validation guide
 | D42 | Recursive Forum comment cleanup could continue outside write guards after a post was hidden | Resolved | 18 November 2026 |
 | D43 | Expired backup jobs consumed scheduler slots and reserved retry credits before the worker rejected them, delaying redispatch of pending account deletions | Resolved | 19 November 2026 |
 | D44 | A deletion accepted after the initial restore inventory could leave an identity, private descendants or stale public contributions on the target at cutover | Resolved | 19 November 2026 |
+| D45 | Moderator identifiers on report decisions could enter another member’s export and survive deletion or backup restoration | Resolved | 20 November 2026 |
+| D46 | Failed account deletion could stall at a large private inventory, keep the write lock without an owner retry, and show unavailable recovery actions to receipt-only readers | Resolved | 20 November 2026 |
+| D47 | Quick Notes and Dashboard allowed an empty editor to overwrite existing notes before the owner’s first confirmed Firestore snapshot | Resolved | 20 November 2026 |
+| D48 | Legacy Arena migration could write the exam, private answer key and backup during an active backup barrier or author deletion | Resolved | 20 November 2026 |
+| D49 | Personal quiz timing included AI question generation and could expire before the learner received the full answering period | Resolved | 20 November 2026 |
+| D50 | Quiz, Arena and Practice accepted short answers longer than the draft, grading and persistence contracts could store | Resolved | 20 November 2026 |
+| D51 | Short-answer grading accepted invalid confidence and oversized AI feedback, and restoring that feedback from legacy Quiz drafts could prevent a history save | Resolved | 20 November 2026 |
+| D52 | Arena lost the submitted answers and review recovery path when the tab reloaded after a committed submission with a lost response | Resolved | 20 November 2026 |
+| D53 | Playground topic and count changes during academic validation could associate generated practice questions or flashcards with different settings | Resolved | 20 November 2026 |
+| D54 | Duplicate moderation reports could restore another report’s hidden content or leave a hidden queue entry without a recoverable decision | Resolved | 20 November 2026 |
+| D55 | Shark Guru sent unbounded quiz and conversation history, causing later valid questions to exceed the AI generation input limit | Resolved | 20 November 2026 |
 | N01 | Inconsistent domain and file names made related modules harder to identify across features | Resolved | 18 November 2026 |
 | N02 | Shared types blurred the distinction between draft sessions, validated configurations and persisted operations | Resolved | 18 November 2026 |
 | N03 | Duplicated domain logic and insufficient unused-code checks obscured active implementation paths | Resolved | 18 November 2026 |

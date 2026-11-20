@@ -27,11 +27,12 @@ interface QuickNotesProps {
   t: TranslationSet;
   lang: string;
   isSticky?: boolean;
+  notesReady?: boolean;
   notes: string;
   onNotesChange: (notes: string) => Promise<boolean>;
 }
 
-export default function QuickNotes({ t, lang, isSticky, notes: externalNotes, onNotesChange }: QuickNotesProps) {
+export default function QuickNotes({ t, lang, isSticky, notesReady = true, notes: externalNotes, onNotesChange }: QuickNotesProps) {
   const { toast } = useToast();
   const [localNotes, setLocalNotes] = useState(externalNotes);
   const [isOpen, setIsOpen] = useState(false);
@@ -47,7 +48,7 @@ export default function QuickNotes({ t, lang, isSticky, notes: externalNotes, on
   }, [isOpen, externalNotes, isDirty]);
 
   const handleSave = async () => {
-    if (savePending.current) return;
+    if (!notesReady || savePending.current) return;
     savePending.current = true;
     setIsSaving(true);
     const saved = await onNotesChange(localNotes).catch(() => false).finally(() => { savePending.current = false; setIsSaving(false); });
@@ -70,14 +71,14 @@ export default function QuickNotes({ t, lang, isSticky, notes: externalNotes, on
   };
 
   const insertLatex = (type: 'inline' | 'block') => {
-    if (savePending.current) return;
+    if (!notesReady || savePending.current) return;
     setIsDirty(true);
     const wrapper = type === 'inline' ? '$' : '$$';
     setLocalNotes(prev => prev + wrapper + wrapper);
   };
 
   const insertSnippet = (snippet: string) => {
-    if (savePending.current) return;
+    if (!notesReady || savePending.current) return;
     setIsDirty(true);
     setLocalNotes(prev => prev + `$${snippet}$`);
   };
@@ -88,7 +89,7 @@ export default function QuickNotes({ t, lang, isSticky, notes: externalNotes, on
       <DialogTrigger asChild>
         <Button
           variant="ghost"
-          aria-label={t.personalNotes}
+          disabled={!notesReady} aria-label={t.personalNotes}
           size="icon"
           className={cn(
             "rounded-xl hover:bg-muted transition-all btn-duo bg-card group border-2",
@@ -125,7 +126,7 @@ export default function QuickNotes({ t, lang, isSticky, notes: externalNotes, on
           </div>
 
           <Textarea
-            disabled={isSaving}
+            disabled={isSaving || !notesReady}
             className="min-h-[200px] md:min-h-[300px] bg-muted/20 border-[3px] border-border rounded-3xl font-bold p-6 md:p-8 text-sm md:text-lg focus:ring-[6px] focus:ring-primary/10 focus:border-primary transition-all shadow-inner"
             placeholder={t.notesPlaceholder}
             value={localNotes} maxLength={NOTES_MAX_LENGTH}
@@ -156,7 +157,7 @@ export default function QuickNotes({ t, lang, isSticky, notes: externalNotes, on
               )}
               <Button
                 onClick={handleSave}
-                disabled={isSaving}
+                disabled={isSaving || !notesReady}
                 className="rounded-xl font-black uppercase tracking-widest text-xs btn-duo bg-primary text-primary-foreground border-2 border-white/20 h-12 px-8 flex items-center gap-2"
               >
                 <Save className="w-4 h-4" /> {t.save}

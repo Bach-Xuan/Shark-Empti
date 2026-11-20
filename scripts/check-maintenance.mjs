@@ -19,8 +19,8 @@ const stable = value => JSON.stringify(Object.entries(value ?? {}).sort(([a], [b
 if (!semver.valid(manifest.version) || lock.version !== manifest.version || lock.packages[''].version !== manifest.version) {
   problems.push('npm version must be valid SemVer and match both lockfile version fields.');
 }
-if (manifest.releaseTag !== `beta-v${manifest.version}` || readJson('docs/backend.json')['x-version'] !== manifest.releaseTag) {
-  problems.push('The beta release tag must match the npm version and the backend data map.');
+if (manifest.releaseTag !== `v${manifest.version}` || readJson('docs/backend.json')['x-version'] !== manifest.releaseTag) {
+  problems.push('The release tag must match the npm version and the backend data map.');
 }
 
 for (const field of ['dependencies', 'devDependencies', 'engines']) {

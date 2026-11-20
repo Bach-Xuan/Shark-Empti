@@ -14,6 +14,9 @@ export const runtime = 'nodejs';
 const Input = z.object({ reportId: z.string(), action: z.enum(['hide', 'restore', 'dismiss']), reason: z.string().trim().min(5).max(2000), requestId: z.string().uuid() }).strict();
 const QueueInput = z.object({ status: z.enum(['open', 'hidden']).default('open'), after: z.string().min(1).max(1024).regex(/^[A-Za-z0-9_-]+$/).optional() }).strict();
 const Cursor = z.object({ status: z.enum(['open', 'hidden']), seconds: z.number().int().min(-62135596800).max(253402300799), nanoseconds: z.number().int().min(0).max(999999999), id: z.string().min(1).max(128) }).strict();
+function ownsArchive(status: unknown, reportId: string, archived: { exists: boolean; get(field: string): unknown }) {
+  return status === 'hidden' && archived.exists && (archived.get('reportId') === undefined || archived.get('reportId') === reportId);
+}
 export async function GET(request: NextRequest) {
   try {
     await authenticatedModerator(request);
@@ -36,7 +39,7 @@ export async function GET(request: NextRequest) {
       const [content, archived] = await Promise.all([ref.get(), db.collection('_moderationArchives').doc(archiveId(ref.path)).get()]);
       const original = content.data() ?? archived.get('snapshot');
       const preview = [original?.title, original?.content].filter(value => typeof value === 'string').join('\n').slice(0, 4000);
-      return { id: doc.id, target, reason: data.reason, status: data.status, preview, hidden: archived.exists, exists: content.exists };
+      return { id: doc.id, target, reason: data.reason, status: data.status, preview, hidden: archived.exists, ownsArchive: ownsArchive(data.status, doc.id, archived), exists: content.exists };
     }));
     const last = visible.at(-1);
     const timestamp = last?.get('createdAt') as Timestamp | undefined;
@@ -68,15 +71,19 @@ export async function POST(request: NextRequest) {
       const count = parent?.get('commentsCount');
       const publication = await prepareForumPublication(transaction, db, ref.path);
       const parentPublication = parentRef ? await prepareForumPublication(transaction, db, parentRef.path) : null;
-      if (input.action === 'dismiss' && report.get('status') !== 'open') throw new ApiError('APP-REQUEST-CONFLICT', 409, 'Only open reports can be dismissed; restore hidden content first.');
+      const status = report.get('status');
+      const ownsHiddenContent = ownsArchive(status, report.id, archive);
+      if (input.action === 'hide' && (status !== 'open' || archive.exists)) throw new ApiError('APP-REQUEST-CONFLICT', 409, 'This report cannot hide the content.');
+      const canDismiss = status === 'open' || (status === 'hidden' && !ownsHiddenContent);
+      if (input.action === 'dismiss' && !canDismiss) throw new ApiError('APP-REQUEST-CONFLICT', 409, 'Dismissal requires an open report or a hidden report without its own archive.');
       if (input.action === 'hide' && !current.exists && !archive.exists) throw new ApiError('FORUM-NOT-FOUND', 404, 'Content no longer exists.');
-      if (input.action === 'restore' && (!archive.exists || current.exists || tombstone?.exists || (parentRef && !parent?.exists))) throw new ApiError('APP-REQUEST-CONFLICT', 409, 'Content cannot be restored over a deletion or an existing item.');
+      if (input.action === 'restore' && (!ownsHiddenContent || current.exists || tombstone?.exists || (parentRef && !parent?.exists))) throw new ApiError('APP-REQUEST-CONFLICT', 409, 'Content cannot be restored over a deletion or an existing item.');
       if (input.action === 'restore' && target.kind !== 'exam' && archive.get('privacyReady') !== true) throw new ApiError('APP-REQUEST-CONFLICT', 409, 'This archive requires a privacy migration before restoration.');
       if (target.kind === 'comment' && input.action !== 'dismiss' && (!Number.isSafeInteger(count) || count < 0 || count >= Number.MAX_SAFE_INTEGER)) throw new ApiError('APP-REQUEST-CONFLICT', 409, 'The parent counter requires repair.');
       const commitBudget = await prepareRequestBudget(transaction, uid, 'community-mutate', Buffer.byteLength(input.reason));
       commitBudget();
-      if (input.action === 'hide' && current.exists && !archive.exists) {
-        transaction.create(archiveRef, { target, snapshot: current.data(), hiddenBy: uid, reason: input.reason, hiddenAt: FieldValue.serverTimestamp(), ...(target.kind !== 'exam' ? { privacyReady: publication.published } : {}) });
+      if (input.action === 'hide') {
+        transaction.create(archiveRef, { reportId: report.id, target, snapshot: current.data(), hiddenBy: uid, reason: input.reason, hiddenAt: FieldValue.serverTimestamp(), ...(target.kind !== 'exam' ? { privacyReady: publication.published } : {}) });
         transaction.delete(ref);
         publication.remove();
         if (parentRef) transaction.update(parentRef, { commentsCount: Math.max(0, count - 1) });

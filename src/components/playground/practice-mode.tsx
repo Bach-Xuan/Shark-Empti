@@ -1,5 +1,6 @@
 
 "use client";
+import { LEARNING_LIMITS } from '@/lib/data-limits';
 import { messages,uiMessage } from '@/lib/i18n';
 import type { DashboardStats } from '@/lib/stats-utils';
 
@@ -151,7 +152,7 @@ export default function PracticeMode({ t, lang, weakPoints, historyPending, tota
   };
 
   const handleAnswer = async (ans: string) => {
-    if (currentFeedback || evaluating.current || !ans.trim()) return;
+    if (currentFeedback || evaluating.current || ans.length > LEARNING_LIMITS.answer || !ans.trim()) return;
     evaluating.current = true;
     const version = evaluationEpoch.current;
     setIsEvaluating(true); setEvaluationError(null);
@@ -165,7 +166,7 @@ export default function PracticeMode({ t, lang, weakPoints, historyPending, tota
           const result = await shortAnswerAnalysis({ questionText: q.question, correctAnswer: q.correct, userAnswer: ans, language: lang }, { signal: aiRequest.start() });
           if (!mounted.current || version !== evaluationEpoch.current) return;
           if (!result.ok) { showErrorToast(result.error, lang); throw new Error('Evaluation unavailable'); }
-          if (!Number.isFinite(result.data.confidence) || result.data.confidence < 0.8) throw new Error('Uncertain evaluation');
+          if (!Number.isFinite(result.data.confidence) || result.data.confidence < 0.8 || result.data.confidence > 1) throw new Error('Uncertain evaluation');
           isCorrect = result.data.isCorrect;
         }
       }
@@ -334,6 +335,7 @@ export default function PracticeMode({ t, lang, weakPoints, historyPending, tota
               <div className="space-y-5 md:space-y-10">
                 <Input
                   value={shortAnswer}
+                  maxLength={LEARNING_LIMITS.answer}
                   onChange={(e) => setShortAnswer(e.target.value)}
                   disabled={!!currentFeedback || isEvaluating}
                   placeholder={t.typeYourAnswer}
@@ -426,6 +428,7 @@ export default function PracticeMode({ t, lang, weakPoints, historyPending, tota
                 <Button
                   key={i}
                   variant={concept === wp.topic ? "default" : "outline"}
+                  disabled={isValidating || isGenerating}
                   onClick={() => setConcept(wp.topic)}
                   aria-pressed={concept === wp.topic}
                   className={cn(
@@ -463,7 +466,7 @@ export default function PracticeMode({ t, lang, weakPoints, historyPending, tota
               onChange={handleNumChange}
               onBlur={handleNumBlur}
               min={1} max={50}
-              disabled={isPracticeDisabled}
+              disabled={isPracticeDisabled || isValidating || isGenerating}
               className="h-12 md:h-20 rounded-xl md:rounded-[1.5rem] border-[3px] border-border font-black text-lg md:text-4xl bg-muted/10 text-center w-24 md:w-40 shadow-inner focus:ring-4 md:ring-8 focus:ring-primary/10 transition-all focus:border-primary disabled:opacity-30"
             />
             <span className="text-muted-foreground font-black uppercase text-[9px] md:text-xs tracking-[0.2em]">{uiMessage(lang, "playgroundview.practice_questions")}</span>

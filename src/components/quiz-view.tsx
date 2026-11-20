@@ -1,5 +1,6 @@
 
 "use client";
+import { LEARNING_LIMITS } from '@/lib/data-limits';
 import { messages,uiMessage } from '@/lib/i18n';
 
 import { generateQuestions,personalizedQuizPerformanceFeedback,shortAnswerAnalysis } from '@/ai/client-flows';
@@ -111,9 +112,11 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
           setError(translatedError(result.error.code, questionLanguage === 'vi' ? 'vi' : 'en'));
           return;
         }
+        const readyAt = Date.now();
+        setClockStartedAt(readyAt);
+        setQuestionStartTime(readyAt);
         setQuestions(result.data.questions);
         onReady?.(result.data.questions);
-        setQuestionStartTime(Date.now());
       } catch (err) {
         console.error("Failed to generate questions", err);
         const aiError = getAiError(err);
@@ -225,7 +228,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
   }, [remainingTime, isFinishing, handleAutoFinish]);
 
   const handleAnswer = useCallback(async (userAnswer: string) => {
-    if (answerPending.current || finishingRef.current || isAnalyzing || !!currentFeedback || !userAnswer.trim()) return;
+    if (answerPending.current || finishingRef.current || isAnalyzing || !!currentFeedback || userAnswer.length > LEARNING_LIMITS.answer || !userAnswer.trim()) return;
     answerPending.current = true;
     setAnswerError(null);
 
@@ -256,7 +259,8 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
           showErrorToast(result.error, lang as 'en' | 'vi');
           return;
         } else {
-          if (!Number.isFinite(result.data.confidence) || result.data.confidence < 0.8) {
+          if (!Number.isFinite(result.data.confidence) || result.data.confidence < 0.8 || result.data.confidence > 1
+            || typeof result.data.feedback !== 'string' || result.data.feedback.length > LEARNING_LIMITS.text) {
             answerPending.current = false;
             setAnswerError(learningNotices[lang === 'vi' ? 'vi' : 'en'].uncertain);
             return;
@@ -423,6 +427,7 @@ export default function QuizView({ t, lang, config, initialQuestions, onFinish, 
                     disabled={!!currentFeedback || isAnalyzing}
                     className="w-full h-16 md:h-28 px-6 md:px-10 rounded-2xl md:rounded-3xl border-[3px] border-border font-black text-lg md:text-3xl focus:outline-hidden focus:border-primary focus:ring-[4px] focus:ring-primary/10 bg-muted/20 text-foreground disabled:opacity-50 transition-all placeholder:text-muted-foreground shadow-inner"
                     value={shortAnswerInput}
+                    maxLength={LEARNING_LIMITS.answer}
                     onChange={(e) => setShortAnswerInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleAnswer(shortAnswerInput)}
                   />

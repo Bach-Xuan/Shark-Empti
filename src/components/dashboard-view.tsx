@@ -90,13 +90,14 @@ const CustomRadarTick = (props: { x?: number; y?: number; payload?: { value?: st
 
 interface DashboardViewProps extends BaseViewProps {
   history: QuizHistoryItem[];
+  notesReady?: boolean;
   personalNotes: string;
   onNotesChange: (notes: string) => Promise<boolean>;
   stats?: ReturnType<typeof calculateDashboardStats>;
   onFixWeakness?: (concept: string, type: 'practice' | 'flashcards') => void;
 }
 
-export default function DashboardView({ t, history, lang, personalNotes, onNotesChange, onFixWeakness, stats }: DashboardViewProps) {
+export default function DashboardView({ t, history, lang, personalNotes, notesReady = true, onNotesChange, onFixWeakness, stats }: DashboardViewProps) {
   const { user } = useUser();
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -167,7 +168,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
   }, [dashboardStats, t, personalNotes, toast, lang]);
 
   const handleSaveNotes = async () => {
-    if (savingNotes.current) return;
+    if (!notesReady || savingNotes.current) return;
     savingNotes.current = true;
     setIsSavingNotes(true);
     try {
@@ -181,13 +182,13 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
   };
 
   const insertLatex = (type: 'inline' | 'block') => {
-    if (savingNotes.current) return;
+    if (!notesReady || savingNotes.current) return;
     const wrapper = type === 'inline' ? '$' : '$$';
     setTempNotesContent(prev => prev + wrapper + wrapper);
   };
 
   const insertSnippet = (snippet: string) => {
-    if (savingNotes.current) return;
+    if (!notesReady || savingNotes.current) return;
     setTempNotesContent(prev => prev + `$${snippet}$`);
   };
 
@@ -402,7 +403,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
               </Button>
             )}
             {!isEditingNotes && (
-              <Button aria-label={t.edit} variant="outline" size="sm" onClick={() => { setTempNotesContent(personalNotes); setIsEditingNotes(true); }} className="btn-duo font-black h-10 w-10 md:h-14 md:w-14 p-0 rounded-xl md:rounded-2xl border-2 md:border-[3px] text-primary flex items-center justify-center bg-card shadow-none">
+              <Button disabled={!notesReady} aria-label={t.edit} variant="outline" size="sm" onClick={() => { setTempNotesContent(personalNotes); setIsEditingNotes(true); }} className="btn-duo font-black h-10 w-10 md:h-14 md:w-14 p-0 rounded-xl md:rounded-2xl border-2 md:border-[3px] text-primary flex items-center justify-center bg-card shadow-none">
                 <Pencil className="w-4 h-4 md:w-6 md:h-6" />
               </Button>
             )}
@@ -421,7 +422,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
               </div>
 
               <Textarea
-                disabled={isSavingNotes}
+                disabled={isSavingNotes || !notesReady}
                 className="min-h-[120px] md:min-h-[300px] bg-background border-2 md:border-[4px] border-primary/20 rounded-xl md:rounded-[2.5rem] focus:ring-4 md:ring-[10px] focus:ring-primary/5 font-bold p-4 md:p-10 text-xs md:text-2xl shadow-inner transition-all"
                 placeholder={t.notesPlaceholder}
                 value={tempNotesContent} maxLength={NOTES_MAX_LENGTH}
@@ -434,7 +435,7 @@ export default function DashboardView({ t, history, lang, personalNotes, onNotes
                 </p>
                 <div className="flex gap-3 md:gap-4 justify-end">
                   <Button disabled={isSavingNotes} variant="ghost" onClick={() => setIsEditingNotes(false)} className="btn-duo rounded-xl md:rounded-2xl px-6 md:px-8 h-9 md:h-14 text-[9px] md:text-xs font-black uppercase tracking-widest bg-card">{t.cancel}</Button>
-                  <Button disabled={isSavingNotes} onClick={handleSaveNotes} className="btn-duo bg-primary text-primary-foreground rounded-xl md:rounded-2xl px-8 md:px-16 h-9 md:h-14 text-[9px] md:text-xs font-black uppercase tracking-widest border-2 md:border-[3px] border-white/20 shadow-none">{t.save}</Button>
+                  <Button disabled={isSavingNotes || !notesReady} onClick={handleSaveNotes} className="btn-duo bg-primary text-primary-foreground rounded-xl md:rounded-2xl px-8 md:px-16 h-9 md:h-14 text-[9px] md:text-xs font-black uppercase tracking-widest border-2 md:border-[3px] border-white/20 shadow-none">{t.save}</Button>
                 </div>
               </div>
             </div>

@@ -1,10 +1,11 @@
 import 'server-only';
 import { FieldPath, type DocumentSnapshot, type Query } from 'firebase-admin/firestore';
 import { eraseOwnedGenerations } from '@/ai/generation-store';
+import { readDescendantPage } from '../firestore-descendants';
 import { exportValue } from '../export-value';
 import { getAdminAuth, getAdminDb } from '../firebase-admin';
 import { ApiError } from '../server-api';
-import { anonymizeContributions, continuation, isCommunityRecordPath, isOwnedRecordPath, OWNED_RECORDS, ownedQuery, redactExport, userBudgetPaths } from './catalog';
+import { anonymizeContributions, continuation, hiddenReportControl, isCommunityRecordPath, isOwnedRecordPath, OWNED_RECORDS, ownedQuery, redactExport, userBudgetPaths } from './catalog';
 import { digest } from './crypto';
 import { JOB_LIMITS } from './config';
 import { PrivateJobStorage } from './storage';
@@ -42,7 +43,7 @@ function advanced(job: JobRecord, patch: Partial<JobCursor>): JobCursor {
   if (patch.after === undefined) delete cursor.after;
   return cursor;
 }
-async function privatePage(id: string, job: JobRecord, deleting: boolean): Promise<{ documents: DocumentSnapshot[]; cursor: JobCursor }> {
+async function privateExportPage(job: JobRecord): Promise<{ documents: DocumentSnapshot[]; cursor: JobCursor }> {
   const db = getAdminDb();
   const uid = job.ownerUid!;
   const collections = job.cursor.collections ?? (await db.doc('users/' + uid).listCollections()).map(item => item.path);
@@ -64,12 +65,6 @@ async function privatePage(id: string, job: JobRecord, deleting: boolean): Promi
   const descendants = (await Promise.all(consumed.map(document => document.ref.listCollections()))).flat().map(item => item.path);
   for (const child of descendants) if (!collections.includes(child)) collections.push(child);
   if (collections.length > 2000) throw new ApiError('APP-EXPORT-LIMIT', 413, 'Account inventory exceeds its bounded capacity.');
-  if (deleting) {
-    await db.runTransaction(async transaction => {
-      await assertJobLease(transaction, id, job);
-      documents.forEach(document => transaction.delete(document.ref));
-    });
-  }
   const pending = inventory.paths.slice(consumed.length);
   return { documents, cursor: pending.length || inventory.after
     ? { phase: 1, collections, collectionIndex: index, ...(inventory.after ? { after: inventory.after } : {}), ...(pending.length ? { pending } : {}) }
@@ -88,7 +83,7 @@ export async function exportStep(id: string, job: JobRecord): Promise<StepResult
     return { cursor: { phase: 1 }, processed: artifact.records, artifact };
   }
   if (job.cursor.phase === 1) {
-    const result = await privatePage(id, job, false);
+    const result = await privateExportPage(job);
     const documents = result.documents.map(snapshot => ({ path: snapshot.ref.path, data: exportValue(snapshot.data()) }));
     return { cursor: result.cursor, processed: documents.length,
       ...(documents.length ? { artifact: await writePart(id, job, { kind: 'private', documents }, documents.length, 'private') } : {}) };
@@ -111,6 +106,13 @@ export async function exportStep(id: string, job: JobRecord): Promise<StepResult
     const documents = snapshots.filter(snapshot => snapshot.exists).map(snapshot => ({ path: snapshot.ref.path, data: exportValue(snapshot.data()) }));
     return { cursor: { phase: job.cursor.phase + 1 }, processed: documents.length,
       ...(documents.length ? { artifact: await writePart(id, job, { kind: 'budgets', documents }, documents.length, 'budgets') } : {}) };
+  }
+  if (sourceIndex === OWNED_RECORDS.length + 1) {
+    const decisions = await page(continuation(db.collection('_communityReports').where('decidedBy', '==', uid)
+      .orderBy(FieldPath.documentId()).select('target', 'status', 'decisionReason', 'decidedAt'), job.cursor.after));
+    const documents = decisions.map(snapshot => ({ path: snapshot.ref.path, data: exportValue(snapshot.data()) }));
+    return { cursor: advanced(job, decisions.more ? { after: decisions.at(-1)!.ref.path } : { phase: job.cursor.phase + 1 }),
+      processed: documents.length, ...(documents.length ? { artifact: await writePart(id, job, { kind: 'moderation-decisions', documents }, documents.length, 'decisions') } : {}) };
   }
   const manifest = { format: 'shark-account-export-v1', ownerUid: uid, createdAt: new Date(job.createdAtMs).toISOString(),
     processingDeadline: new Date(job.createdAtMs + JOB_LIMITS.exportProcessingMs).toISOString(),
@@ -157,6 +159,7 @@ async function deleteOrAnonymize(id: string, job: JobRecord, snapshot: DocumentS
       transaction.update(snapshot.ref, patch);
       publication.write({ ...current.data(), ...patch });
     }
+    else if (source.collection === '_communityReports' && current.get('status') === 'hidden') transaction.set(snapshot.ref, hiddenReportControl(current.data()!));
     else if (action === 'archive') transaction.set(snapshot.ref, anonymizeContributions(current.data(), new Set([uid])) as Record<string, unknown>);
     else if (action === 'actor') transaction.update(snapshot.ref, { actorId: '__deleted__' });
     else if (action === 'moderator') transaction.update(snapshot.ref, { hiddenBy: '__deleted__' });
@@ -187,7 +190,16 @@ export async function deletionStep(id: string, job: JobRecord): Promise<StepResu
       return { cursor: result.size > documents.length ? { phase: 0, after: documents.at(-1)!.ref.path } : { phase: 1 }, processed: documents.length };
     });
   }
-  if (job.cursor.phase === 1) { const result = await privatePage(id, job, true); return { cursor: result.cursor, processed: result.documents.length }; }
+  if (job.cursor.phase === 1) {
+    // The account lock prevents new descendants. Re-enumerating the remaining names
+    // also resumes checkpoints produced by the older collection-inventory worker.
+    const paths = await readDescendantPage(db, db.doc('users/' + uid), JOB_LIMITS.pageSize);
+    if (paths.length) await db.runTransaction(async transaction => {
+      await assertJobLease(transaction, id, job);
+      for (const path of paths) transaction.delete(db.doc(path));
+    });
+    return { cursor: { phase: paths.length === JOB_LIMITS.pageSize ? 1 : 2 }, processed: paths.length };
+  }
   const index = job.cursor.phase - 2;
   if (index < OWNED_RECORDS.length) {
     const documents = await page(continuation(ownedQuery(index, uid), job.cursor.after));
@@ -229,6 +241,15 @@ export async function deletionStep(id: string, job: JobRecord): Promise<StepResu
       if (current.exists) transaction.set(document.ref, anonymizeContributions(current.data(), new Set([uid])) as Record<string, unknown>);
     });
     return { cursor: advanced(job, documents.more ? { after: documents.at(-1)!.ref.path } : { phase: job.cursor.phase + 1 }), processed: documents.length };
+  }
+  if (archiveIndex === 2) {
+    // Append after all historical phases so persisted deletion cursors retain their meaning.
+    return db.runTransaction(async transaction => {
+      await assertJobLease(transaction, id, job);
+      const reports = await transaction.get(db.collection('_communityReports').where('decidedBy', '==', uid).limit(JOB_LIMITS.pageSize));
+      for (const report of reports.docs) transaction.update(report.ref, { decidedBy: '__deleted__' });
+      return { cursor: { phase: job.cursor.phase + (reports.size < JOB_LIMITS.pageSize ? 1 : 0) }, processed: reports.size };
+    });
   }
   await db.runTransaction(async transaction => {
     await assertJobLease(transaction, id, job);

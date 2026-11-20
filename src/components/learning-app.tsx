@@ -76,7 +76,7 @@ function HomeContent() {
   } | null>(null);
 
   // Centralized Data Hooks
-  const { notes: personalNotes, updateNotes: onNotesChange } = useUserNotes();
+  const { notes: personalNotes, updateNotes: onNotesChange, ready: notesReady, failed: notesFailed, retry: retryNotes } = useUserNotes();
 
   useEffect(() => {
     const viewParam = searchParams.get('view') as AppView;
@@ -141,12 +141,15 @@ function HomeContent() {
 
       <div className="fixed left-0 top-32 md:top-40 z-[90] flex flex-col gap-2 md:gap-3 animate-in slide-in-from-left-4 duration-1000">
         <ActivityCalendar t={t} lang={lang} isSticky />
+        {notesFailed && <button type="button" className="service-link bg-card" onClick={retryNotes}>
+          {lang === 'vi' ? 'Tải lại ghi chú' : 'Reload notes'}
+        </button>}
         {view !== 'dashboard' && (
           <QuickNotes
             t={t}
             lang={lang}
             isSticky
-            notes={personalNotes}
+            notesReady={notesReady} notes={personalNotes}
             onNotesChange={onNotesChange}
           />
         )}
@@ -191,7 +194,7 @@ function HomeContent() {
         {view === 'dashboard' && !historyPage.error && (!historyPage.loading || history.length > 0) && (
           <ErrorBoundary><DashboardView
             t={t} lang={lang} history={history} stats={stats}
-            personalNotes={personalNotes} onNotesChange={onNotesChange}
+            notesReady={notesReady} personalNotes={personalNotes} onNotesChange={onNotesChange}
             onFixWeakness={handleFixWeakness}
           /></ErrorBoundary>
         )}

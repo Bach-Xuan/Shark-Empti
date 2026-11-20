@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { buildAiRequest,getAiOperationDefinition } from '@/ai/operation-registry';
+import { fitCoachingContext } from '@/ai/coaching-context';
 import { AI_OPERATIONS } from '@/ai/protocol';
 import { expect,it,vi } from 'vitest';
 vi.mock('server-only', () => ({}));
@@ -32,4 +33,24 @@ it('represents chatbot history once and leaves model selection outside the opera
   expect(built.messages?.map(message => message.role)).toEqual(['assistant']);
   expect(JSON.stringify(built).split('Earlier advice')).toHaveLength(2);
   expect(built).not.toHaveProperty('model');
+});
+
+it('validates probability and feedback bounds before accepting a short-answer grade', () => {
+  const schema = getAiOperationDefinition('short-answer-analysis').outputSchema;
+  const grade = { isCorrect: true, feedback: 'Equivalent answer', confidence: 0.8 };
+  expect(schema.safeParse(grade).success).toBe(true);
+  for (const confidence of [-0.1, 1.01, 90]) expect(schema.safeParse({ ...grade, confidence }).success).toBe(false);
+  expect(schema.safeParse({ ...grade, feedback: 'a'.repeat(20001) }).success).toBe(false);
+});
+
+it('fits multibyte quiz context and recent complete turns within the coaching operation limit', () => {
+  const question = { questionText: 'Why?', correctAnswer: 'ok', userAnswer: 'no', isCorrect: false, explanation: '🦈'.repeat(6000) };
+  const turn = [{ role: 'user' as const, message: 'What happened?' }, { role: 'model' as const, message: '🦈'.repeat(1200) }];
+  const input = { ...inputs['ai-coaching-chatbot'], quizQuestions: Array.from({ length: 50 }, () => question),
+    chatHistory: Array.from({ length: 50 }, () => turn).flat() };
+  const fitted = fitCoachingContext(input)!;
+  expect(Buffer.byteLength(JSON.stringify(fitted))).toBeLessThanOrEqual(getAiOperationDefinition('ai-coaching-chatbot').inputLimits.maxSerializedBytes);
+  expect(fitted.quizQuestions.length).toBeGreaterThan(0);
+  expect(fitted.chatHistory?.slice(-2)).toEqual(turn);
+  expect(fitCoachingContext({ ...input, userMessage: '🦈'.repeat(33_000) })).toBeNull();
 });

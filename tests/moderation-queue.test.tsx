@@ -7,7 +7,7 @@ vi.mock('@/firebase', () => ({ useUser: () => ({ user: mocks.user }) }));
 vi.mock('@/components/app-preferences', () => ({ useLanguageState: () => ['en', vi.fn()] }));
 vi.mock('@/lib/forum-client', () => ({ communityRequest: mocks.request }));
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
-const report = (id: string, status = 'open') => ({ id, status, target: { kind: 'post', id }, reason: 'Review ' + id, preview: '', hidden: status === 'hidden', exists: status === 'open' });
+const report = (id: string, status = 'open') => ({ id, status, target: { kind: 'post', id }, reason: 'Review ' + id, preview: '', hidden: status === 'hidden', ownsArchive: status === 'hidden', exists: status === 'open' });
 
 it('appends cursor pages and exposes a separately named hidden-report list', async () => {
   mocks.request.mockResolvedValueOnce({ reports: [report('one')], nextCursor: 'next-page' })

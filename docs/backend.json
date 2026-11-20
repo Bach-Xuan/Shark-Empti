@@ -1,9 +1,11 @@
 {
   "$comment": "Descriptive data map, not an executable validation schema. Technical identifiers follow the source; editing this file changes no runtime behavior. Shared JSON body reads have a ten-second deadline. AI responses are bounded at 2,000,000 decoded bytes and results at 750,000 serialized UTF-8 bytes before ledger persistence.",
-  "x-version": "beta-v2.1.0",
+  "x-version": "v2.2.0",
   "x-authority": {
     "description": "Actual contracts: Firestore Rules, AI/API Zod schemas, history/profile readers and server-api.ts. Updating this file changes no validation, migration or access policy.",
     "documentation": "TECHNICAL_DOCUMENTATION.md",
+    "flows": "FLOW.md",
+    "accountOperations": "ACCOUNT_OPERATIONS.md",
     "design": "DESIGN.md",
     "configuration": "CONFIGURATION.md",
     "audit": "AUDIT_REPORT.md",
@@ -72,7 +74,8 @@
           "type": "string"
         },
         "userAnswer": {
-          "type": "string"
+          "type": "string",
+          "maxLength": 2000
         },
         "isCorrect": {
           "type": "boolean"
@@ -90,7 +93,8 @@
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "maxLength": 20000
         }
       }
     }
@@ -616,6 +620,7 @@
       "description": "Returns prompts without keys and server startedAtMs. Replay and distinct IDs preserve the first eligible clock; sessions are user/exam-bound, fingerprinted and logically expire after 24 hours."
     },
     "arenaSubmit": {
+      "clientRecovery": "Same-tab drafts retain the request UUID, answers, date and language before submission. After a lost response, resuming replays that payload directly to submit and reads the canonical review.",
       "method": "POST",
       "path": "/api/arena/{examId}/submit",
       "runtime": "nodejs",
@@ -676,6 +681,10 @@
       "description": "Validated target, reason, UUID and budget; private report queue."
     },
     "moderation": {
+      "queueFields": {
+        "hidden": "An archive currently exists for the target.",
+        "ownsArchive": "This hidden report owns the archive. A legacy archive without a reportId can be restored through a hidden report for that target."
+      },
       "methods": [
         "GET",
         "POST"
@@ -747,6 +756,10 @@
       ],
       "authentication": "Firebase ID token in Authorization: Bearer header; guest access denied",
       "provider": "OpenRouter chat/completions",
+      "operationLimits": {
+        "short-answer-analysis": { "answerCharacters": 2000, "feedbackCharacters": 20000, "confidenceMin": 0, "confidenceMax": 1, "minimumConfidenceToGrade": 0.8 },
+        "ai-coaching-chatbot": { "maxSerializedInputBytes": 131072, "encoding": "UTF-8 JSON" }
+      },
       "validation": "Zod input/output validation plus operation-specific cross-field checks",
       "state": "At most three server-ordered attempts; one OpenRouter request per attempt-route invocation; idempotent status recovery and explicit cancellation",
       "quota": "Two concurrent generations per user; 30 weighted attempts per 15-minute user window; global ceiling 300",
@@ -762,6 +775,7 @@
       "authority": "src/lib/jobs/types.ts, store.ts, queue.ts, worker.ts; owner API or exact raw-body QStash signature; minimal read-only deletion receipt",
       "admission": "Authenticated creation/list/status/download use account-traffic before private work; read controls retain consent/lock/maintenance exceptions. Receipt-only status validates a 43-character base64url HMAC before database work and charges account-receipt_global before the job lookup, without persisting a credential identifier or requiring Auth. Capacities/refill follow request-budget.ts; authentication/admission cost and edge protection remain separate.",
       "documentation": "ACCOUNT_OPERATIONS.md",
+      "deletionRecovery": "After the cause of failure is addressed, a recently authenticated owner can explicitly confirm the deletion again. The matching deletion lock and journal identify the existing checkpoint and receipt. A public receipt grants status access only.",
       "clientRecovery": "Serial read-only status polling: 12-second active/15-minute quota intervals; 30-second owner and 15-second public-receipt deadlines; four transient retries after 5/15/30/60 seconds, then pause. Hidden tabs suspend reads; online/visible focus can resume with a five-second minimum interval. Terminal/unavailable and permanent denial/protocol results stop automatic checks. Auth rejection may use a currently held minimal receipt; 429 does not use that fallback. File/request generations prevent stale replacement. No job mutation is replayed automatically.",
       "artifactIntegrity": "Ciphertext and plaintext SHA-256; manifest JSON filenames match downloads; native private-prefix version cleanup is bounded and includes uncheckpointed uploads.",
       "communityScope": "Collection-group matches restricted to posts/{id}/comments/{id} and arenaExams/{id}/attempts/{id}; never another owner private tree."
@@ -789,7 +803,7 @@
     },
     "/users/{uid}/notes/main": {
       "schema": "UserNotes",
-      "description": "Private notes/main SDK writes allow only bounded content and server updatedAt changes; unrelated legacy fields are preserved."
+      "description": "Editors wait for an authoritative owner snapshot. Private notes/main SDK writes allow only bounded content and server updatedAt changes; unrelated legacy fields are preserved."
     },
     "/users/{uid}/activity/main": {
       "schema": "UserActivity",
@@ -850,13 +864,13 @@
       "description": "Admin-only pre-migration snapshot and backedUpAt; retained for operator recovery, no automatic TTL."
     },
     "/_communityReports/{id}": {
-      "description": "Private reporterId, target, reason, status and decision metadata; budgeted authenticated report API and authorized moderation API only."
+      "description": "Private report with reporterId, target, reason, status and decision metadata including decidedBy. Export redacts other identities. Deletion anonymizes decisions and retains a minimal queue control for a hidden report whose reporter was erased."
     },
     "/_accountRequests/{hash}": {
       "description": "Private uid/kind/pending-operator request and timestamp; owner API only, no client Rules grant. No automatic execution or configured fulfilment/retention policy."
     },
     "/_moderationArchives/{hash}": {
-      "description": "Private reversible hidden-content snapshot, actor, reason and time; restore respects live parents and deletion tombstones."
+      "description": "Private reversible snapshot with reportId, actor, reason and time. Restore checks the owning hidden report, live parents and deletion tombstones. Legacy archives without reportId accept a hidden report for the same target."
     },
     "/_moderationActions/{id}": {
       "description": "Private attributable moderation action log; server-owned, no browser access or default TTL."
@@ -886,7 +900,7 @@
       "description": "Server-only current policyVersion, minimumAge and acceptedAt Timestamp. Authenticated policy acknowledgement does not independently verify age. Server business APIs and private learning writes require the current record; profile provisioning, owner reads and account data controls have explicit exceptions. Included in exports, deletion and backup; restore excludes UIDs in the deletion journal."
     },
     "/_accountJobs/{uuid}": {
-      "description": "Admin-only durable export/deletion/backup state: kind, environment, status, ownerUid until deletion completion, cursor, artifact metadata, progress, lease, nextRunAtMs and logical expiry."
+      "description": "Admin-only durable export/deletion/backup state: kind, environment, status, ownerUid until deletion completion, cursor, artifact metadata, progress, lease, nextRunAtMs and logical expiry. A confirmed failed deletion resumes its existing cursor and receipt under the matching owner lock and journal."
     },
     "/_accountLocks/{uid}": {
       "description": "Admin-only deletion/deleted write tombstone; Rules/Admin mutations reject new writes. Active deletion retained until completion; deleted tombstone seven days."

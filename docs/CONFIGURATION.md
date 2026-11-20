@@ -1,8 +1,8 @@
-# ⚙️ Configuration, Dependencies and Troubleshooting · Shark Empti **β V2.1.0**
+# ⚙️ Configuration, Dependencies and Troubleshooting · Shark Empti **v2.2.0**
 
 This guide configures the application and its release environment. See [README](../README.md), [architecture](TECHNICAL_DOCUMENTATION.md), [validation](VALIDATION.md), [account operations](ACCOUNT_OPERATIONS.md), the [data map](backend.json) and [audit register](AUDIT_REPORT.md). Runtime behavior is determined by source, Rules and configuration, not this guide alone. The [interface design guide](DESIGN.md) covers learner-facing states and interactions.
 
-The beta series displays **β V2.1.0**. The release tag is `beta-v2.1.0`, recorded in the package manifest and data map. The npm version field and lockfile use `2.1.0` for SemVer compatibility. [npm package version](https://docs.npmjs.com/cli/v11/configuring-npm/package-json#version)
+The interface, package release tag and backend data map use **v2.2.0**. The npm manifest and lockfile record the numeric version `2.2.0`. [npm package version](https://docs.npmjs.com/cli/v11/configuring-npm/package-json#version)
 
 ## 🧰 Runtime and dependencies
 
@@ -75,6 +75,8 @@ Deploy the learning PUT/PATCH API and updated Quiz/Flashcard/Practice clients to
 
 Bounds in `src/lib/data-limits.ts`, producer schemas, persistence schemas, UI inputs and Rules must remain synchronized. The `learning-traffic` and `learning-write` token buckets use provisional ceilings in `src/lib/request-budget.ts`; calibrate them against the intended environment before release. New budget scopes are automatically included in attributable export/deletion without renumbering durable job phases. API fingerprints are preserved with learning records through backup/restore; do not remove them to bypass changed-payload conflicts.
 
+The legacy Arena migration checks the current author’s deletion lock and the active backup barrier in the same transaction that creates the private key and recovery copy. Inventory remains read-only. See the [operator workflows](FLOW.md#operator-and-development-workflows).
+
 ## Timestamp migration
 
 New learning APIs persist Firestore Timestamp values; direct SDK creation/update of history, Flashcards and Practice is denied. History accepts bounded epoch milliseconds at the API boundary, preserving the completion instant across retries, while Flashcard/Practice timestamps are server-derived. Deploy the single-query history reader only after every supported collection passes the timestamp inventory. Firestore sorts mixed field types in separate groups. Keep the currently deployed reader available until conversion finishes and privileged legacy writers are stopped.
@@ -130,7 +132,7 @@ Account polling recovery is defined in `src/lib/account-polling.ts`: four transi
 
 ## CI action governance
 
-Pushes and pull requests run unit tests and the optimized desktop Chromium project. Manually dispatch the full workflow on the release candidate before promotion. A `beta-v*` or `v*` tag also runs both full browser matrices, Rules/integration, the native Emulator restore drill, coverage and cross-engine print checks. Both tiers build the application and check bundle budgets, smoke tests and dependency policy.
+Pushes and pull requests run unit tests and the optimized desktop Chromium project. Manually dispatch the full workflow on the release candidate before promotion. A `v*` tag also runs both full browser matrices, Rules/integration, the native Emulator restore drill, coverage and cross-engine print checks. Both tiers build the application and check bundle budgets, smoke tests and dependency policy.
 
 [The validation workflow](../.github/workflows/ci.yml) pins every external action to a full commit SHA with its reviewed release in a comment, following [GitHub's immutable-reference guidance](https://docs.github.com/en/actions/reference/security/secure-use#using-third-party-actions). Its token has `contents: read` and checkout does not persist credentials for later build/test steps. The reviewed action manifests are:
 

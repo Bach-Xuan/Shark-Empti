@@ -2,7 +2,7 @@ import 'server-only';
 import { Timestamp, type DocumentData } from 'firebase-admin/firestore';
 import { SERVICE_CONSENT_COLLECTION } from '../service-policy';
 import { readTimeMillis } from '../time';
-import { anonymizeContributions, isCommunityRecordPath, OWNED_RECORDS } from './catalog';
+import { anonymizeContributions, hiddenReportControl, isCommunityRecordPath, OWNED_RECORDS } from './catalog';
 import { digest } from './crypto';
 
 /** Apply identical erasure rules to an archive row and to a row already on an isolated target. */
@@ -10,6 +10,9 @@ export function retainedRecord(path: string, data: DocumentData, deleted: Set<st
   const parts = path.split('/'), [root, id] = parts;
   if ((['users', SERVICE_CONSENT_COLLECTION].includes(root) && deleted.has(id)) || budgets.has(path)
     || (root === '_aiQuota' && id.startsWith('user_') && deleted.has(id.slice(5)))) return null;
+  if (root === '_communityReports' && data.status === 'hidden' && deleted.has(data.reporterId)) {
+    return { path, data: hiddenReportControl(data) };
+  }
   for (const rule of OWNED_RECORDS) {
     if (rule.collection !== root || (rule.action !== 'delete' && rule.action !== 'job')) continue;
     const owner = data[rule.field];

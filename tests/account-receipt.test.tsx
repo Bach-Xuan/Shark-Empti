@@ -24,6 +24,15 @@ it('recovers receipt reads automatically, follows active deletion and stops afte
   expect(fetcher).toHaveBeenCalledTimes(3);
   for (const call of fetcher.mock.calls) expect(call[1].method).toBeUndefined();
 });
+it('directs a failed deletion receipt to authenticated account controls without submitting another request', async () => {
+  const fetcher = vi.fn().mockImplementation(async () => response(receipt.id, 'failed'));
+  vi.stubGlobal('fetch', fetcher);
+  await act(async () => { render(<AccountReceipt />); });
+  expect(screen.getByRole('link', { name: jobMessages.en.title }).getAttribute('href')).toBe('/account/data');
+  expect(screen.getByText(jobMessages.en.receiptRecovery, { exact: false })).toBeTruthy();
+  expect(fetcher).toHaveBeenCalledOnce();
+  expect(fetcher.mock.calls[0][1].method).toBeUndefined();
+});
 it('stops on an unavailable receipt and allows an explicit refresh', async () => {
   const fetcher = vi.fn().mockResolvedValueOnce(new Response(null, { status: 404 })).mockImplementation(async () => response());
   vi.stubGlobal('fetch', fetcher);

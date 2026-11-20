@@ -20,15 +20,40 @@ export async function createAccountJob(uid: string, kind: 'export' | 'deletion',
   const ref = db.collection('_accountJobs').doc(id);
   const now = Date.now();
   const receipt = kind === 'deletion' ? receiptFor(id, uid) : undefined;
-  const job = await db.runTransaction(async transaction => {
+  return db.runTransaction(async transaction => {
     const previous = await transaction.get(ref);
     if (previous.exists) {
       const old = readJob(previous.data());
       if (old.ownerUid !== uid || old.kind !== kind) throw new ApiError('APP-REQUEST-CONFLICT', 409, 'The request identifier has already been used.');
-      return old;
+      if (old.kind !== 'deletion' || old.status !== 'failed') return { id, job: old, receipt };
     }
     if (kind === 'deletion' && (await transaction.get(db.doc(DELETION_CUTOVER))).exists) {
       throw new ApiError('APP-MAINTENANCE', 503, 'Account deletion is paused during restore cutover. Retry after service resumes.');
+    }
+    if (kind === 'deletion') {
+      const lock = await transaction.get(db.collection('_accountLocks').doc(uid));
+      if (lock.get('status') === 'deleting') {
+        const lockedRef = db.collection('_accountJobs').doc(lock.get('jobId'));
+        const locked = await transaction.get(lockedRef);
+        const existing = locked.exists ? readJob(locked.data()) : null;
+        if (existing?.ownerUid !== uid || existing.kind !== 'deletion' || existing.environment !== config.environment) {
+          throw new ApiError('ACCOUNT-DELETING', 409, 'The deletion checkpoint requires operator review.');
+        }
+        const identity = { id: locked.id, receipt: receiptFor(locked.id, uid) };
+        if (existing.status === 'failed') {
+          const journal = await transaction.get(db.collection('_deletionJournal').doc(uid));
+          if (journal.get('jobId') !== locked.id || journal.get('uid') !== uid) {
+            throw new ApiError('ACCOUNT-DELETING', 409, 'The deletion journal requires operator review.');
+          }
+          const commitBudget = await prepareRequestBudget(transaction, uid, 'account-request', 0, now, { allowLocked: true });
+          commitBudget();
+          const retry = { status: 'queued' as const, updatedAtMs: now, nextRunAtMs: now };
+          transaction.update(lockedRef, { ...retry, errorCode: FieldValue.delete() });
+          const { errorCode: _error, ...checkpoint } = existing;
+          return { ...identity, job: { ...checkpoint, ...retry } };
+        }
+        return { ...identity, job: existing };
+      }
     }
     await assertWritable(transaction, uid, { allowUnconsented: true });
     const commitBudget = await prepareRequestBudget(transaction, uid, 'account-request');
@@ -42,9 +67,8 @@ export async function createAccountJob(uid: string, kind: 'export' | 'deletion',
       // Journal survives job completion so a later restore cannot resurrect this UID.
       transaction.set(db.collection('_deletionJournal').doc(uid), { uid, jobId: id, createdAtMs: now });
     }
-    return record;
+    return { id, job: record, receipt };
   });
-  return { id, job, receipt };
 }
 
 export async function assertJobLease(transaction: Transaction, id: string, job: JobRecord) {

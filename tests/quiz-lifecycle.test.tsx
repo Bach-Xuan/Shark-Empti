@@ -24,3 +24,30 @@ it('keeps current question and answers when UI language changes', () => {
   expect(screen.getByRole('button', { name: '4' }).hasAttribute('disabled')).toBe(true);
   expect(mocks.generate).not.toHaveBeenCalled();
 });
+
+it.each([false, true])('enforces the answer limit before accepting quiz input (Arena = %s)', async blindAnswers => {
+  const bank = [{ ...questions[0], type: 'Short Answer', correct: '4' }];
+  render(<QuizView t={translations.en} lang="en" config={config} initialQuestions={bank} blindAnswers={blindAnswers} onFinish={vi.fn()} onAskGuru={() => {}} />);
+  const input = screen.getByRole('textbox') as HTMLInputElement;
+  expect(input.maxLength).toBe(2000);
+  const submit = screen.getByRole('button', { name: translations.en.submitAnswer });
+  fireEvent.change(input, { target: { value: '4'.repeat(2001) } });
+  fireEvent.click(submit);
+  expect(input.disabled).toBe(false);
+  fireEvent.change(input, { target: { value: '4' } });
+  fireEvent.click(submit);
+  expect(screen.queryByRole('button', { name: translations.en.submitAnswer })).toBeNull();
+});
+
+it('gives the learner the full time limit after slow question generation', async () => {
+  vi.useFakeTimers();
+  let release!: () => void;
+  mocks.generate.mockImplementationOnce(() => new Promise(resolve => { release = () => resolve({ ok: true, data: { questions } }); }));
+  const finish = vi.fn().mockResolvedValue(true);
+  render(<QuizView t={translations.en} lang="en" config={config} initialQuestions={null} onFinish={finish} onAskGuru={() => {}} />);
+  await act(async () => { await vi.advanceTimersByTimeAsync(61_000); release(); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(59_000); });
+  expect(finish).not.toHaveBeenCalled();
+  await act(async () => { await vi.advanceTimersByTimeAsync(2_000); });
+  expect(finish).toHaveBeenCalledOnce();
+});

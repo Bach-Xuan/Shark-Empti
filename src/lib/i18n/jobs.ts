@@ -3,6 +3,9 @@ export const jobMessages = {
   en: {
     title: 'Your account and data', export: 'Create complete export', deletion: 'Delete account',
     description: 'Export or delete your account through a background job. It continues when this tab is closed. Export processing can wait for capacity for up to seven days; download every JSON part and the manifest within 24 hours after it becomes ready.',
+    resumeDeletion: 'To resume this deletion, confirm the checkbox and choose Delete account again. Your receipt and progress are preserved.',
+    receiptRecovery: 'To resume deletion, sign in to Account data and confirm the request again. Contact support if you can no longer sign in.',
+    exportRecovery: 'Contact support if you need help recovering this export.',
     processingExpired: 'This export exceeded its seven-day processing window. You can create a new export; contact support if capacity keeps preventing completion.',
     warning: 'Deletion removes private learning data and sign-in access. Community contributions remain with the account identity removed. Your own writing may still identify you: review or remove personal details before confirming. This action cannot be undone.',
     confirm: 'I have reviewed my public contributions and understand permanent account deletion.',
@@ -17,11 +20,14 @@ export const jobMessages = {
     receiptOnly: 'Sign-in access is unavailable. The read-only receipt can still show deletion status.',
     receiptUnavailable: 'This receipt is unavailable or expired. Check your receipt file or contact support.',
     invalidReceiptFile: 'The selected file is not a valid receipt. Choose the JSON receipt file you saved.',
-    status: { queued: 'Queued', running: 'Processing', waiting_quota: 'Waiting for available free-tier capacity', ready: 'Ready to download', completed: 'Completed', failed: 'Needs recovery; contact support' } satisfies Record<JobStatus, string>,
+    status: { queued: 'Queued', running: 'Processing', waiting_quota: 'Waiting for available free-tier capacity', ready: 'Ready to download', completed: 'Completed', failed: 'Needs recovery' } satisfies Record<JobStatus, string>,
   },
   vi: {
     title: 'Tài khoản và dữ liệu của bạn', export: 'Tạo bản xuất đầy đủ', deletion: 'Xóa tài khoản',
     description: 'Xuất hoặc xóa tài khoản bằng tác vụ nền. Tác vụ vẫn tiếp tục khi đóng tab. Bản xuất có thể chờ hạn mức xử lý tối đa bảy ngày; hãy tải đủ các phần JSON và manifest trong 24 giờ sau khi sẵn sàng.',
+    resumeDeletion: 'Để tiếp tục xóa, hãy đánh dấu ô xác nhận rồi chọn Xóa tài khoản một lần nữa. Biên nhận và tiến độ của bạn được giữ lại.',
+    receiptRecovery: 'Để tiếp tục xóa, hãy đăng nhập vào trang Tài khoản và dữ liệu rồi xác nhận lại yêu cầu. Nếu bạn không còn đăng nhập được, hãy liên hệ hỗ trợ.',
+    exportRecovery: 'Hãy liên hệ hỗ trợ nếu bạn cần khôi phục bản xuất này.',
     processingExpired: 'Bản xuất đã vượt thời hạn xử lý bảy ngày. Bạn có thể tạo bản xuất mới; hãy liên hệ hỗ trợ nếu hạn mức liên tục ngăn tác vụ hoàn tất.',
     warning: 'Xóa tài khoản sẽ xóa dữ liệu học tập riêng và quyền đăng nhập. Đóng góp cộng đồng được giữ sau khi gỡ liên kết tài khoản. Nội dung bạn tự viết vẫn có thể nhận dạng bạn: hãy xem lại hoặc xóa thông tin cá nhân trước khi xác nhận. Không thể hoàn tác thao tác này.',
     confirm: 'Tôi đã xem lại đóng góp công khai và hiểu việc xóa tài khoản là vĩnh viễn.',
@@ -36,6 +42,6 @@ export const jobMessages = {
     receiptOnly: 'Chưa thể dùng phiên đăng nhập. Biên nhận chỉ đọc vẫn có thể hiển thị trạng thái xóa.',
     receiptUnavailable: 'Biên nhận không khả dụng hoặc đã hết hạn. Hãy kiểm tra file biên nhận hoặc liên hệ hỗ trợ.',
     invalidReceiptFile: 'File đã chọn không phải biên nhận hợp lệ. Hãy chọn file JSON biên nhận bạn đã lưu.',
-    status: { queued: 'Đang chờ', running: 'Đang xử lý', waiting_quota: 'Đang chờ dung lượng hoặc hạn mức miễn phí', ready: 'Sẵn sàng tải', completed: 'Hoàn tất', failed: 'Cần khôi phục; hãy liên hệ hỗ trợ' } satisfies Record<JobStatus, string>,
+    status: { queued: 'Đang chờ', running: 'Đang xử lý', waiting_quota: 'Đang chờ dung lượng hoặc hạn mức miễn phí', ready: 'Sẵn sàng tải', completed: 'Hoàn tất', failed: 'Cần khôi phục' } satisfies Record<JobStatus, string>,
   },
 } as const;

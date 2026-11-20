@@ -1,4 +1,4 @@
-# 🦈 Shark Empti · **β V2.1.0**
+# 🦈 Shark Empti · **v2.2.0**
 
 [![XERJ Corpus Hub contributor](https://hub.xerj.org/contributors/Bach-Xuan/badge.svg)](https://hub.xerj.org/contributors/Bach-Xuan)
 
@@ -56,6 +56,7 @@ Install browser engines with `npx --no-install playwright install chromium webki
 
 ## 📚 Documentation
 
+- [Application and operational flows](docs/FLOW.md) follows learner, moderator and operator journeys through completion and recovery.
 - [Configuration](docs/CONFIGURATION.md): environment, Firebase, OpenRouter, timestamp migration, deployment and troubleshooting.
 - [Interface design](docs/DESIGN.md) covers navigation, interaction states, accessibility, responsive layout and print.
 - [Technical documentation](docs/TECHNICAL_DOCUMENTATION.md): architecture, data ownership and security contracts.

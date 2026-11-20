@@ -1,6 +1,8 @@
-# 🎨 Interface Design · Shark Empti **β V2.1.0**
+# 🎨 Interface Design · Shark Empti **v2.2.0**
 
 Shark Empti helps a learner choose an activity, finish it, understand their answers and return to practice. A learner can move between Vietnamese and English, change theme or recover an interrupted session while keeping their work. This guide describes how those behaviors appear in the interface.
+
+The [application flow guide](FLOW.md) connects UI states to their storage and recovery behavior. Notes editing waits for a confirmed server read, Playground freezes its generation settings during validation, and Arena offers same-tab submission recovery.
 
 ## 🧭 Screens and navigation
 

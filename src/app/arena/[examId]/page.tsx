@@ -1,6 +1,6 @@
 "use client";
 import { useLanguageState,useThemeState } from '@/components/app-preferences';
-import { showErrorToast,showUnexpectedErrorToast } from '@/lib/error-toast';
+import { showErrorToast } from '@/lib/error-toast';
 import { createAppError,type AppError } from '@/lib/app-error';
 import { arenaDetailMessages,arenaResponseError,arenaSubscriptionError } from '@/lib/arena-detail';
 import { errorMessages,translatedError } from '@/lib/i18n/errors';
@@ -11,7 +11,7 @@ import { ReactionStatus } from '@/components/reaction-status';
 import { readHistoryItem } from '@/lib/history-schema';
 import { ReportContent } from '@/components/report-content';
 import { isDocumentId } from '@/lib/document-id';
-import { readDraft, writeDraft, removeDraft, parseWith, arenaSessionDraftSchema } from '@/lib/learning-drafts';
+import { readDraft, writeDraft, removeDraft, parseWith, arenaSessionDraftSchema, type ArenaSessionDraft } from '@/lib/learning-drafts';
 import AiChatbot from '@/components/ai-chatbot';
 import { uiMessage } from '@/lib/i18n';
 import { publicAuthorName } from '@/lib/i18n/public';
@@ -28,7 +28,7 @@ import { useFirestore,useUser } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { arenaLeaderboardQuery } from '@/lib/arena-leaderboard';
 import { translations,TranslationSet } from '@/lib/translations';
-import { ArenaRanking,ArenaExam,QuizAnalysis,QuizHistoryItem } from '@/lib/types';
+import { ArenaRanking,ArenaExam,QuizHistoryItem } from '@/lib/types';
 import type { QuizQuestion } from '@/lib/learning-session';
 import { cn } from '@/lib/utils';
 import {
@@ -57,6 +57,13 @@ export default function ArenaDetailPage() {
   return <ArenaDetailSession key={JSON.stringify([examId, user?.uid ?? null])} examId={examId} />;
 }
 
+type PendingSubmission = ArenaSessionDraft & { submission: NonNullable<ArenaSessionDraft['submission']> };
+
+function captureSubmission(examId: string, requestId: string, results: Omit<QuizHistoryItem, 'date' | 'lang'>, lang: QuizHistoryItem['lang']): PendingSubmission {
+  const answers = results.quizResults.map(result => result.userAnswer);
+  return { examId, requestId, submission: { answers, date: Date.now(), lang } };
+}
+
 function ArenaDetailSession({ examId }: { examId: string }) {
   const { user, loading: authLoading } = useUser();
   const db = useFirestore();
@@ -81,7 +88,7 @@ function ArenaDetailSession({ examId }: { examId: string }) {
   const [draftAvailable, setDraftAvailable] = useState(true);
   const [lastResults, setLastResults] = useState<QuizHistoryItem | null>(null);
   const [earnedCoins, setEarnedCoins] = useState(0);
-  const pendingSubmission = useRef<{ body: string; results: QuizHistoryItem } | null>(null);
+  const pendingSubmission = useRef<PendingSubmission | null>(null);
   const submitting = useRef(false);
   const starting = useRef(false);
   const [isStarting, setIsStarting] = useState(false);
@@ -149,13 +156,22 @@ function ArenaDetailSession({ examId }: { examId: string }) {
   useEffect(() => {
     if (!user) return;
     const saved = readDraft(user.uid, 'arena-session', parseWith(arenaSessionDraftSchema));
-    if (saved?.examId === examId) { pendingStart.current = saved.requestId; setResumable(true); }
+    if (saved?.examId === examId) {
+      pendingStart.current = saved.requestId;
+      if (saved.submission) pendingSubmission.current = { ...saved, submission: saved.submission };
+      setResumable(true);
+    }
   }, [user, examId]);
   const copy = arenaDetailMessages[lang];
   const startAttempt = async () => {
     if (authLoading) return;
     if (!user) { router.push('/login'); return; }
     if (!exam || examError || submitting.current || starting.current) return;
+    if (pendingSubmission.current) {
+      setIsStarting(true);
+      try { await submitPending(pendingSubmission.current); } finally { if (mounted.current) setIsStarting(false); }
+      return;
+    }
     starting.current = true;
     setIsStarting(true);
     pendingStart.current ??= crypto.randomUUID();
@@ -172,7 +188,7 @@ function ArenaDetailSession({ examId }: { examId: string }) {
       const body: unknown = await response.json().catch(() => null);
       if (!mounted.current || controller.signal.aborted) return;
       if (!response.ok) {
-        if (response.status === 409) { pendingStart.current = null; setResumable(false); removeDraft(user.uid, 'arena-session'); removeDraft(user.uid, 'arena-progress'); }
+        if (arenaResponseError(body, response.status).code === 'APP-REQUEST-CONFLICT') { pendingStart.current = null; setResumable(false); removeDraft(user.uid, 'arena-session'); removeDraft(user.uid, 'arena-progress'); }
         showErrorToast(arenaResponseError(body, response.status), currentLanguage.current);
         return;
       }
@@ -202,18 +218,16 @@ function ArenaDetailSession({ examId }: { examId: string }) {
     }
   };
 
-  const handleFinishQuiz = async (results: Omit<QuizHistoryItem, 'date' | 'lang'>, analysis?: QuizAnalysis) => {
-    if (!user) {
-      showUnexpectedErrorToast('AUTH-REQUIRED', '', {}, lang);
-      return false;
-    }
-    if (!mounted.current || !db || !exam || !activeAttempt.current || submitting.current) return false;
+  const handleFinishQuiz = async (results: Omit<QuizHistoryItem, 'date' | 'lang'>) => {
+    if (!user || !activeAttempt.current) return false;
+    const pending = pendingSubmission.current ??= captureSubmission(examId, activeAttempt.current, results, lang);
+    setDraftAvailable(writeDraft(user.uid, 'arena-session', pending));
+    return submitPending(pending);
+  };
+
+  async function submitPending(pending: PendingSubmission) {
+    if (!mounted.current || !user || !db || !exam || submitting.current) return false;
     submitting.current = true;
-    pendingSubmission.current ??= {
-      body: JSON.stringify({ answers: results.quizResults.map(result => result.userAnswer), requestId: activeAttempt.current }),
-      results: { ...results, ...(analysis ? { analysis } : {}), date: Date.now(), lang },
-    };
-    const pending = pendingSubmission.current;
     const controller = new AbortController();
     requestController.current = controller;
 
@@ -223,7 +237,7 @@ function ArenaDetailSession({ examId }: { examId: string }) {
       const response = await fetch(`/api/arena/${encodeURIComponent(examId)}/submit`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: pending.body,
+        body: JSON.stringify({ answers: pending.submission.answers, requestId: pending.requestId }),
         signal: controller.signal,
       });
       const submission: unknown = await response.json().catch(() => null);
@@ -239,7 +253,7 @@ function ArenaDetailSession({ examId }: { examId: string }) {
         return false;
       }
 
-      const canonical = readHistoryItem('arena-review', { ...pending.results,
+      const canonical = readHistoryItem('arena-review', { date: pending.submission.date, lang: pending.submission.lang, config: exam.config,
         quizResults: 'reviewResults' in submission ? submission.reviewResults : null,
         totalTime: 'duration' in submission ? submission.duration : null });
       if (!canonical || canonical.quizResults.length !== Number(exam.config.numQuestions)) {
@@ -249,6 +263,9 @@ function ArenaDetailSession({ examId }: { examId: string }) {
       setEarnedCoins(submission.coinsAwarded);
       if (submission.isFirstAttempt) toast({ title: t.firstAttemptBonus.toUpperCase() });
       setLastResults(canonical);
+      pendingSubmission.current = null;
+      pendingStart.current = null;
+      setResumable(false);
       removeDraft(user.uid, 'arena-session'); removeDraft(user.uid, 'arena-progress');
       setView('result');
       return true;
@@ -260,7 +277,7 @@ function ArenaDetailSession({ examId }: { examId: string }) {
     } finally {
       submitting.current = false;
     }
-  };
+  }
 
   if (loading) return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-12 h-12 animate-spin text-primary" /></div>;
   if (!exam) return <div className="min-h-screen flex flex-col items-center justify-center gap-4">
@@ -284,7 +301,14 @@ function ArenaDetailSession({ examId }: { examId: string }) {
 
       <main className="flex-1 main-container pt-24 md:pt-36 space-y-10 pb-20">
         <ReportContent target={{ kind: 'exam', id: examId }} lang={lang} />
-        {resumable && <p role="status">{lang === 'vi' ? 'Có lượt đang làm trong tab này. Bắt đầu sẽ tiếp tục đúng mã lượt và đồng hồ trước đó.' : 'An unfinished attempt is available in this tab. Start continues its original ID and server clock.'}</p>}
+        {resumable && <div>
+          <p role="status">{lang === 'vi' ? 'Tiếp tục lượt đã lưu để làm tiếp hoặc nhận lại kết quả đã nộp.' : 'Resume the saved attempt to continue or recover a submitted result.'}</p>
+          <Button variant="outline" disabled={isStarting} onClick={() => {
+            if (!user) return;
+            removeDraft(user.uid, 'arena-session'); removeDraft(user.uid, 'arena-progress');
+            pendingSubmission.current = null; pendingStart.current = null; setResumable(false);
+          }}>{lang === 'vi' ? 'Bỏ bản nháp của lượt này' : 'Discard this attempt draft'}</Button>
+        </div>}
         <p className="text-sm text-muted-foreground">{lang === 'vi' ? 'Arena là hoạt động luyện tập cộng đồng, không phải thi có giám sát. Chỉ lượt hoàn tất đầu tiên của người không phải tác giả mới được xếp hạng/nhận điểm tượng trưng. Lượt làm lại và đề cũ đã chuyển đổi không nhận thưởng.' : 'Arena is community practice, not a proctored assessment. Only a non-author’s first completion is ranked and earns symbolic points. Retakes and migrated legacy exams earn no rewards.'}</p>
         {examError && <SubscriptionError error={examError} label={copy.exam} lang={lang} onRetry={() => setExamRetry(value => value + 1)} />}
         {view === 'details' && (

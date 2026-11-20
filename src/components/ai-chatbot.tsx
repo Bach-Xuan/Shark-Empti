@@ -1,5 +1,7 @@
 
 "use client";
+import { fitCoachingContext } from '@/ai/coaching-context';
+import { createAppError } from '@/lib/app-error';
 import { uiMessage } from '@/lib/i18n';
 
 import { aiCoachingChatbotForQuizReview } from '@/ai/client-flows';
@@ -37,10 +39,12 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
   const scrollRef = useRef<HTMLDivElement>(null);
   const externalHandlerRef = useRef<((message: string) => Promise<void>) | null>(null);
   const generation = useRef(0);
+  const successfulHistory = useRef<ChatMessage[]>([]);
   const requestPending = useRef(false);
   useEffect(() => {
     const lifecycle = generation;
     lifecycle.current++;
+    successfulHistory.current = [];
     requestPending.current = false;
     setIsTyping(false);
     return () => { lifecycle.current++; aiRequest.cancel(); };
@@ -75,7 +79,7 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
     }
   }, [messages, isTyping]);
 
-  const fetchAiResponse = useCallback(async (userMsg: string, currentHistory: ChatMessage[]) => {
+  const fetchAiResponse = useCallback(async (userMsg: string) => {
     if (requestPending.current) return;
     requestPending.current = true;
     const requestGeneration = generation.current;
@@ -100,14 +104,21 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
         errorCategory: r.errorCategory ?? undefined
       })) || [];
 
-      const response = await aiCoachingChatbotForQuizReview({
+      const context = fitCoachingContext({
         userMessage: userMsg,
         preferredLanguage: lang as 'en' | 'vi',
         isVietnamese: lang === 'vi',
         quizSummary: summary,
         quizQuestions: questions,
-        chatHistory: currentHistory
-      }, { signal: aiRequest.start() });
+        chatHistory: successfulHistory.current,
+      });
+      if (!context) {
+        showErrorToast(createAppError('APP-PAYLOAD-TOO-LARGE', ''), lang as 'en' | 'vi');
+        return;
+      }
+      setMessages(previous => [...previous, { role: 'user', message: userMsg }]);
+      setInput(current => current.trim() === userMsg ? '' : current);
+      const response = await aiCoachingChatbotForQuizReview(context, { signal: aiRequest.start() });
 
       if (requestGeneration !== generation.current) return;
       if (!response.ok) {
@@ -116,6 +127,7 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
         return;
       }
 
+      successfulHistory.current = [...context.chatHistory ?? [], { role: 'user', message: userMsg }, { role: 'model', message: response.data.aiResponse }];
       setMessages(prev => [...prev, { role: 'model', message: response.data.aiResponse }]);
     } catch (e) {
       if (requestGeneration !== generation.current) return;
@@ -133,10 +145,8 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
 
   const handleExternalMessage = useCallback(async (msg: string) => {
     if (isTyping || requestPending.current) return;
-    const updatedMessages: ChatMessage[] = [...messages, { role: 'user', message: msg }];
-    setMessages(updatedMessages);
-    await fetchAiResponse(msg, messages);
-  }, [isTyping, messages, fetchAiResponse]);
+    await fetchAiResponse(msg);
+  }, [isTyping, fetchAiResponse]);
 
   useEffect(() => {
     externalHandlerRef.current = handleExternalMessage;
@@ -152,12 +162,8 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
   const handleSend = useCallback(async () => {
     if (!input.trim() || isTyping || requestPending.current) return;
 
-    const userMsg = input.trim();
-    const updatedMessages: ChatMessage[] = [...messages, { role: 'user', message: userMsg }];
-    setMessages(updatedMessages);
-    setInput("");
-    await fetchAiResponse(userMsg, messages);
-  }, [input, isTyping, messages, fetchAiResponse]);
+    await fetchAiResponse(input.trim());
+  }, [input, isTyping, fetchAiResponse]);
 
   const handleClose = (e: React.MouseEvent) => {
     e.stopPropagation();

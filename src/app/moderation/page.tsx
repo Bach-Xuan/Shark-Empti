@@ -11,7 +11,7 @@ import { useMutation } from '@/hooks/use-mutation';
 import { z } from 'zod';
 import { publicMessages } from '@/lib/i18n/public';
 
-const Queue = z.object({ reports: z.array(z.object({ id: z.string(), target: z.object({ kind: z.string(), id: z.string(), parentId: z.string().optional() }), reason: z.string(), status: z.string(), preview: z.string(), hidden: z.boolean(), exists: z.boolean() })).max(50), nextCursor: z.string().nullable() });
+const Queue = z.object({ reports: z.array(z.object({ id: z.string(), target: z.object({ kind: z.string(), id: z.string(), parentId: z.string().optional() }), reason: z.string(), status: z.string(), preview: z.string(), hidden: z.boolean(), ownsArchive: z.boolean(), exists: z.boolean() })).max(50), nextCursor: z.string().nullable() });
 type Report = z.infer<typeof Queue>['reports'][number];
 export default function ModerationPage() {
   const { user } = useUser();
@@ -83,8 +83,9 @@ export default function ModerationPage() {
         <p>{report.reason}</p><p className="whitespace-pre-wrap break-words">{report.preview}</p>
         <p>{report.hidden ? lang === 'vi' ? 'Nội dung đang ẩn' : 'Content hidden' : lang === 'vi' ? 'Nội dung không bị ẩn bởi hệ thống kiểm duyệt' : 'Content not currently hidden by moderation'}</p>
         <div className="flex flex-wrap gap-3">
-          {report.status === 'open' && <><Button disabled={mutation.pending || reason.trim().length < 5 || !report.exists} onClick={() => act(report.id, 'hide')}>{lang === 'vi' ? 'Ẩn' : 'Hide'}</Button><Button variant="outline" disabled={mutation.pending || reason.trim().length < 5} onClick={() => act(report.id, 'dismiss')}>{lang === 'vi' ? 'Không xử lý' : 'Dismiss'}</Button></>}
-          {report.hidden && <Button disabled={mutation.pending || reason.trim().length < 5} onClick={() => act(report.id, 'restore')}>{lang === 'vi' ? 'Khôi phục' : 'Restore'}</Button>}
+          {report.status === 'open' && <Button disabled={mutation.pending || reason.trim().length < 5 || !report.exists || report.hidden} onClick={() => act(report.id, 'hide')}>{lang === 'vi' ? 'Ẩn' : 'Hide'}</Button>}
+          {!report.ownsArchive && <Button variant="outline" disabled={mutation.pending || reason.trim().length < 5} onClick={() => act(report.id, 'dismiss')}>{lang === 'vi' ? 'Không xử lý' : 'Dismiss'}</Button>}
+          {report.ownsArchive && <Button disabled={mutation.pending || reason.trim().length < 5} onClick={() => act(report.id, 'restore')}>{lang === 'vi' ? 'Khôi phục' : 'Restore'}</Button>}
         </div>
       </article>)}
       {nextCursor && <Button onClick={() => void load(nextCursor)} disabled={loading || mutation.pending}>{lang === 'vi' ? 'Tải thêm' : 'Load more'}</Button>}

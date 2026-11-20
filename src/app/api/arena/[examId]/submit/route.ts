@@ -1,3 +1,4 @@
+import { LEARNING_LIMITS } from '@/lib/data-limits';
 import { calculateArenaScore, answersMatch } from '@/lib/arena-scoring';
 import { ARENA_SESSION_TTL_MS,arenaFingerprint,arenaSessionId } from '@/lib/arena-session';
 import { readArenaExam } from '@/lib/public-firestore-schema';
@@ -16,7 +17,7 @@ import { enforceRequestBudget, prepareRequestBudget } from '@/lib/request-budget
 
 export const runtime = 'nodejs';
 
-const SubmitSchema = z.object({ answers: z.array(z.string().max(2000)).max(50), requestId: z.string().uuid() });
+const SubmitSchema = z.object({ answers: z.array(z.string().max(LEARNING_LIMITS.answer)).max(50), requestId: z.string().uuid() });
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ examId: string }> }) {
   try {
