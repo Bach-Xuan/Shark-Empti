@@ -21,6 +21,8 @@ For D56 and D57, 525 unit/component tests and all 39 Firestore Rules tests passe
 
 The D59 chat regression checks that feedback recovery preserves an in-flight reply and that switching attempt IDs aborts pending work and ignores its late completion.
 
+For D60, the [chat component regression](../tests/coaching-chat.test.tsx) checks the visible transcript and the next coaching payload after a change of attempt. The [personal retake browser test](../tests/e2e/coaching-chat.spec.ts) completes a quiz, chats from its results, and checks the greeting, unsent input and outgoing request on a retake. It also follows the new conversation through the second result screen. The flow passed on desktop Chromium, Firefox and WebKit using an optimized local demo build, Firebase Emulators and the AI fixture.
+
 D58 regression coverage includes verbatim recall after eviction, chronological ordering, ambiguous and oversized matches, failed turns, and isolation after a quiz change. See the [selector tests](../tests/ai-flows.test.ts) and [chat component test](../tests/coaching-chat.test.tsx).
 
 A local Node 24 comparison used 500 synthetic exchanges per language, 12 recent pairs, one incorrectly answered algebra question, and a unique quote from exchange 43. Measurements compare the previous selector with the updated selector on the same input, using 50 warm-ups and 1,000 alternating measurements per case. Payload size counts serialized UTF-8 JSON. Reference tokens count the system text, message bodies and prompt using `o200k_base`, excluding provider-specific framing.

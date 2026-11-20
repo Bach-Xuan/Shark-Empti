@@ -16,7 +16,7 @@ import type { QuizHistoryItem } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { Loader2,Minus,Send,Sparkles,User } from 'lucide-react';
 import { useAiRequestScope } from '@/hooks/use-ai-request-scope';
-import React,{ useCallback,useEffect,useRef,useState } from 'react';
+import React,{ useCallback,useEffect,useLayoutEffect,useRef,useState } from 'react';
 
 interface ChatMessage {
   role: 'user' | 'model';
@@ -42,21 +42,18 @@ export default function AiChatbot({ t, lang, results, sessionId, trigger }: AiCh
   const generation = useRef(0);
   const conversation = useRef({ exchanges: [] as ChatMessage[], recentStart: 0 });
   const requestPending = useRef(false);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const lifecycle = generation;
     lifecycle.current++;
     conversation.current = { exchanges: [], recentStart: 0 };
     requestPending.current = false;
+    setMessages([]);
+    setInput('');
     setIsTyping(false);
     return () => { lifecycle.current++; aiRequest.cancel(); };
   }, [sessionId, aiRequest]);
 
-  /**
-   * Welcome message management
-   */
-  useEffect(() => {
-    setMessages(previous => previous.length <= 1 && !previous.some(item => item.role === 'user') ? [{ role: 'model', message: t.botIntro }] : previous);
-  }, [lang, t.botIntro]);
+  const transcript: ChatMessage[] = [{ role: 'model', message: t.botIntro }, ...messages];
 
   /**
    * Onboarding: Auto-open on first visit
@@ -78,7 +75,7 @@ export default function AiChatbot({ t, lang, results, sessionId, trigger }: AiCh
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages, isTyping]);
+  }, [messages, isTyping, t.botIntro]);
 
   const fetchAiResponse = useCallback(async (userMsg: string) => {
     if (requestPending.current) return;
@@ -206,7 +203,7 @@ export default function AiChatbot({ t, lang, results, sessionId, trigger }: AiCh
 
           {/* Chat Messages */}
           <div ref={scrollRef} role="log" aria-label={uiMessage(lang, 'aichatbot.messages')} tabIndex={0} className="flex-1 min-h-0 overflow-y-auto p-4 md:p-5 space-y-4 md:space-y-6 bg-background/50 backdrop-blur-xs custom-scrollbar focus-visible:outline-2 focus-visible:outline-primary">
-            {messages.map((m, i) => (
+            {transcript.map((m, i) => (
               <div key={i} className={cn("flex items-end gap-2", m.role === 'user' ? 'flex-row-reverse' : 'flex-row')}>
                 <div className={cn(
                   "w-6 h-6 rounded-full flex items-center justify-center shrink-0 border-2",

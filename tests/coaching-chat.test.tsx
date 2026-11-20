@@ -59,11 +59,25 @@ it('preserves pending coaching across feedback recovery and ignores a late reply
   submit('Follow up');
   expect(coach.mock.lastCall![0].chatHistory.map((turn: { message: string }) => turn.message)).toEqual(['First question', 'First reply']);
   const secondSignal = coach.mock.lastCall![1].signal;
-  view.rerender(<AiChatbot {...props} sessionId="second" />);
+  const nextResults = { ...history, quizResults: [{ ...history.quizResults[0], question: 'Next quiz question?' }] };
+  view.rerender(<AiChatbot {...props} sessionId="second" results={nextResults} lang="vi" t={translations.vi} />);
   expect(secondSignal.aborted).toBe(true);
+  expect(screen.getByRole('log').textContent).toBe(translations.vi.botIntro);
   await second('Stale reply');
   expect(screen.queryByText('Stale reply')).toBeNull();
   coach.mockResolvedValueOnce({ ok: true, data: { aiResponse: 'OK' } });
   await act(async () => submit('New attempt'));
   expect(coach.mock.lastCall![0].chatHistory).toEqual([]);
+  expect(coach.mock.lastCall![0].quizQuestions.map((item: { questionText: string }) => item.questionText)).toEqual(['Next quiz question?']);
+});
+
+it('does not resend a question opened from quiz feedback when the attempt changes', async () => {
+  coach.mockResolvedValue({ ok: true, data: { aiResponse: 'Feedback explanation' } });
+  const props = { sessionId: 'first', results: null, trigger: { message: 'Explain this answer', timestamp: 1 },
+    lang: 'en', t: translations.en };
+  const view = render(<AiChatbot {...props} />);
+  await screen.findByText('Feedback explanation');
+  view.rerender(<AiChatbot {...props} sessionId="second" />);
+  expect(screen.getByRole('log').textContent).toBe(translations.en.botIntro);
+  expect(coach).toHaveBeenCalledTimes(1);
 });

@@ -211,7 +211,7 @@ function HomeContent() {
         )}
       </main>
 
-      <AiChatbot sessionId={lastResults ? draftId : null} t={t} lang={lang} results={lastResults} trigger={chatbotTrigger} />
+      <AiChatbot sessionId={draftId} t={t} lang={lang} results={lastResults} trigger={chatbotTrigger} />
     </div>
   );
 }
