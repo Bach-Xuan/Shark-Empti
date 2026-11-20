@@ -471,7 +471,7 @@ function ArenaDetailSession({ examId }: { examId: string }) {
            </div>
         )}
       </main>
-      {view === 'result' && lastResults && <AiChatbot t={t} lang={lang} results={lastResults} trigger={null} />}
+      {view === 'result' && lastResults && <AiChatbot sessionId={activeRequestId} t={t} lang={lang} results={lastResults} trigger={null} />}
     </div>
   );
 }

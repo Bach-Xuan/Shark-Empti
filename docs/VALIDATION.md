@@ -9,12 +9,30 @@ The following checks exercise the [application flows](FLOW.md) recorded in the a
 | Finding | Regression checked | Local evidence |
 |---|---|---|
 | D45, D46 | Export redaction, moderator erasure during deletion and restore, and resuming a failed deletion with the original receipt, lock and checkpoint | [Account job integration tests](../tests/integration/account-jobs.test.ts) |
+| D56, D57 | Concurrent legacy-note edits, stale-write denial, conflict recovery, and edit–close–remote update–reopen–save | [Rules emulator tests](../tests/firebase.rules.test.ts), [Quick Notes tests](../tests/quick-notes.test.tsx) and [two-tab browser test](../tests/e2e/notes.spec.ts) |
 | D47 | Refusing early writes before a confirmed owner read, recovering a failed listener and rejecting an old owner’s save callback | [Notes subscription tests](../tests/notes.test.tsx) |
 | D48, D54 | Enforcing backup and deletion barriers during migration, and preventing a duplicate report from restoring another report’s archive | [Community integration tests](../tests/integration/community.test.ts) |
 | D49–D51, D53, D55 | Starting the personal timer after generation, bounding answer and feedback sizes, validating confidence, freezing topic selection and fitting multibyte chat context | [Quiz lifecycle](../tests/quiz-lifecycle.test.tsx), [Playground](../tests/playground.test.tsx), [AI flows](../tests/ai-flows.test.ts) |
 | D52 | Losing an Arena submit response after the server commits, reloading, replaying the original answers and receiving a single recorded attempt | [Arena component tests](../tests/arena-detail.test.tsx), [browser flow](../tests/e2e/app.spec.ts) |
 
 For D46, the [owner controls](../tests/account-job-polling.test.tsx) and [receipt view](../tests/account-receipt.test.tsx) check the recovery instructions available to each reader. For D51, [draft recovery tests](../tests/learning-drafts.test.tsx) cover the feedback size boundary in active Quiz progress and pending save payloads.
+
+For D56 and D57, 525 unit/component tests and all 39 Firestore Rules tests passed locally. Two print cases require a separate browser configuration and were skipped in the unit run. On an optimized demo build, two desktop Chromium tabs using the same account on Home and Forum reproduced the competing edits and verified draft retention and reload against local Emulators. Deployed Rules and production clients require separate rollout verification.
+
+The D59 chat regression checks that feedback recovery preserves an in-flight reply and that switching attempt IDs aborts pending work and ignores its late completion.
+
+D58 regression coverage includes verbatim recall after eviction, chronological ordering, ambiguous and oversized matches, failed turns, and isolation after a quiz change. See the [selector tests](../tests/ai-flows.test.ts) and [chat component test](../tests/coaching-chat.test.tsx).
+
+A local Node 24 comparison used 500 synthetic exchanges per language, 12 recent pairs, one incorrectly answered algebra question, and a unique quote from exchange 43. Measurements compare the previous selector with the updated selector on the same input, using 50 warm-ups and 1,000 alternating measurements per case. Payload size counts serialized UTF-8 JSON. Reference tokens count the system text, message bodies and prompt using `o200k_base`, excluding provider-specific framing.
+
+| Language and request | Input bytes, before → after | Reference tokens, before → after | Median selection time (µs), before → after |
+|---|---:|---:|---:|
+| English, ordinary | 3,850 → 3,850 | 993 → 993 | 22.0 → 22.8 |
+| English, quoted | 3,870 → 3,679 | 997 → 947 | 22.1 → 128.0 |
+| Vietnamese, ordinary | 5,545 → 5,545 | 1,308 → 1,308 | 41.7 → 42.3 |
+| Vietnamese, quoted | 5,552 → 5,221 | 1,310 → 1,236 | 42.2 → 91.0 |
+
+These examples recovered a shorter exchange. A smaller byte count can still encode more tokens for other text or tokenizers. Hosted model token usage, response quality and end-to-end latency require separate verification.
 
 The local D45–D55 verification passed 524 unit/component tests, 189 Rules/integration tests and six desktop Chromium cases covering account controls, polling and draft recovery. All six browser cases passed together on a fresh Emulator instance. The optimized demo build also passed the HTTP smoke checks and all six route bundle budgets.
 

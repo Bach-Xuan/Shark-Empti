@@ -11,6 +11,7 @@ vi.mock('@/firebase', () => ({ useUser: () => ({ user: { uid: 'learner' } }) }))
 vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: () => false }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
 vi.mock('@/components/feature-help', () => ({ default: () => null }));
+vi.mock('@/components/latex-toolbar', () => ({ LatexQuickToolbar: () => null }));
 vi.mock('@/components/ui-text', () => ({ UiText: () => null }));
 vi.mock('recharts', () => {
   const Empty = () => null;
@@ -19,7 +20,7 @@ vi.mock('recharts', () => {
 beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} }));
 afterEach(() => { cleanup(); localStorage.clear(); vi.unstubAllGlobals(); });
 it('shares stable progress across dashboard, expanded roadmap, locale changes and remount', async () => {
-  const props = { history: [history], personalNotes: '', onNotesChange: async () => true };
+  const props = { history: [history], personalNotes: '', notesRevision: 0, notesReady: true, onNotesChange: async () => true };
   const view = render(<DashboardView {...props} t={translations.en} lang="en" />);
   const user = userEvent.setup();
   const card = screen.getByRole('checkbox', { name: 'Practice' });
@@ -44,4 +45,23 @@ it('shares stable progress across dashboard, expanded roadmap, locale changes an
   expect(screen.getByRole('checkbox', { name: 'Luyện tập' }).getAttribute('aria-checked')).toBe('true');
   const group = calculateDashboardStats([history], translations.en, 'en')!.processedGroupedInsights[0];
   expect(readRoadmapChecks('learner')[group.topicId][group.recommendations[0].id]).toBe(true);
+});
+
+it('pins the Dashboard edit base and retains the draft until a conflicting save is resolved', async () => {
+  const save = vi.fn().mockResolvedValueOnce({ content: 'Quick Notes edit', revision: 2 }).mockResolvedValue(true);
+  const props = { history: [history], notesReady: true, onNotesChange: save, t: translations.en, lang: 'en' as const };
+  const view = render(<DashboardView {...props} personalNotes="Original" notesRevision={1} />);
+  const editor = within(view.container.querySelector('#notes-section') as HTMLElement);
+  const user = userEvent.setup();
+  await user.click(editor.getByRole('button', { name: translations.en.edit }));
+  const input = editor.getByRole('textbox') as HTMLTextAreaElement;
+  await user.clear(input);
+  await user.type(input, 'My edit');
+  view.rerender(<DashboardView {...props} personalNotes="Quick Notes edit" notesRevision={2} />);
+  await user.click(editor.getByRole('button', { name: translations.en.save }));
+  expect(save).toHaveBeenCalledWith('My edit', { content: 'Original', revision: 1 });
+  expect(input.value).toBe('My edit');
+  await user.click(editor.getByRole('button', { name: 'Overwrite latest note' }));
+  expect(save).toHaveBeenLastCalledWith('My edit', { content: 'Quick Notes edit', revision: 2 });
+  expect(editor.queryByRole('textbox')).toBeNull();
 });

@@ -69,6 +69,10 @@ Drain in-flight background workers and deploy the consent API, updated client an
 
 Do not infer a missing private key or assume local credentials point to a staging project. If a key is exposed, revoke/rotate it and update the deployment; `.gitignore` alone does not remove committed history.
 
+## Notes revision rollout
+
+Coordinate deployment of the revision-aware Notes editors and Firestore Rules. The earlier Rules reject writes containing a revision, and the updated Rules reject older clients that omit the increment. Ask users with an older open tab to copy unsaved text before refreshing. Existing notes acquire their first revision on the next successful edit.
+
 ## Learning write validation rollout
 
 Deploy the learning PUT/PATCH API and updated Quiz/Flashcard/Practice clients together before applying the matching restrictive Rules. Older tabs that still write complex records through the SDK require refresh; do not temporarily reopen arbitrary private writes. Verify authenticated creation, response-loss replay, feedback recovery, notes/profile edits, activity leaf merging and owner legacy read/delete access. The new API uses document lookups and requires no additional composite index. This is a coordinated client/server/Rules rollout, not a remote data migration.

@@ -43,8 +43,9 @@ service cloud.firestore {
         && (!changed.hasAny(['createdAt']) || (data.createdAt is timestamp && data.createdAt <= request.time
           && (!(resource.data.get('createdAt', null) is timestamp) || data.createdAt == resource.data.createdAt)));
     }
-    function validNotes(data) {
-      return data.keys().hasAll(['content', 'updatedAt']) && data.content is string && data.content.size() <= 20000
+    function validNotes(data, previousRevision) {
+      return data.revision is int && data.revision == previousRevision + 1
+        && data.keys().hasAll(['content', 'updatedAt']) && data.content is string && data.content.size() <= 20000
         && data.updatedAt == request.time;
     }
     function validActivity(data, before) {
@@ -140,8 +141,8 @@ service cloud.firestore {
         allow delete: if writableAccount(userId) && !(collection in ['forumReactions', 'arenaRankings']);
       }
       match /notes/main {
-        allow create: if writableOwner(userId) && request.resource.data.keys().hasOnly(['content', 'updatedAt']) && validNotes(request.resource.data);
-        allow update: if writableOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content', 'updatedAt']) && validNotes(request.resource.data);
+        allow create: if writableOwner(userId) && request.resource.data.keys().hasOnly(['content', 'revision', 'updatedAt']) && validNotes(request.resource.data, 0);
+        allow update: if writableOwner(userId) && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['content', 'revision', 'updatedAt']) && validNotes(request.resource.data, resource.data.get('revision', 0));
       }
       match /activity/main {
         allow create: if writableOwner(userId) && request.resource.data.keys().hasOnly(['activeDays', 'updatedAt'])

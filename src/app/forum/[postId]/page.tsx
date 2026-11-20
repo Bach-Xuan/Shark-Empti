@@ -121,7 +121,7 @@ export default function PostDetailPage() {
   const [tempContent, setTempContent] = useState("");
   const [tempSubject, setTempSubject] = useState("");
 
-  const { notes: personalNotes, updateNotes: onNotesChange } = useUserNotes();
+  const { notesRevision, notes: personalNotes, ready: notesReady, failed: notesFailed, retry: retryNotes, updateNotes: onNotesChange } = useUserNotes();
 
 
   const commentSource = useMemo(() => db && post?.id === postId ? query(collection(db, PUBLIC_FORUM_COLLECTION, postId, 'comments'), where('privacyVersion', '==', COMMUNITY_PRIVACY_VERSION), orderBy('createdAt', 'asc')) : null, [db, postId, post?.id]);
@@ -297,11 +297,12 @@ export default function PostDetailPage() {
 
       <div className="fixed left-0 top-32 md:top-40 z-[90] flex flex-col gap-2 md:gap-3 animate-in slide-in-from-left-4 duration-1000">
         <ActivityCalendar t={t} lang={lang} isSticky />
+        {notesFailed && <button type="button" className="service-link bg-card" onClick={retryNotes}>{lang === 'vi' ? 'Tải lại ghi chú' : 'Reload notes'}</button>}
         <QuickNotes
           t={t}
           lang={lang}
           isSticky
-          notes={personalNotes}
+          notesRevision={notesRevision} notesReady={notesReady} notes={personalNotes}
           onNotesChange={onNotesChange}
         />
       </div>

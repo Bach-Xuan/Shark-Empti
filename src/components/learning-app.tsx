@@ -76,7 +76,7 @@ function HomeContent() {
   } | null>(null);
 
   // Centralized Data Hooks
-  const { notes: personalNotes, updateNotes: onNotesChange, ready: notesReady, failed: notesFailed, retry: retryNotes } = useUserNotes();
+  const { notesRevision, notes: personalNotes, updateNotes: onNotesChange, ready: notesReady, failed: notesFailed, retry: retryNotes } = useUserNotes();
 
   useEffect(() => {
     const viewParam = searchParams.get('view') as AppView;
@@ -149,7 +149,7 @@ function HomeContent() {
             t={t}
             lang={lang}
             isSticky
-            notesReady={notesReady} notes={personalNotes}
+            notesRevision={notesRevision} notesReady={notesReady} notes={personalNotes}
             onNotesChange={onNotesChange}
           />
         )}
@@ -194,7 +194,7 @@ function HomeContent() {
         {view === 'dashboard' && !historyPage.error && (!historyPage.loading || history.length > 0) && (
           <ErrorBoundary><DashboardView
             t={t} lang={lang} history={history} stats={stats}
-            notesReady={notesReady} personalNotes={personalNotes} onNotesChange={onNotesChange}
+            notesRevision={notesRevision} notesReady={notesReady} personalNotes={personalNotes} onNotesChange={onNotesChange}
             onFixWeakness={handleFixWeakness}
           /></ErrorBoundary>
         )}
@@ -211,7 +211,7 @@ function HomeContent() {
         )}
       </main>
 
-      <AiChatbot t={t} lang={lang} results={lastResults} trigger={chatbotTrigger} />
+      <AiChatbot sessionId={lastResults ? draftId : null} t={t} lang={lang} results={lastResults} trigger={chatbotTrigger} />
     </div>
   );
 }

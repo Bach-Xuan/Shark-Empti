@@ -2,6 +2,7 @@ import { assertFails,assertSucceeds,initializeTestEnvironment,RulesTestEnvironme
 import { type Firestore,disableNetwork,enableNetwork,collection,deleteDoc,deleteField,doc,getDoc,getDocs,query,serverTimestamp,setDoc,updateDoc,where } from 'firebase/firestore';
 import fs from 'node:fs';
 import { afterAll,afterEach,beforeAll,describe,it,expect } from 'vitest';
+import { saveNoteVersion } from '@/firebase/firestore/note-version';
 import { recordActiveDay } from '@/firebase/firestore/record-active-day';
 import { arenaLeaderboardQuery } from '@/lib/arena-leaderboard';
 import { currentServicePolicy } from '@/lib/service-policy';
@@ -10,7 +11,7 @@ import { forumReactionId } from '@/lib/community-privacy';
 let testEnv: RulesTestEnvironment;
 const validPost = () => ({ authorId: 'author', authorName: 'Author', authorPhoto: '', createdAt: serverTimestamp(), title: 'Math', content: 'Valid content', subject: 'math', likesCount: 0, likedBy: [], commentsCount: 0 });
 const validProfile = () => ({ displayName: 'Learner', photoURL: '', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
-const validNotes = (content: string) => ({ content, updatedAt: serverTimestamp() });
+const validNotes = (content: string, revision = 1) => ({ content, revision, updatedAt: serverTimestamp() });
 const publicPost = () => { const { likedBy: _members, ...metadata } = validPost(); return { ...metadata, privacyVersion: 1 }; };
 
 beforeAll(async () => {
@@ -95,14 +96,32 @@ describe('Firestore access policy', () => {
     await seedConsent('learner');
     const db = testEnv.authenticatedContext('learner').firestore(), ref = doc(db, 'users/learner/notes/main');
     for (const value of [{ content: {} }, { content: 'x'.repeat(20001) }, { content: 'Valid', unknown: true }, { content: 'Valid', updatedAt: new Date(1) }]) {
-      await assertFails(setDoc(ref, { updatedAt: serverTimestamp(), ...value }));
+      await assertFails(setDoc(ref, { revision: 1, updatedAt: serverTimestamp(), ...value }));
     }
     await assertFails(setDoc(doc(db, 'users/learner/notes/other'), validNotes('Unexpected document')));
     await assertSucceeds(setDoc(ref, validNotes('x'.repeat(20000))));
     await testEnv.withSecurityRulesDisabled(context => updateDoc(doc(context.firestore(), ref.path), { preserved: { private: 'Legacy' } }));
-    await assertSucceeds(updateDoc(ref, validNotes('')));
-    await assertFails(updateDoc(ref, { preserved: deleteField(), updatedAt: serverTimestamp() }));
+    await assertSucceeds(updateDoc(ref, validNotes('', 2)));
+    await assertFails(updateDoc(ref, { preserved: deleteField(), revision: 3, updatedAt: serverTimestamp() }));
     expect((await getDoc(ref)).get('preserved')).toEqual({ private: 'Legacy' });
+  });
+  it('serializes concurrent editors of a legacy note and rejects stale clients', async () => {
+    await seedConsent('learner');
+    const path = 'users/learner/notes/main';
+    await testEnv.withSecurityRulesDisabled(ctx => setDoc(doc(ctx.firestore(), path), { content: 'Original', legacy: true }));
+    const client = () => testEnv.authenticatedContext('learner').firestore() as unknown as Firestore;
+    const first = client(), second = client();
+    const edits = ['Physics', 'Chemistry'];
+    const results = await Promise.all([first, second].map((db, i) => saveNoteVersion(db, 'learner', edits[i], { content: 'Original', revision: 0 })));
+    const winner = results.indexOf(true);
+    expect(winner).toBeGreaterThanOrEqual(0);
+    expect(results[1 - winner]).toEqual({ content: edits[winner], revision: 1 });
+    const ref = doc(second, path);
+    await assertFails(updateDoc(ref, { content: 'Old tab', updatedAt: serverTimestamp() }));
+    await assertFails(updateDoc(ref, validNotes('Stale', 1)));
+    await assertFails(updateDoc(ref, validNotes('Skipped', 3)));
+    expect(await saveNoteVersion(second, 'learner', edits[1 - winner], { content: edits[winner], revision: 1 })).toBe(true);
+    expect((await getDoc(ref)).data()).toMatchObject({ content: edits[1 - winner], revision: 2, legacy: true });
   });
   it('F02 requires a single real activity date and prevents replacing existing leaves', async () => {
     await seedConsent('learner');
@@ -150,7 +169,7 @@ describe('Firestore access policy', () => {
     await seedConsent('unconfirmed');
     await assertSucceeds(setDoc(doc(db, 'users/unconfirmed/notes/main'), validNotes('Private')));
     await testEnv.withSecurityRulesDisabled(context => updateDoc(doc(context.firestore(), '_serviceConsents/unconfirmed'), { policyVersion: 'old' }));
-    await assertFails(updateDoc(doc(db, 'users/unconfirmed/notes/main'), validNotes('Rejected')));
+    await assertFails(updateDoc(doc(db, 'users/unconfirmed/notes/main'), validNotes('Rejected', 2)));
     await assertSucceeds(getDoc(doc(db, 'users/unconfirmed/notes/main')));
   });
   it.each([['history', 'date'], ['flashcards', 'createdAt'], ['practice', 'createdAt']])('requires server APIs for %s writes while retaining legacy reads and deletion', async (group, field) => {
@@ -172,14 +191,14 @@ describe('Firestore access policy', () => {
     await assertSucceeds(setDoc(doc(db, 'users/learner/notes/main'), validNotes('Owned')));
     await testEnv.withSecurityRulesDisabled(context => setDoc(doc(context.firestore(), '_accountLocks/learner'), { status: 'deleting' }));
     await assertSucceeds(getDoc(doc(db, 'users/learner/notes/main')));
-    await assertFails(setDoc(doc(db, 'users/learner/notes/main'), validNotes('Rejected')));
+    await assertFails(setDoc(doc(db, 'users/learner/notes/main'), validNotes('Rejected', 2)));
     await testEnv.withSecurityRulesDisabled(async context => {
       await deleteDoc(doc(context.firestore(), '_accountLocks/learner'));
       await setDoc(doc(context.firestore(), '_serviceState/maintenance'), { active: true, expiresAtMs: Date.now() + 60000 });
     });
-    await assertFails(updateDoc(doc(db, 'users/learner/notes/main'), validNotes('Rejected')));
+    await assertFails(updateDoc(doc(db, 'users/learner/notes/main'), validNotes('Rejected', 2)));
     await testEnv.withSecurityRulesDisabled(context => setDoc(doc(context.firestore(), '_serviceState/maintenance'), { active: true, expiresAtMs: 1 }));
-    await assertSucceeds(updateDoc(doc(db, 'users/learner/notes/main'), validNotes('Allowed after expiry')));
+    await assertSucceeds(updateDoc(doc(db, 'users/learner/notes/main'), validNotes('Allowed after expiry', 2)));
     for (const collection of ['_accountJobs', '_accountLocks', '_deletionJournal', '_jobWorkerState', '_jobBudgets', '_serviceState']) {
       await assertFails(getDoc(doc(db, collection + '/private')));
       await assertFails(setDoc(doc(db, collection + '/forged'), { active: false }));

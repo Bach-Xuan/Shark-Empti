@@ -14,12 +14,14 @@ DialogTitle,
 DialogTrigger,
 } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import type { SaveNote } from '@/firebase/firestore/note-version';
+import { useNoteDraft } from '@/hooks/use-note-draft';
 import { NOTES_MAX_LENGTH } from '@/lib/data-limits';
 import { useToast } from '@/hooks/use-toast';
 import { TranslationSet } from '@/lib/translations';
 import { cn } from '@/lib/utils';
 import { Check,Copy,Save,Sigma,StickyNote } from 'lucide-react';
-import { useEffect,useRef,useState } from 'react';
+import { useRef,useState } from 'react';
 
 import { LatexQuickToolbar } from '@/components/latex-toolbar';
 
@@ -27,33 +29,28 @@ interface QuickNotesProps {
   t: TranslationSet;
   lang: string;
   isSticky?: boolean;
-  notesReady?: boolean;
+  notesReady: boolean;
   notes: string;
-  onNotesChange: (notes: string) => Promise<boolean>;
+  notesRevision: number;
+  onNotesChange: SaveNote;
 }
 
-export default function QuickNotes({ t, lang, isSticky, notesReady = true, notes: externalNotes, onNotesChange }: QuickNotesProps) {
+export default function QuickNotes({ t, lang, isSticky, notesRevision, notesReady, notes: externalNotes, onNotesChange }: QuickNotesProps) {
   const { toast } = useToast();
-  const [localNotes, setLocalNotes] = useState(externalNotes);
+  const draft = useNoteDraft(externalNotes, notesRevision, onNotesChange);
+  const localNotes = draft.content;
   const [isOpen, setIsOpen] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isDirty, setIsDirty] = useState(false);
   const savePending = useRef(false);
-
-  useEffect(() => {
-    if (isOpen && !isDirty) {
-      setLocalNotes(externalNotes);
-    }
-  }, [isOpen, externalNotes, isDirty]);
 
   const handleSave = async () => {
     if (!notesReady || savePending.current) return;
     savePending.current = true;
     setIsSaving(true);
-    const saved = await onNotesChange(localNotes).catch(() => false).finally(() => { savePending.current = false; setIsSaving(false); });
+    const saved = await draft.submit().catch(() => false).finally(() => { savePending.current = false; setIsSaving(false); });
     if (!saved) return;
-    setIsDirty(false);
+    draft.reset();
     toast({
       title: uiMessage(lang, "quicknotes.saved"),
       description: uiMessage(lang, "quicknotes.your_notes_have_been_updated"),
@@ -72,20 +69,22 @@ export default function QuickNotes({ t, lang, isSticky, notesReady = true, notes
 
   const insertLatex = (type: 'inline' | 'block') => {
     if (!notesReady || savePending.current) return;
-    setIsDirty(true);
     const wrapper = type === 'inline' ? '$' : '$$';
-    setLocalNotes(prev => prev + wrapper + wrapper);
+    draft.edit(localNotes + wrapper + wrapper);
   };
 
   const insertSnippet = (snippet: string) => {
     if (!notesReady || savePending.current) return;
-    setIsDirty(true);
-    setLocalNotes(prev => prev + `$${snippet}$`);
+    draft.edit(localNotes + `$${snippet}$`);
   };
 
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
+    <Dialog open={isOpen} onOpenChange={open => {
+      if (savePending.current) return;
+      draft.reset();
+      setIsOpen(open);
+    }}>
       <DialogTrigger asChild>
         <Button
           variant="ghost"
@@ -111,7 +110,7 @@ export default function QuickNotes({ t, lang, isSticky, notesReady = true, notes
             {t.personalNotes.toUpperCase()}
           </DialogTitle>
           <p className="text-[10px] md:text-xs font-black uppercase tracking-[0.2em] text-muted-foreground mt-1">
-            {uiMessage(lang, "quicknotes.save_your_thoughts_and_reminders_latex_supported")}
+            {uiMessage(lang, "quicknotes.close_policy")}
           </p>
         </DialogHeader>
 
@@ -128,11 +127,15 @@ export default function QuickNotes({ t, lang, isSticky, notesReady = true, notes
           <Textarea
             disabled={isSaving || !notesReady}
             className="min-h-[200px] md:min-h-[300px] bg-muted/20 border-[3px] border-border rounded-3xl font-bold p-6 md:p-8 text-sm md:text-lg focus:ring-[6px] focus:ring-primary/10 focus:border-primary transition-all shadow-inner"
-            placeholder={t.notesPlaceholder}
+            aria-label={t.personalNotes} placeholder={t.notesPlaceholder}
             value={localNotes} maxLength={NOTES_MAX_LENGTH}
-            onChange={(e) => { setIsDirty(true); setLocalNotes(e.target.value); }}
+            onChange={(e) => { draft.edit(e.target.value); }}
           />
 
+          {draft.conflict && <div>
+            <p role="alert">{uiMessage(lang, 'quicknotes.conflict')}</p>
+            <Button type="button" variant="outline" disabled={isSaving || !notesReady} onClick={draft.reload}>{uiMessage(lang, 'quicknotes.reload')}</Button>
+          </div>}
           {localNotes.includes('$') && (
             <div className="p-6 md:p-8 bg-muted/10 rounded-3xl border-2 border-dashed border-border/50 animate-in fade-in duration-300">
               <span className="text-[8px] md:text-[9px] font-black uppercase text-primary block mb-2 md:mb-4">{t.latexPreview}</span>
@@ -160,7 +163,7 @@ export default function QuickNotes({ t, lang, isSticky, notesReady = true, notes
                 disabled={isSaving || !notesReady}
                 className="rounded-xl font-black uppercase tracking-widest text-xs btn-duo bg-primary text-primary-foreground border-2 border-white/20 h-12 px-8 flex items-center gap-2"
               >
-                <Save className="w-4 h-4" /> {t.save}
+                <Save className="w-4 h-4" /> {draft.conflict ? uiMessage(lang, 'quicknotes.overwrite') : t.save}
               </Button>
             </div>
           </div>

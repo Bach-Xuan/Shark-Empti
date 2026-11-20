@@ -21,6 +21,8 @@ DialogTitle,
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
+import type { SaveNote } from '@/firebase/firestore/note-version';
+import { useNoteDraft } from '@/hooks/use-note-draft';
 import { NOTES_MAX_LENGTH } from '@/lib/data-limits';
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useToast } from '@/hooks/use-toast';
@@ -90,21 +92,23 @@ const CustomRadarTick = (props: { x?: number; y?: number; payload?: { value?: st
 
 interface DashboardViewProps extends BaseViewProps {
   history: QuizHistoryItem[];
-  notesReady?: boolean;
+  notesReady: boolean;
   personalNotes: string;
-  onNotesChange: (notes: string) => Promise<boolean>;
+  notesRevision: number;
+  onNotesChange: SaveNote;
   stats?: ReturnType<typeof calculateDashboardStats>;
   onFixWeakness?: (concept: string, type: 'practice' | 'flashcards') => void;
 }
 
-export default function DashboardView({ t, history, lang, personalNotes, notesReady = true, onNotesChange, onFixWeakness, stats }: DashboardViewProps) {
+export default function DashboardView({ t, history, lang, personalNotes, notesRevision, notesReady, onNotesChange, onFixWeakness, stats }: DashboardViewProps) {
   const { user } = useUser();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [isSavingNotes, setIsSavingNotes] = useState(false);
   const savingNotes = useRef(false);
-  const [tempNotesContent, setTempNotesContent] = useState("");
+  const draft = useNoteDraft(personalNotes, notesRevision, onNotesChange);
+  const tempNotesContent = draft.content;
   const [activeCopiedId, setActiveCopiedId] = useState<string | null>(null);
   const [expandedAttemptIdx, setExpandedAttemptIdx] = useState<number | null>(null);
 
@@ -172,7 +176,7 @@ export default function DashboardView({ t, history, lang, personalNotes, notesRe
     savingNotes.current = true;
     setIsSavingNotes(true);
     try {
-      if (await onNotesChange(tempNotesContent)) setIsEditingNotes(false);
+      if (await draft.submit()) { draft.reset(); setIsEditingNotes(false); }
     } catch {
       showUnexpectedErrorToast('APP-NOTES-SAVE-FAILED', 'Notes could not be saved.', {}, lang);
     } finally {
@@ -184,12 +188,12 @@ export default function DashboardView({ t, history, lang, personalNotes, notesRe
   const insertLatex = (type: 'inline' | 'block') => {
     if (!notesReady || savingNotes.current) return;
     const wrapper = type === 'inline' ? '$' : '$$';
-    setTempNotesContent(prev => prev + wrapper + wrapper);
+    draft.edit(tempNotesContent + wrapper + wrapper);
   };
 
   const insertSnippet = (snippet: string) => {
     if (!notesReady || savingNotes.current) return;
-    setTempNotesContent(prev => prev + `$${snippet}$`);
+    draft.edit(tempNotesContent + `$${snippet}$`);
   };
 
   const getErrorIcon = (errorLabel: string) => {
@@ -403,7 +407,7 @@ export default function DashboardView({ t, history, lang, personalNotes, notesRe
               </Button>
             )}
             {!isEditingNotes && (
-              <Button disabled={!notesReady} aria-label={t.edit} variant="outline" size="sm" onClick={() => { setTempNotesContent(personalNotes); setIsEditingNotes(true); }} className="btn-duo font-black h-10 w-10 md:h-14 md:w-14 p-0 rounded-xl md:rounded-2xl border-2 md:border-[3px] text-primary flex items-center justify-center bg-card shadow-none">
+              <Button disabled={!notesReady} aria-label={t.edit} variant="outline" size="sm" onClick={() => { draft.reset(); draft.edit(personalNotes); setIsEditingNotes(true); }} className="btn-duo font-black h-10 w-10 md:h-14 md:w-14 p-0 rounded-xl md:rounded-2xl border-2 md:border-[3px] text-primary flex items-center justify-center bg-card shadow-none">
                 <Pencil className="w-4 h-4 md:w-6 md:h-6" />
               </Button>
             )}
@@ -421,12 +425,16 @@ export default function DashboardView({ t, history, lang, personalNotes, notesRe
                 <LatexQuickToolbar onSelect={insertSnippet} />
               </div>
 
+              {draft.conflict && <div>
+                <p role="alert">{uiMessage(lang, 'quicknotes.conflict')}</p>
+                <Button type="button" variant="outline" disabled={isSavingNotes || !notesReady} onClick={draft.reload}>{uiMessage(lang, 'quicknotes.reload')}</Button>
+              </div>}
               <Textarea
                 disabled={isSavingNotes || !notesReady}
                 className="min-h-[120px] md:min-h-[300px] bg-background border-2 md:border-[4px] border-primary/20 rounded-xl md:rounded-[2.5rem] focus:ring-4 md:ring-[10px] focus:ring-primary/5 font-bold p-4 md:p-10 text-xs md:text-2xl shadow-inner transition-all"
-                placeholder={t.notesPlaceholder}
+                aria-label={t.personalNotes} placeholder={t.notesPlaceholder}
                 value={tempNotesContent} maxLength={NOTES_MAX_LENGTH}
-                onChange={(e) => setTempNotesContent(e.target.value)}
+                onChange={(e) => draft.edit(e.target.value)}
               />
 
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6">
@@ -434,8 +442,8 @@ export default function DashboardView({ t, history, lang, personalNotes, notesRe
                   <Sigma className="w-2.5 h-2.5 md:w-5 md:h-5" /> {t.latexHelp}
                 </p>
                 <div className="flex gap-3 md:gap-4 justify-end">
-                  <Button disabled={isSavingNotes} variant="ghost" onClick={() => setIsEditingNotes(false)} className="btn-duo rounded-xl md:rounded-2xl px-6 md:px-8 h-9 md:h-14 text-[9px] md:text-xs font-black uppercase tracking-widest bg-card">{t.cancel}</Button>
-                  <Button disabled={isSavingNotes || !notesReady} onClick={handleSaveNotes} className="btn-duo bg-primary text-primary-foreground rounded-xl md:rounded-2xl px-8 md:px-16 h-9 md:h-14 text-[9px] md:text-xs font-black uppercase tracking-widest border-2 md:border-[3px] border-white/20 shadow-none">{t.save}</Button>
+                  <Button disabled={isSavingNotes} variant="ghost" onClick={() => { draft.reset(); setIsEditingNotes(false); }} className="btn-duo rounded-xl md:rounded-2xl px-6 md:px-8 h-9 md:h-14 text-[9px] md:text-xs font-black uppercase tracking-widest bg-card">{t.cancel}</Button>
+                  <Button disabled={isSavingNotes || !notesReady} onClick={handleSaveNotes} className="btn-duo bg-primary text-primary-foreground rounded-xl md:rounded-2xl px-8 md:px-16 h-9 md:h-14 text-[9px] md:text-xs font-black uppercase tracking-widest border-2 md:border-[3px] border-white/20 shadow-none">{draft.conflict ? uiMessage(lang, 'quicknotes.overwrite') : t.save}</Button>
                 </div>
               </div>
             </div>

@@ -119,7 +119,7 @@ export default function ForumPage() {
   const [editingPost, setEditingPost] = useState<ForumPost | null>(null);
   const [postToDelete, setPostToDelete] = useState<ForumPost | null>(null);
 
-  const { notes: personalNotes, updateNotes: onNotesChange } = useUserNotes();
+  const { notesRevision, notes: personalNotes, ready: notesReady, failed: notesFailed, retry: retryNotes, updateNotes: onNotesChange } = useUserNotes();
 
 
   const source = usePageMemo(() => db ? query(collection(db, PUBLIC_FORUM_COLLECTION), where('privacyVersion', '==', COMMUNITY_PRIVACY_VERSION), ...(sortType === 'mostLiked' ? [orderBy('likesCount', 'desc'), orderBy('createdAt', 'desc')] : [orderBy('createdAt', sortType === 'oldest' ? 'asc' : 'desc')])) : null, [db, sortType]);
@@ -301,11 +301,12 @@ export default function ForumPage() {
 
       <div className="fixed left-0 top-32 md:top-40 z-[90] flex flex-col gap-2 md:gap-3 animate-in slide-in-from-left-4 duration-1000">
         <ActivityCalendar t={t} lang={lang} isSticky />
+        {notesFailed && <button type="button" className="service-link bg-card" onClick={retryNotes}>{lang === 'vi' ? 'Tải lại ghi chú' : 'Reload notes'}</button>}
         <QuickNotes
           t={t}
           lang={lang}
           isSticky
-          notes={personalNotes}
+          notesRevision={notesRevision} notesReady={notesReady} notes={personalNotes}
           onNotesChange={onNotesChange}
         />
       </div>

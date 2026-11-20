@@ -54,3 +54,41 @@ it('fits multibyte quiz context and recent complete turns within the coaching op
   expect(fitted.chatHistory?.slice(-2)).toEqual(turn);
   expect(fitCoachingContext({ ...input, userMessage: '🦈'.repeat(33_000) })).toBeNull();
 });
+
+it('recalls a unique verbatim quote in chronological order within the displaced pair’s byte cost', () => {
+  const pair = (user: string, model: string) => [{ role: 'user' as const, message: user }, { role: 'model' as const, message: model }];
+  const old = pair('Tại sao?', 'Vì tổng bằng hai.');
+  const small = pair('x', 'y');
+  const large = pair('Explain this', 'A longer answer. '.repeat(50));
+  const recent = pair('Next question', 'Most recent answer');
+  const chatHistory = [...old, ...small, ...large, ...recent];
+  const quiz = { questionText: '2+2?', correctAnswer: '4', userAnswer: '3', isCorrect: false, explanation: 'Add.' };
+  const fit = (userMessage: string, history = chatHistory) => fitCoachingContext({
+    ...inputs['ai-coaching-chatbot'], userMessage, quizQuestions: [quiz], chatHistory: history,
+  }, 2)!;
+  for (const quote of ['“tổng bằng hai”', '"Tại sao?"']) {
+    const result = fit(quote);
+    expect(result.chatHistory).toEqual([...old, ...small, ...recent]);
+    expect(result.quizQuestions).toEqual([quiz]);
+    const ordinary = { ...result, chatHistory: chatHistory.slice(2) };
+    expect(Buffer.byteLength(JSON.stringify(result))).toBeLessThanOrEqual(Buffer.byteLength(JSON.stringify(ordinary)));
+  }
+  for (const text of ['tổng bằng hai', '“tổng bằng hai', '"not in history"', '“tổng bằng hai” or “x”', '"Next question"']) {
+    expect(fit(text).chatHistory).toEqual(chatHistory.slice(2));
+  }
+  const duplicated = [...old, ...pair('Another question', 'Vì tổng bằng hai.'), ...large];
+  expect(fit('“tổng bằng hai”', duplicated).chatHistory).toEqual(duplicated.slice(2));
+  expect(fit('“tổng bằng hai”', [...old, ...small]).chatHistory).toEqual(small);
+  expect(fit('“tổng bằng hai”', old).chatHistory).toEqual([]);
+});
+
+it('recalls a pair dropped by the current request and leaves duplicate older matches unresolved', () => {
+  const pair = (question: string) => [{ role: 'user' as const, message: question }, { role: 'model' as const, message: 'a'.repeat(39_000) }];
+  const old = pair('Earlier property');
+  const recent = pair('A recent question');
+  const input = { ...inputs['ai-coaching-chatbot'], userMessage: 'Why "Earlier property"?',
+    quizQuestions: [{ questionText: '2+2?', correctAnswer: '4', userAnswer: '3', isCorrect: false, explanation: 'Add' }],
+    chatHistory: [...old, ...recent] };
+  expect(fitCoachingContext(input)?.chatHistory).toEqual(old);
+  expect(fitCoachingContext({ ...input, chatHistory: [...old, ...old, ...recent] })?.chatHistory).toEqual(recent);
+});

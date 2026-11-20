@@ -1,6 +1,6 @@
 # 📋 Consolidated Technical Audit Report · Shark Empti **v2.2.0**
 
-This register covers **101 findings**. **100 are resolved and 1 remains open.**
+This register covers **105 findings**. **104 are resolved and 1 remains open.**
 
 See the [application flow guide](FLOW.md), [technical documentation](TECHNICAL_DOCUMENTATION.md), [validation guide](VALIDATION.md), [account operations](ACCOUNT_OPERATIONS.md) and [interface design guide](DESIGN.md) for implementation and verification guidance.
 
@@ -96,6 +96,10 @@ See the [application flow guide](FLOW.md), [technical documentation](TECHNICAL_D
 | D53 | Playground topic and count changes during academic validation could associate generated practice questions or flashcards with different settings | Resolved | 20 November 2026 |
 | D54 | Duplicate moderation reports could restore another report’s hidden content or leave a hidden queue entry without a recoverable decision | Resolved | 20 November 2026 |
 | D55 | Shark Guru sent unbounded quiz and conversation history, causing later valid questions to exceed the AI generation input limit | Resolved | 20 November 2026 |
+| D56 | Concurrent Dashboard and Quick Notes editors could save different drafts based on the same Firestore note and silently overwrite the first committed edit because writes did not check the draft revision | Resolved | 20 November 2026 |
+| D57 | Closing Quick Notes kept its unsaved dirty draft, so reopening after a Dashboard or another tab saved newer text could display and resubmit the obsolete draft | Resolved | 20 November 2026 |
+| D58 | Shark Guru discarded successful exchanges from session history when fitting the quiz and chat byte budgets, so later explicit quotations could no longer recover an omitted exchange even when it would fit in place of a selected pair | Resolved | 20 November 2026 |
+| D59 | Recovering missing feedback replaced the personal quiz result object, clearing Shark Guru’s completed exchanges and cancelling a pending reply even though the learner was reviewing the same attempt | Resolved | 20 November 2026 |
 | N01 | Inconsistent domain and file names made related modules harder to identify across features | Resolved | 18 November 2026 |
 | N02 | Shared types blurred the distinction between draft sessions, validated configurations and persisted operations | Resolved | 18 November 2026 |
 | N03 | Duplicated domain logic and insufficient unused-code checks obscured active implementation paths | Resolved | 18 November 2026 |

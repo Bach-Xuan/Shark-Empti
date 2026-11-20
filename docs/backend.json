@@ -198,6 +198,11 @@
           "type": "string",
           "maxLength": 20000
         },
+        "revision": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Each accepted edit increments the stored revision. Editors treat a missing revision as zero."
+        },
         "updatedAt": {
           "$ref": "#/$defs/FirestoreTimestamp"
         }
@@ -803,7 +808,7 @@
     },
     "/users/{uid}/notes/main": {
       "schema": "UserNotes",
-      "description": "Editors wait for an authoritative owner snapshot. Private notes/main SDK writes allow only bounded content and server updatedAt changes; unrelated legacy fields are preserved."
+      "description": "Editors wait for an authoritative owner snapshot. Private notes/main SDK writes allow only bounded content, a server updatedAt timestamp and the next revision; unrelated legacy fields are preserved."
     },
     "/users/{uid}/activity/main": {
       "schema": "UserActivity",

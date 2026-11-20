@@ -24,13 +24,14 @@ interface ChatMessage {
 }
 
 interface AiChatbotProps {
+  sessionId: string | null;
   t: TranslationSet;
   lang: string;
   results: QuizHistoryItem | null;
   trigger: { message: string, timestamp: number } | null;
 }
 
-export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps) {
+export default function AiChatbot({ t, lang, results, sessionId, trigger }: AiChatbotProps) {
   const aiRequest = useAiRequestScope();
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -39,16 +40,16 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
   const scrollRef = useRef<HTMLDivElement>(null);
   const externalHandlerRef = useRef<((message: string) => Promise<void>) | null>(null);
   const generation = useRef(0);
-  const successfulHistory = useRef<ChatMessage[]>([]);
+  const conversation = useRef({ exchanges: [] as ChatMessage[], recentStart: 0 });
   const requestPending = useRef(false);
   useEffect(() => {
     const lifecycle = generation;
     lifecycle.current++;
-    successfulHistory.current = [];
+    conversation.current = { exchanges: [], recentStart: 0 };
     requestPending.current = false;
     setIsTyping(false);
     return () => { lifecycle.current++; aiRequest.cancel(); };
-  }, [results, aiRequest]);
+  }, [sessionId, aiRequest]);
 
   /**
    * Welcome message management
@@ -104,19 +105,21 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
         errorCategory: r.errorCategory ?? undefined
       })) || [];
 
+      const session = conversation.current;
       const context = fitCoachingContext({
         userMessage: userMsg,
         preferredLanguage: lang as 'en' | 'vi',
         isVietnamese: lang === 'vi',
         quizSummary: summary,
         quizQuestions: questions,
-        chatHistory: successfulHistory.current,
-      });
+        chatHistory: session.exchanges,
+      }, session.recentStart);
       if (!context) {
         showErrorToast(createAppError('APP-PAYLOAD-TOO-LARGE', ''), lang as 'en' | 'vi');
         return;
       }
-      setMessages(previous => [...previous, { role: 'user', message: userMsg }]);
+      const question: ChatMessage = { role: 'user', message: userMsg };
+      setMessages(previous => [...previous, question]);
       setInput(current => current.trim() === userMsg ? '' : current);
       const response = await aiCoachingChatbotForQuizReview(context, { signal: aiRequest.start() });
 
@@ -127,8 +130,11 @@ export default function AiChatbot({ t, lang, results, trigger }: AiChatbotProps)
         return;
       }
 
-      successfulHistory.current = [...context.chatHistory ?? [], { role: 'user', message: userMsg }, { role: 'model', message: response.data.aiResponse }];
-      setMessages(prev => [...prev, { role: 'model', message: response.data.aiResponse }]);
+      const answer: ChatMessage = { role: 'model', message: response.data.aiResponse };
+      // Recall swaps one pair for one pair, so the ordinary recency window advances by the same count.
+      session.recentStart = session.exchanges.length - (context.chatHistory?.length ?? 0);
+      session.exchanges.push(question, answer);
+      setMessages(prev => [...prev, answer]);
     } catch (e) {
       if (requestGeneration !== generation.current) return;
       console.error("Chatbot error:", e);
