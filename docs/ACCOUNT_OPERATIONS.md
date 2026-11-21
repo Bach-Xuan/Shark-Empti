@@ -39,16 +39,41 @@ The [architecture guide](ARCHITECTURE.md#recovery-boundaries) places account job
 States: `queued`, `running`, `waiting_quota`, `ready`, `completed`, `failed`. Per-job/global leases fence checkpoints; duplicate deliveries cannot claim an active lease or repeat a terminal job. Cursors and stable content-addressed parts recover lost upload responses. Each invocation processes at most two batches with a 20-second target. Closing the tab only stops polling. Old `_accountRequests` remain manual-review records; the legacy learning export is not a complete account export.
 
 ```mermaid
-flowchart LR
+---
+config:
+  look: classic
+  flowchart:
+    nodeSpacing: 28
+    rankSpacing: 28
+    curve: monotoneY
+---
+flowchart TD
     accTitle: Account job delivery and recovery
-    accDescr: Account requests create durable jobs in Firestore. A signed QStash delivery starts bounded work. The worker checkpoints progress and the maintenance schedule revisits due work. Owners and deletion receipts read status through the API.
-    Request["Reauthenticated account request"] --> State["Firestore job and cursor"]
-    Request --> Queue["QStash delivery"]
-    Sweep["Signed maintenance schedule"] -->|Revisit due work| Queue
-    Queue -->|Verify signature and claim lease| Work["Worker processes bounded batches"]
-    Work -->|Checkpoint or record outcome| State
-    Work -->|Enqueue more work when needed| Queue
-    State --> Status["Owner or deletion receipt status"]
+    accDescr: Account requests create a job and enqueue delivery. The maintenance schedule revisits due work. The worker verifies delivery, claims the lease, processes a batch and saves progress. Owners and deletion receipts read status through the API.
+
+    Request("Account request<br/>Recent sign-in")
+    State("Firestore<br/>Job and cursor")
+    Sweep("Signed maintenance")
+    Queue("QStash delivery")
+    Work("Worker<br/>Verify and process")
+    Status("Owner or receipt status")
+
+    Request -->|Create job| State
+    Request -->|Enqueue| Queue
+    Sweep -.->|Revisit due jobs| Queue
+    Queue --> Work
+    Work -->|Save progress| State
+    Work -.->|Continue if needed| Queue
+    State --> Status
+
+    classDef client fill:#dbeafe,stroke:#3b82f6,color:#172554,stroke-width:2px;
+    classDef server fill:#ede9fe,stroke:#8b5cf6,color:#2e1065,stroke-width:2px;
+    classDef data fill:#ccfbf1,stroke:#0d9488,color:#134e4a,stroke-width:2px;
+    classDef delivery fill:#fef3c7,stroke:#d97706,color:#451a03,stroke-width:2px;
+    class Request,Status client;
+    class Work server;
+    class State data;
+    class Sweep,Queue delivery;
 ```
 
 Authenticated creation/list/status/download calls consume account traffic admission before body or private resource work, including invalid, missing and replayed requests. Owner read controls remain available before consent and under deletion/maintenance barriers; creation retains recent-auth and backup protection. Receipt-only status checks the 43-character base64url HMAC format before database access and uses a separate global token bucket without storing credential identifiers or depending on an Auth user. Its capacity/refill matches the global account-traffic policy; the buckets are distinct. Admission and Auth work still consume resources, so these provisional limits are not an edge abuse-control or spending guarantee. See [traffic contracts](TECHNICAL_DOCUMENTATION.md#forum-moderation-and-account-controls).

@@ -19,22 +19,44 @@ Language and theme start with the preferences cookie and synchronize between tab
 ## 📚 Personal learning
 
 ```mermaid
+---
+config:
+  look: classic
+  flowchart:
+    nodeSpacing: 30
+    rankSpacing: 28
+    curve: monotoneY
+---
 flowchart TD
     accTitle: Personal quiz and save recovery
-    accDescr: The learner configures a quiz, completes it, and saves the attempt. If the save fails or its outcome is uncertain, the learner retries using the same record before reviewing or practising again.
-    Setup[Choose topic and settings] --> Validate[Validate academic topic]
-    Validate -->|Accepted| Questions[Generate questions]
-    Validate -->|Revise| Setup
-    Questions --> Answer[Answer or reach time limit]
-    Answer --> Finish[Request quiz feedback]
-    Finish --> Save[Save completed attempt]
-    Save -->|Acknowledged| Result[Review result]
-    Save -->|Uncertain or failed| Retry[Retry saved payload and ID]
+    accDescr: The learner chooses settings, validates the topic, and completes the quiz. After feedback is requested, the client saves the attempt. It retries an uncertain save with the original data. Review leads to a retake, history, or practice.
+
+    Setup("Choose quiz settings")
+    Validate{"Topic valid?"}
+    Quiz("Take quiz<br/>Request feedback")
+    Save("Save attempt")
+    Retry("Retry same save")
+    Result("Review result")
+    FollowUp("History, Flashcards<br/>or Practice")
+
+    Setup --> Validate
+    Validate -->|Yes| Quiz
+    Validate -.->|Revise| Setup
+    Quiz --> Save
+    Save -->|Saved| Result
+    Save -.->|Uncertain or failed| Retry
     Retry --> Save
-    Result -->|Same questions| Answer
-    Result -->|New questions| Questions
-    Result --> Dashboard[Dashboard and history]
-    Dashboard --> Playground[Flashcards or Practice]
+    Result --> FollowUp
+    Result -.->|Retake| Quiz
+
+    classDef learner fill:#dbeafe,stroke:#3b82f6,color:#172554,stroke-width:2px;
+    classDef decision fill:#ede9fe,stroke:#8b5cf6,color:#2e1065,stroke-width:2px;
+    classDef saved fill:#ccfbf1,stroke:#0d9488,color:#134e4a,stroke-width:2px;
+    classDef retry fill:#fef3c7,stroke:#d97706,color:#451a03,stroke-width:2px;
+    class Setup,Quiz,FollowUp learner;
+    class Validate decision;
+    class Save,Result saved;
+    class Retry retry;
 ```
 
 1. **Configure the quiz.** Setup collects the topic, optional subject and grade, question type, difficulty, count, exclusions and optional time limit. It checks the numeric settings, snapshots the form and requests academic validation. An invalid topic returns the learner to Setup with a reason. A new attempt gets a UUID.
@@ -87,27 +109,45 @@ flowchart TD
 4. If a creation response is lost, the client can replay the same creation. If an attempt response is lost, it reads status before claiming again. A status read can settle an expired lease. Cancellation becomes terminal immediately or after the active attempt settles. The generation lifetime also limits access before physical cleanup.
 
 ```mermaid
+---
+config:
+  sequence:
+    diagramMarginX: 18
+    actorMargin: 34
+    width: 112
+    height: 46
+    mirrorActors: false
+    messageMargin: 28
+    actorFontSize: 16
+    messageFontSize: 15
+---
 sequenceDiagram
     accTitle: AI generation and recovery after response loss
-    accDescr: The browser creates a generation and requests an attempt. The server claims it in Firestore, calls OpenRouter, and persists the result or retry decision. The browser reads status when it misses the attempt response.
+    accDescr: The browser creates a generation and requests an attempt. The server claims it in Firestore, calls OpenRouter, and persists the result or retry decision. The browser checks the ledger through the API after a lost response.
+
     participant Browser
     participant API as Generation API
     participant Ledger as Firestore ledger
     participant Model as OpenRouter
-    Browser->>API: Create with a stable generation ID
-    API->>Ledger: Create or replay the generation
-    API-->>Browser: Generation status
-    Browser->>API: Request an attempt
-    API->>Ledger: Claim attempt and reserve quota
-    API->>Model: Make one provider request
-    Model-->>API: Output or failure
-    API->>Ledger: Finalize with the matching lease
-    alt Attempt response arrives
-        API-->>Browser: Result or next status
-    else Browser misses the attempt response
-        Browser->>API: Read generation status
-        API->>Ledger: Read status and settle an expired lease if needed
-        API-->>Browser: Result or next status
+
+    rect rgba(59, 130, 246, 0.10)
+        Browser->>API: Create with a stable ID
+        API->>Ledger: Create or replay
+        API-->>Browser: Generation status
+    end
+    rect rgba(139, 92, 246, 0.12)
+        Browser->>API: Request an attempt
+        API->>Ledger: Claim and reserve quota
+        API->>Model: Call one model
+        Model-->>API: Output or failure
+        API->>Ledger: Finalize with matching lease
+    end
+    alt Response arrives
+        API-->>Browser: Result or retry status
+    else Response is lost
+        Browser->>API: Read status
+        API->>Ledger: Read or settle expired lease
+        API-->>Browser: Current status or result
     end
 ```
 

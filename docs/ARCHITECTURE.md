@@ -5,34 +5,41 @@ Shark Empti is a Next.js App Router application with Firebase for identity and p
 ## 🗺️ System overview
 
 ```mermaid
-flowchart LR
+---
+config:
+  look: classic
+  flowchart:
+    nodeSpacing: 30
+    rankSpacing: 42
+    curve: monotoneY
+---
+flowchart TD
     accTitle: Shark Empti runtime dependencies
-    accDescr: The browser uses Next.js pages and APIs, Firebase Auth, and Firestore rules. Server routes use Firebase Admin and OpenRouter. QStash delivers work to the account worker, which uses Firestore and private B2 storage.
-    Browser["Browser<br/>React learner and public UI"]
-    subgraph App["Next.js application"]
-        Pages["Proxy and App Router pages"]
-        API["Application API routes"]
-        Worker["Internal account worker"]
-    end
-    Auth["Firebase Auth and Google sign-in"]
-    Store["Cloud Firestore"]
-    Model["OpenRouter"]
-    Queue["QStash"]
-    Storage["Private Backblaze B2"]
+    accDescr: The browser uses Next.js, Firebase Auth and Firestore. Next.js uses Firebase Admin and OpenRouter. QStash delivers account work to the Next.js worker, which uses Firebase and private B2 storage.
 
-    Browser -->|HTML and navigation| Pages
-    Browser -->|Same-origin requests| API
-    Browser -->|Sign-in and ID tokens| Auth
-    Browser -->|SDK reads and bounded writes under Rules| Store
-    API -->|Firebase Admin identity checks| Auth
-    API -->|Firebase Admin reads and transactions| Store
-    API -->|AI attempt| Model
-    API -->|Enqueue account jobs| Queue
-    Queue -->|Signed delivery or schedule| Worker
-    Worker -->|Job state and data batches| Store
-    Worker -->|Identity inventory and deletion| Auth
-    Worker -->|Encrypted parts and cleanup| Storage
-    API -->|Authorized export download| Storage
+    Browser("Browser<br/>React UI")
+    App("Next.js<br/>Pages, APIs and worker")
+    Firebase("Firebase<br/>Auth and Firestore")
+    Model("OpenRouter")
+    Queue("QStash")
+    Storage("Private Backblaze B2")
+
+    Browser -->|Pages and API calls| App
+    Browser -->|Auth and SDK under Rules| Firebase
+    App -->|Firebase Admin| Firebase
+    App -->|AI attempts| Model
+    App -->|Enqueue jobs| Queue
+    Queue -.->|Signed delivery| App
+    App -->|Encrypted artifacts| Storage
+
+    classDef client fill:#dbeafe,stroke:#3b82f6,color:#172554,stroke-width:2px;
+    classDef server fill:#ede9fe,stroke:#8b5cf6,color:#2e1065,stroke-width:2px;
+    classDef data fill:#ccfbf1,stroke:#0d9488,color:#134e4a,stroke-width:2px;
+    classDef external fill:#fef3c7,stroke:#d97706,color:#451a03,stroke-width:2px;
+    class Browser client;
+    class App server;
+    class Firebase,Storage data;
+    class Model,Queue external;
 ```
 
 The root layout renders the initial theme and language from a preference cookie. The page proxy attaches the resource policy and passes the response nonce to the renderer. The route provider loads Firebase on application routes. Public information pages can render independently of Firebase. Dashboard, Playground, math rendering and Focus Shield load their feature code when needed. Focus Shield uses camera permission and bundled TensorFlow assets for inference in the browser.
