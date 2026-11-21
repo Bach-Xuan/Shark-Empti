@@ -27,7 +27,7 @@ When a newly issued receipt is held by the current controls and Auth is rejected
 
 ## 🔌 API and state contract
 
-The [account flow](FLOW.md#account-data-workers-and-recovery) traces the owner request through dispatch, processing, status and recovery.
+The [architecture guide](ARCHITECTURE.md#recovery-boundaries) places account jobs in the application's recovery model. The [account flow](FLOW.md#account-data-workers-and-recovery) traces the owner request through dispatch, processing, status and recovery.
 
 | Endpoint | Authorization and behavior |
 |---|---|
@@ -37,6 +37,19 @@ The [account flow](FLOW.md#account-data-workers-and-recovery) traces the owner r
 | `POST /api/internal/jobs` | QStash signature over the raw body and exact destination, current/next signing keys and matching environment. |
 
 States: `queued`, `running`, `waiting_quota`, `ready`, `completed`, `failed`. Per-job/global leases fence checkpoints; duplicate deliveries cannot claim an active lease or repeat a terminal job. Cursors and stable content-addressed parts recover lost upload responses. Each invocation processes at most two batches with a 20-second target. Closing the tab only stops polling. Old `_accountRequests` remain manual-review records; the legacy learning export is not a complete account export.
+
+```mermaid
+flowchart LR
+    accTitle: Account job delivery and recovery
+    accDescr: Account requests create durable jobs in Firestore. A signed QStash delivery starts bounded work. The worker checkpoints progress and the maintenance schedule revisits due work. Owners and deletion receipts read status through the API.
+    Request["Reauthenticated account request"] --> State["Firestore job and cursor"]
+    Request --> Queue["QStash delivery"]
+    Sweep["Signed maintenance schedule"] -->|Revisit due work| Queue
+    Queue -->|Verify signature and claim lease| Work["Worker processes bounded batches"]
+    Work -->|Checkpoint or record outcome| State
+    Work -->|Enqueue more work when needed| Queue
+    State --> Status["Owner or deletion receipt status"]
+```
 
 Authenticated creation/list/status/download calls consume account traffic admission before body or private resource work, including invalid, missing and replayed requests. Owner read controls remain available before consent and under deletion/maintenance barriers; creation retains recent-auth and backup protection. Receipt-only status checks the 43-character base64url HMAC format before database access and uses a separate global token bucket without storing credential identifiers or depending on an Auth user. Its capacity/refill matches the global account-traffic policy; the buckets are distinct. Admission and Auth work still consume resources, so these provisional limits are not an edge abuse-control or spending guarantee. See [traffic contracts](TECHNICAL_DOCUMENTATION.md#forum-moderation-and-account-controls).
 

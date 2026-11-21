@@ -2,7 +2,7 @@
 
 This guide follows a learner, moderator or operator from an entry point to the resulting screen, stored record or recovery action. The same Quiz interface serves two different journeys. A personal quiz writes learning history. An Arena attempt sends answers to the server for scoring and may update a public ranking.
 
-For field definitions, collection paths and component ownership, see the [backend data map](backend.json) and [technical documentation](TECHNICAL_DOCUMENTATION.md). The [interface design guide](DESIGN.md) describes how these flows appear to learners.
+For field definitions, collection paths and component ownership, see the [backend data map](backend.json) and [technical documentation](TECHNICAL_DOCUMENTATION.md). The [system architecture](ARCHITECTURE.md) maps the components behind these flows. The [interface design guide](DESIGN.md) describes how these flows appear to learners.
 
 ## 🔑 Entry, identity and consent
 
@@ -20,6 +20,8 @@ Language and theme start with the preferences cookie and synchronize between tab
 
 ```mermaid
 flowchart TD
+    accTitle: Personal quiz and save recovery
+    accDescr: The learner configures a quiz, completes it, and saves the attempt. If the save fails or its outcome is uncertain, the learner retries using the same record before reviewing or practising again.
     Setup[Choose topic and settings] --> Validate[Validate academic topic]
     Validate -->|Accepted| Questions[Generate questions]
     Validate -->|Revise| Setup
@@ -83,6 +85,31 @@ flowchart TD
 2. The attempt route claims the next attempt and reserves user/global quota in Firestore. It calls one OpenRouter model outside the transaction. Server configuration selects model priority. The adapter bounds the response body and validates the operation-specific output.
 3. Finalization uses the matching lease to release concurrency and persist a result, retry decision or terminal error. A retryable outcome may advance to another model. The protocol allows up to three attempts.
 4. If a creation response is lost, the client can replay the same creation. If an attempt response is lost, it reads status before claiming again. A status read can settle an expired lease. Cancellation becomes terminal immediately or after the active attempt settles. The generation lifetime also limits access before physical cleanup.
+
+```mermaid
+sequenceDiagram
+    accTitle: AI generation and recovery after response loss
+    accDescr: The browser creates a generation and requests an attempt. The server claims it in Firestore, calls OpenRouter, and persists the result or retry decision. The browser reads status when it misses the attempt response.
+    participant Browser
+    participant API as Generation API
+    participant Ledger as Firestore ledger
+    participant Model as OpenRouter
+    Browser->>API: Create with a stable generation ID
+    API->>Ledger: Create or replay the generation
+    API-->>Browser: Generation status
+    Browser->>API: Request an attempt
+    API->>Ledger: Claim attempt and reserve quota
+    API->>Model: Make one provider request
+    Model-->>API: Output or failure
+    API->>Ledger: Finalize with the matching lease
+    alt Attempt response arrives
+        API-->>Browser: Result or next status
+    else Browser misses the attempt response
+        Browser->>API: Read generation status
+        API->>Ledger: Read status and settle an expired lease if needed
+        API-->>Browser: Result or next status
+    end
+```
 
 Production generation creation requires `AI_GENERATION_PROTOCOL_ENABLED=true`. The browser allows 30 seconds per request within a 120-second operation window. Each provider call has a 20-second deadline, and its Firestore lease lasts 35 seconds. These different clocks allow a client that missed an HTTP response to retrieve the server's decision.
 

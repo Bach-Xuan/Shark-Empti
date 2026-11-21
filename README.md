@@ -56,6 +56,7 @@ Install browser engines with `npx --no-install playwright install chromium webki
 
 ## 📚 Documentation
 
+- [System architecture](docs/ARCHITECTURE.md) maps the runtime components, data boundaries and recovery model.
 - [Application and operational flows](docs/FLOW.md) follows learner, moderator and operator journeys through completion and recovery.
 - [Configuration](docs/CONFIGURATION.md): environment, Firebase, OpenRouter, timestamp migration, deployment and troubleshooting.
 - [Interface design](docs/DESIGN.md) covers navigation, interaction states, accessibility, responsive layout and print.

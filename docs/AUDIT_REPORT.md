@@ -2,7 +2,7 @@
 
 This register covers **107 findings**. **106 are resolved and 1 remains open.**
 
-See the [application flow guide](FLOW.md), [technical documentation](TECHNICAL_DOCUMENTATION.md), [validation guide](VALIDATION.md), [account operations](ACCOUNT_OPERATIONS.md) and [interface design guide](DESIGN.md) for implementation and verification guidance.
+See the [system architecture](ARCHITECTURE.md), the [application flow guide](FLOW.md), [technical documentation](TECHNICAL_DOCUMENTATION.md), [validation guide](VALIDATION.md), [account operations](ACCOUNT_OPERATIONS.md) and [interface design guide](DESIGN.md) for implementation and verification guidance.
 
 ## 🧭 Finding-Code Legend
 

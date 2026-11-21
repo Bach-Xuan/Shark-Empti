@@ -2,7 +2,7 @@
 
 Shark Empti helps a learner choose an activity, finish it, understand their answers and return to practice. A learner can move between Vietnamese and English, change theme or recover an interrupted session while keeping their work. This guide describes how those behaviors appear in the interface.
 
-The [application flow guide](FLOW.md) connects UI states to their storage and recovery behavior. Both notes editors retain drafts on a save conflict and offer reload or explicit overwrite. Closing Quick Notes discards unsaved edits. Notes editing waits for a confirmed server read, Playground freezes its generation settings during validation, and Arena offers same-tab submission recovery.
+The [system architecture](ARCHITECTURE.md#data-boundaries) describes which data is handled in the browser and which actions cross into the backend. The [application flow guide](FLOW.md) connects UI states to their storage and recovery behavior. Both notes editors retain drafts on a save conflict and offer reload or explicit overwrite. Closing Quick Notes discards unsaved edits. Notes editing waits for a confirmed server read, Playground freezes its generation settings during validation, and Arena offers same-tab submission recovery.
 
 ## 🧭 Screens and navigation
 

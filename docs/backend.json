@@ -3,6 +3,7 @@
   "x-version": "v2.2.0",
   "x-authority": {
     "description": "Actual contracts: Firestore Rules, AI/API Zod schemas, history/profile readers and server-api.ts. Updating this file changes no validation, migration or access policy.",
+    "architecture": "ARCHITECTURE.md",
     "documentation": "TECHNICAL_DOCUMENTATION.md",
     "flows": "FLOW.md",
     "accountOperations": "ACCOUNT_OPERATIONS.md",

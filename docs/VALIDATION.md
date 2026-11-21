@@ -1,6 +1,6 @@
 # 🧪 Validation and Test Guide · Shark Empti **v2.2.0**
 
-This guide explains how to run the repository's built-in checks and interpret their results. [Configuration](CONFIGURATION.md) covers setup, [technical documentation](TECHNICAL_DOCUMENTATION.md) describes behavior, [account operations](ACCOUNT_OPERATIONS.md) covers operational drills, and the [audit register](AUDIT_REPORT.md) records outstanding concerns. A local pass applies to the tested source, configuration and environment; it does not establish deployed, live-provider or physical-device behavior. The [interface design guide](DESIGN.md) covers learner-facing states and interactions.
+This guide explains how to run the repository's built-in checks and interpret their results. The [architecture overview](ARCHITECTURE.md#environments-and-evidence) identifies the services and environments these checks cover. [Configuration](CONFIGURATION.md) covers setup, [technical documentation](TECHNICAL_DOCUMENTATION.md) describes behavior, [account operations](ACCOUNT_OPERATIONS.md) covers operational drills, and the [audit register](AUDIT_REPORT.md) records outstanding concerns. A local pass applies to the tested source, configuration and environment; it does not establish deployed, live-provider or physical-device behavior. The [interface design guide](DESIGN.md) covers learner-facing states and interactions.
 
 ## 🔄 Flow regression coverage
 

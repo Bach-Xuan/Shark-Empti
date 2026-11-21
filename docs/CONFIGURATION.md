@@ -1,6 +1,6 @@
 # ⚙️ Configuration, Dependencies and Troubleshooting · Shark Empti **v2.2.0**
 
-This guide configures the application and its release environment. See [README](../README.md), [architecture](TECHNICAL_DOCUMENTATION.md), [validation](VALIDATION.md), [account operations](ACCOUNT_OPERATIONS.md), the [data map](backend.json) and [audit register](AUDIT_REPORT.md). Runtime behavior is determined by source, Rules and configuration, not this guide alone. The [interface design guide](DESIGN.md) covers learner-facing states and interactions.
+This guide configures the application and its release environment. See [README](../README.md), [system architecture](ARCHITECTURE.md), [technical documentation](TECHNICAL_DOCUMENTATION.md), [validation](VALIDATION.md), [account operations](ACCOUNT_OPERATIONS.md), the [data map](backend.json) and [audit register](AUDIT_REPORT.md). Runtime behavior is determined by source, Rules and configuration, not this guide alone. The [interface design guide](DESIGN.md) covers learner-facing states and interactions.
 
 The interface, package release tag and backend data map use **v2.2.0**. The npm manifest and lockfile record the numeric version `2.2.0`. [npm package version](https://docs.npmjs.com/cli/v11/configuring-npm/package-json#version)
 
