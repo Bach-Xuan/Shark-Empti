@@ -69,11 +69,13 @@ Drain in-flight background workers and deploy the consent API, updated client an
 
 Do not infer a missing private key or assume local credentials point to a staging project. If a key is exposed, revoke/rotate it and update the deployment; `.gitignore` alone does not remove committed history.
 
-## Notes revision rollout
+## 📝 Notes revision rollout
 
 Coordinate deployment of the revision-aware Notes editors and Firestore Rules. The earlier Rules reject writes containing a revision, and the updated Rules reject older clients that omit the increment. Ask users with an older open tab to copy unsaved text before refreshing. Existing notes acquire their first revision on the next successful edit.
 
-## Learning write validation rollout
+<a id="learning-write-validation-rollout"></a>
+
+## ✅ Learning write validation rollout
 
 Deploy the learning PUT/PATCH API and updated Quiz/Flashcard/Practice clients together before applying the matching restrictive Rules. Older tabs that still write complex records through the SDK require refresh; do not temporarily reopen arbitrary private writes. Verify authenticated creation, response-loss replay, feedback recovery, notes/profile edits, activity leaf merging and owner legacy read/delete access. The new API uses document lookups and requires no additional composite index. This is a coordinated client/server/Rules rollout, not a remote data migration.
 
@@ -81,7 +83,9 @@ Bounds in `src/lib/data-limits.ts`, producer schemas, persistence schemas, UI in
 
 The legacy Arena migration checks the current author’s deletion lock and the active backup barrier in the same transaction that creates the private key and recovery copy. Inventory remains read-only. See the [operator workflows](FLOW.md#operator-and-development-workflows).
 
-## Timestamp migration
+<a id="timestamp-migration"></a>
+
+## 🕒 Timestamp migration
 
 New learning APIs persist Firestore Timestamp values; direct SDK creation/update of history, Flashcards and Practice is denied. History accepts bounded epoch milliseconds at the API boundary, preserving the completion instant across retries, while Flashcard/Practice timestamps are server-derived. Deploy the single-query history reader only after every supported collection passes the timestamp inventory. Firestore sorts mixed field types in separate groups. Keep the currently deployed reader available until conversion finishes and privileged legacy writers are stopped.
 
@@ -115,7 +119,7 @@ npm run dev
 Open [localhost:9002](http://localhost:9002). Client and Admin Firebase project IDs must match. Camera access requires a secure context and explicit permission. A missing provider key disables AI, not the static public pages.
 
 <a id="local-troubleshooting"></a>
-### Local troubleshooting
+### 🔧 Local troubleshooting
 
 | Symptom | Check |
 |---|---|
@@ -134,7 +138,9 @@ Community, moderator and account APIs have separate pre-query traffic admission 
 
 Account polling recovery is defined in `src/lib/account-polling.ts`: four transient retries, distinct per-request deadlines and throttled online/visible-focus recovery. No additional flag enables automatic mutations. Forum cleanup uses the configured default Firestore database and existing Admin query/delete permissions; parent-scoped name-only descendant queries need no new application index. Every cleanup batch and tombstone finalization honor write guards transactionally. Verify runtime duration, Admin REST authorization and interruption/resumption in the intended staging project before deployed acceptance.
 
-## CI action governance
+<a id="ci-action-governance"></a>
+
+## ⚙️ CI action governance
 
 Pushes and pull requests run unit tests and the optimized desktop Chromium project. Pull requests also select Emulator integration and restore checks from the changed paths. See the [trigger matrix](VALIDATION.md#prerequisites-and-isolation). Manually dispatch the full workflow on the release candidate before promotion. A `v*` tag also runs both full browser matrices, Rules/integration, the native Emulator restore drill, coverage and cross-engine print checks. Both tiers build the application and check bundle budgets, smoke tests and dependency policy.
 
@@ -160,7 +166,9 @@ For an action update, resolve the exact release tag in its official repository, 
 
 There is no `vercel.json`; dashboard settings govern hosting. Never assume Preview uses a separate Firebase database merely because the website URL differs. Local Emulator success does not verify remote Rules or IAM.
 
-### Browser security policy
+<a id="browser-security-policy"></a>
+
+### 🛡️ Browser security policy
 
 The application sets a same-origin camera policy, disables microphone and geolocation access, and sets `nosniff` and a strict-origin cross-site referrer policy.
 

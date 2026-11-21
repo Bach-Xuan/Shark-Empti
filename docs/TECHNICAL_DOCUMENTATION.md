@@ -80,7 +80,7 @@ Ordinary business writes reject any existing account-lock document and active ma
 
 New idempotency receipts use `fingerprintVersion: 2` and canonical JSON object ordering, including nested objects; array order remains significant. Retained receipts without that version preserve their original insertion-order comparison because their original payload is not stored and cannot be safely reconstructed. No migration discards receipts or weakens changed-payload conflicts. Receipt identity, business effects and budget reservations remain transactional.
 
-### Arena
+### 🏆 Arena
 
 `POST /api/arena` validates questions and creates public V2 metadata without questions plus a private answer bank. `POST /api/arena/{examId}/start` accepts a UUID and commits a private session; retries retain the first eligible server clock. `POST /api/arena/{examId}/submit` accepts at most 50 answers and the same UUID, grades server-side, and atomically commits the session, compact receipt, score and eligible reward. Same-ID replays recover the result; changed answers conflict.
 
@@ -90,7 +90,9 @@ Start accepts at most 4 KB and returns prompts without private keys/explanations
 
 The client preserves the exact serialized submission and UUID for a transport retry. A deliberate retake resets that snapshot and receives a new UUID. Score review appears after server acknowledgement; Guru assistance is disabled during the attempt and becomes available after completion. AI feedback is outside timed answering.
 
-### Forum, moderation and account controls
+<a id="forum-moderation-and-account-controls"></a>
+
+### 👥 Forum, moderation and account controls
 
 Traffic admission is separate from transactional business quota. Forum mutations, reports and Arena creation/start/submit use `community-traffic` after shared identity/account checks and before parsing or resource lookups. Moderator admission precedes the additional current-role lookup and queue/body work. Invalid, missing-resource, forbidden and replayed requests still consume admitted traffic; a receipt replay does not reserve another business-write allowance.
 

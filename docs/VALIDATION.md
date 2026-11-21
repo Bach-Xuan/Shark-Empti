@@ -2,7 +2,7 @@
 
 This guide explains how to run the repository's built-in checks and interpret their results. [Configuration](CONFIGURATION.md) covers setup, [technical documentation](TECHNICAL_DOCUMENTATION.md) describes behavior, [account operations](ACCOUNT_OPERATIONS.md) covers operational drills, and the [audit register](AUDIT_REPORT.md) records outstanding concerns. A local pass applies to the tested source, configuration and environment; it does not establish deployed, live-provider or physical-device behavior. The [interface design guide](DESIGN.md) covers learner-facing states and interactions.
 
-## Flow regression coverage
+## 🔄 Flow regression coverage
 
 The following checks exercise the [application flows](FLOW.md) recorded in the audit.
 
@@ -40,7 +40,9 @@ The local D45–D55 verification passed 524 unit/component tests, 189 Rules/inte
 
 Firebase Emulator tests exercise local transactions. Hosted provider delivery, deployed Rules and indexes, and the staging recovery time require environment-specific verification.
 
-## Prerequisites and isolation
+<a id="prerequisites-and-isolation"></a>
+
+## 🧰 Prerequisites and isolation
 
 Run the integration and browser suites in separate Emulator invocations, as the npm scripts do. Integration tests deliberately exhaust shared request budgets. Reusing that database for a browser run can make consent return HTTP 429 before the flow under test starts.
 
@@ -75,7 +77,7 @@ if ($null -eq $previousJavaOptions) { Remove-Item Env:JAVA_TOOL_OPTIONS } else {
 
 This forces the JDK socket fallback for that shell only. Restore any pre-existing `JAVA_TOOL_OPTIONS` after testing. See [local troubleshooting](CONFIGURATION.md#local-troubleshooting).
 
-## Static, unit and integration checks
+## ✅ Static, unit and integration checks
 
 ```powershell
 npm run lint
@@ -108,7 +110,9 @@ D41 checks cover public serializer whitelists, stored timestamps, ranking eligib
 
 The projection inventory must precede cutover. Regression fixtures include unrecognized documents, missing source records, hidden/tombstoned posts and public ranking IDs equal to owner UIDs. A blocked inventory preserves those records and stops before converting business data. Because Rules trust server-controlled version markers, the inventory and restricted privileged-writer access are operational prerequisites, not proof about a live dataset.
 
-## Optimized build and browser matrix
+<a id="optimized-build-and-browser-matrix"></a>
+
+## 🖥️ Optimized build and browser matrix
 
 On the local optimized demo, Chromium, Firefox and WebKit reloaded About with a fresh nonce and a no-store response, retained the selected language and accepted another language change after hydration. For hosted verification, request the published page twice at the same URL, compare script nonces with each response policy and inspect the CDN cache result. Check versioned script URLs separately for immutable caching.
 
@@ -169,7 +173,7 @@ With `BROWSER_FLOOR_CONFIG` set, the print tests use the configured historical e
 
 Production HTTP smoke checks public HTML, metadata, response headers, API authentication and the six route budgets for compressed scripts. It checks the scripts referenced by the login and registration HTML for the Firestore transport. Optimized browser tests also inspect the same-origin scripts requested during guest interaction. Both use a fingerprinted local demo build.
 
-## Performance and dependency checks
+## 📊 Performance and dependency checks
 
 | Command | Purpose and interpretation |
 |---|---|
@@ -182,7 +186,7 @@ Production HTTP smoke checks public HTML, metadata, response headers, API authen
 
 For comparisons, keep Node, dependency graph, fixture data, viewport, cache state and sampling method consistent. Report sample count, font transfer and regressions. Small-sample p95 can be the largest sample; navigation load is not LCP, and CDP node counts alone do not prove a memory leak. Refresh dependency data before making current advisory claims.
 
-### Authentication, history, Forum and camera measurements
+### ⏱️ Authentication, history, Forum and camera measurements
 
 Optimized demo builds on Windows used Chromium 151, local Auth and Firestore Emulators, the same lockfile and five fresh browser contexts per build. The baseline at `ddd489e` used 120 sessions split evenly between original ISO strings and native timestamps. The updated fixture represents those 120 sessions after conversion. The builds were measured in separate runs. Differences in small-sample wall-clock times also reflect local scheduling.
 
@@ -221,7 +225,9 @@ The new scheduler eliminated 95.9% of polling callbacks. Both repeat runs retain
 
 The installed dependency graph passed `npm ls --all` on Node 24.22.3. TypeScript 6.0.3 falls within the installed TypeScript ESLint parser range of `>=4.8.4 <6.1.0`. The optimized HTTP smoke identifies the TensorFlow and Recharts chunks by content and excludes them from the initial scripts for all six measured routes. Dependency compatibility checks exercise the Firestore/gRPC API, CSV parsing and Firebase CLI's ESM streaming JSON adapter. The Firebase CLI parent upgrade also retired the obsolete FTP check and override. The full lockfile inventory returned zero active advisories across 1,412 package instances after the picomatch advisory was withdrawn. The four locked picomatch installations use 2.3.2 or 4.0.7. The release check still blocks active high or critical findings. Refresh the inventory for each release. [Advisory withdrawal](https://github.com/advisories/GHSA-fc5q-39xc-vjpf) · [Dependency policy](../config/dependency-audit-policy.json)
 
-## Live and operational verification
+<a id="live-and-operational-verification"></a>
+
+## 🔍 Live and operational verification
 
 The configured Firestore project's learning-date inventory contained 58 convertible records. The backfill converted all 58, and an independent scan found 58 native timestamps, zero legacy values and zero invalid dates. Each stored instant matched its original value in the encrypted, field-only recovery snapshot. Other projects require their own inventory.
 
@@ -231,6 +237,8 @@ Account export/deletion, signed queue delivery, expiry, backup and isolated rest
 
 For educational evaluation, sample Vietnamese and English items by subject, difficulty and answer type. Have two reviewers independently mark factual correctness, answerability and agreement between feedback and the submitted work, then reconcile disagreements. Record the sample sizes, model IDs, failure categories and uncertainty before changing score labels. For Focus Shield, use consented, separately labelled sessions across lighting and device conditions. Split evaluation by participant, report missing predictions and compare false-positive and false-negative rates per condition. Product owners must agree on acceptable error rates before interpreting results as calibrated.
 
-## Results and cleanup
+<a id="results-and-cleanup"></a>
+
+## 🧹 Results and cleanup
 
 Record command, source/build fingerprint, environment, test counts, skips, failure/retry details and relevant limitations in the appropriate official release record. Exclude credentials, private data and raw provider responses. Follow [maintenance and generated artifacts](CONFIGURATION.md#maintenance-and-generated-artifacts): preview cleanup with `-- --dry-run`, retain useful evidence before removal, and remove temporary builds, results, coverage, reports, traces, screenshots and logs after review. Keep official tests, licenses, installed runtimes and credentials. Never follow linked directories when cleaning.

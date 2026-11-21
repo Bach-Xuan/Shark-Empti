@@ -1,10 +1,10 @@
-# Application and operational flows · Shark Empti **v2.2.0**
+# 🗺️ Application and operational flows · Shark Empti **v2.2.0**
 
 This guide follows a learner, moderator or operator from an entry point to the resulting screen, stored record or recovery action. The same Quiz interface serves two different journeys. A personal quiz writes learning history. An Arena attempt sends answers to the server for scoring and may update a public ranking.
 
-For field definitions, collection paths and component ownership, see the [backend data map](backend.json) and [technical documentation](TECHNICAL_DOCUMENTATION.md).
+For field definitions, collection paths and component ownership, see the [backend data map](backend.json) and [technical documentation](TECHNICAL_DOCUMENTATION.md). The [interface design guide](DESIGN.md) describes how these flows appear to learners.
 
-## Entry, identity and consent
+## 🔑 Entry, identity and consent
 
 | Entry point | What happens | Next step or recovery |
 |---|---|---|
@@ -16,7 +16,7 @@ For field definitions, collection paths and component ownership, see the [backen
 
 Language and theme start with the preferences cookie and synchronize between tabs. Language changes affect labels and available bilingual feedback. Learner-authored text stays in its original language. [Route providers](../src/components/route-providers.tsx) · [Auth and bootstrap](../src/firebase/auth-provider.tsx) · [Consent UI](../src/components/service-consent.tsx) · [Preferences](../src/components/app-preferences.tsx)
 
-## Personal learning
+## 📚 Personal learning
 
 ```mermaid
 flowchart TD
@@ -55,7 +55,7 @@ flowchart TD
 
 [History reader](../src/hooks/use-history.ts) · [Dashboard](../src/components/dashboard-view.tsx) · [Playground](../src/components/playground-view.tsx) · [Chat](../src/components/ai-chatbot.tsx) · [Report selection](../src/hooks/use-profile-report.ts) · [Focus session](../src/components/focus-tracker-session.ts)
 
-### Leaving, returning and retrying
+### 🔄 Leaving, returning and retrying
 
 | Event | Where the learner resumes |
 |---|---|
@@ -67,7 +67,7 @@ flowchart TD
 
 [Draft storage](../src/lib/draft-storage.ts) · [Draft schemas](../src/lib/learning-drafts.ts) · [Paged reads](../src/hooks/use-paged-collection.ts) · [Feature help](../src/components/feature-help.tsx) · [Error boundary](../src/components/error-boundary.tsx)
 
-## AI requests and recovery
+## 🤖 AI requests and recovery
 
 | Operation | Called from | Result consumed by the caller |
 |---|---|---|
@@ -88,7 +88,7 @@ Production generation creation requires `AI_GENERATION_PROTOCOL_ENABLED=true`. T
 
 [Operation registry](../src/ai/operation-registry.ts) · [Client recovery](../src/ai/client.ts) · [Generation store](../src/ai/generation-store.ts) · [Provider adapter](../src/ai/openrouter.ts)
 
-## Community and moderation
+## 👥 Community and moderation
 
 | Journey | Execution and outcome |
 |---|---|
@@ -102,7 +102,9 @@ Production generation creation requires `AI_GENERATION_PROTOCOL_ENABLED=true`. T
 
 [Forum API](../src/app/api/forum) · [Forum cleanup](../src/lib/forum-deletion.ts) · [Arena API](../src/app/api/arena) · [Leaderboard order](../src/lib/arena-leaderboard.ts) · [Moderation API](../src/app/api/community/moderation/route.ts)
 
-## Account data, workers and recovery
+<a id="account-data-workers-and-recovery"></a>
+
+## 🔐 Account data, workers and recovery
 
 1. **Request.** The owner opens Account data, reviews job availability and reauthenticates with Google. Export and deletion use a request UUID. Deletion also requires explicit confirmation. The transaction records the job and, for deletion, writes the account lock and deletion journal. The UI offers a deletion receipt to save locally.
 2. **Dispatch.** The server reserves delivery credits and publishes a job ID and environment to QStash. The internal endpoint verifies the signature, destination and environment. A worker claims job and global leases, processes bounded batches and checkpoints its cursor. Quota pressure can move a job to `waiting_quota`. The signed maintenance sweep revisits due work.
@@ -115,7 +117,7 @@ The worker advances a durable job from `queued` to `running`. A partial step che
 
 [Account controls](../src/components/account-data-controls.tsx) · [Receipt](../src/components/account-receipt.tsx) · [Polling](../src/lib/account-polling.ts) · [Job store](../src/lib/jobs/store.ts) · [Account worker](../src/lib/jobs/account-worker.ts)
 
-## HTTP route index
+## 🔗 HTTP route index
 
 Paths below are relative to `/api`. Browser reads of public projections and owner learning data also use the Firebase client directly under [Firestore Rules](../firestore.rules).
 
@@ -140,7 +142,9 @@ Paths below are relative to `/api`. Browser reads of public projections and owne
 | `/account/jobs/{id}` | GET reads owner status, minimal receipt status or an authorized export part. |
 | `/internal/jobs` | POST accepts a signed worker delivery or maintenance tick. |
 
-## Operator and development workflows
+<a id="operator-and-development-workflows"></a>
+
+## 🛠️ Operator and development workflows
 
 | Workflow | Trigger, work and completion |
 |---|---|

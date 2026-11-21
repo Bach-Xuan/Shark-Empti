@@ -2,7 +2,7 @@
 
 Export/deletion and backup require `ACCOUNT_JOBS_ENABLED=true` and valid server settings; local tests do not establish operational readiness. See [configuration](CONFIGURATION.md) and [validation](VALIDATION.md). The [interface design guide](DESIGN.md) covers learner-facing states and interactions.
 
-## Provision separate environments
+## 🧰 Provision separate environments
 
 1. Create a separate Firebase Spark staging project with its own Auth, Firestore, Web config and service account; use Google sign-in, restrict domains and review access. Never point Emulator fixtures at real data.
 2. Create an [Upstash account](https://console.upstash.com/), verify email, enable available MFA and select QStash Free. Store its token and current/next signing keys as server secrets.
@@ -15,7 +15,7 @@ Export/deletion and backup require `ACCOUNT_JOBS_ENABLED=true` and valid server 
 9. Create one hourly QStash POST per environment to `https://<matching-origin>/api/internal/jobs`, body `{"jobId":"maintenance","environment":"staging"}` (or production), with three retries. Verify signatures and reject altered bodies, wrong destination/environment and expired signatures.
 10. Enable staging jobs, complete [acceptance checks](#acceptance-gates) and prepare a production canary; an enabled flag does not prove readiness.
 
-## Free-tier budget
+## 📊 Free-tier budget
 
 [QStash Free](https://upstash.com/pricing/qstash) publishes 1,000 deliveries/day including retries. Four credits per publication cover the initial delivery plus three retries: daily allocations are 500 production, 100 staging and 192 for two hourly schedules, leaving 208 for overhead. Limits are soft, both environments share quota, and delayed retries may cross days; verify recovery bursts and reduce allocations if needed. It is not a hard cap. Queue messages contain only job ID/environment; Firestore checkpoints survive queue failure, and quota rejection becomes `waiting_quota` without upgrading the plan.
 
@@ -25,7 +25,7 @@ Account controls and the public receipt poll active jobs every 12 seconds and qu
 
 When a newly issued receipt is held by the current controls and Auth is rejected, the UI can continue with minimal receipt-only deletion status and disable mutations. The independent public receipt page uses the saved/file credential without initializing a signed-in account. Receipt IDs are checked against returned status, and replacing a file cancels old status work and rejects slower prior file selections. An unavailable/expired receipt is distinguished from a transport failure; a transport failure does not set a job's business status to failed. Receipt identifiers remain out of URLs. These local recovery contracts do not establish provider delivery or production recovery targets.
 
-## API and state contract
+## 🔌 API and state contract
 
 The [account flow](FLOW.md#account-data-workers-and-recovery) traces the owner request through dispatch, processing, status and recovery.
 
@@ -40,7 +40,7 @@ States: `queued`, `running`, `waiting_quota`, `ready`, `completed`, `failed`. Pe
 
 Authenticated creation/list/status/download calls consume account traffic admission before body or private resource work, including invalid, missing and replayed requests. Owner read controls remain available before consent and under deletion/maintenance barriers; creation retains recent-auth and backup protection. Receipt-only status checks the 43-character base64url HMAC format before database access and uses a separate global token bucket without storing credential identifiers or depending on an Auth user. Its capacity/refill matches the global account-traffic policy; the buckets are distinct. Admission and Auth work still consume resources, so these provisional limits are not an edge abuse-control or spending guarantee. See [traffic contracts](TECHNICAL_DOCUMENTATION.md#forum-moderation-and-account-controls).
 
-## Export and deletion inventory
+## 🗂️ Export and deletion inventory
 
 Exports use paged `showMissing` traversal. Deletion queries descendant document names, including those under missing parents. Report exports omit other members’ identifiers. Moderators receive their decision metadata separately from private reporter submissions. Deletion anonymizes `decidedBy` and retains only the queue control needed to reverse an active hide when its reporter is erased. `src/lib/jobs/catalog.ts` inventories attributable Auth identity/claims, profile/private learning, Forum/Arena, answer keys/backups, rankings, AI/sessions, reports/archives, requests, attributable receipts and budgets. Exclude credentials, secrets and others’ private data. Export is paged live reading, not an atomic snapshot. Opaque legacy receipts without `ownerUid` cannot be attributed; reconcile them and rely on bounded expiry before complete self-service acceptance.
 
@@ -58,7 +58,9 @@ Owner reaction views live in `users/{uid}/forumReactions`; private Arena pointer
 
 `npm run migrate:community -- --project=YOUR_FIREBASE_PROJECT_ID` inventories without writes. It first scans readable Forum and Arena projection paths, including orphan comments, and reports unrecognized or source-less projections; any conflict stops conversion before business data is changed. Preserve such records for operator review. Remote application additionally requires `--apply --confirm-community-privacy-migration`, explicit authorization, reviewed inventory and recovery evidence. Application holds renewable maintenance and worker fences, rechecks account locks/deletion journals, preserves conflicting unknown data and reports blocked records. Repeating a run preserves assigned public IDs and recognized reaction timestamps. A clean inventory is a prerequisite to deploying the matching API/UI, Rules and indexes together: Rules trust the version marker and the inventory alone does not prevent later privileged writes. D41 is locally resolved. Deployment acceptance still requires verification of hidden archives, older clients and deployed query behavior. No remote conversion has been performed.
 
-## Retention on Spark
+<a id="retention-on-spark"></a>
+
+## 🧾 Retention on Spark
 
 Set `RETENTION_ENABLED=true` for Firestore-only cleanup with `JOB_ENVIRONMENT`, `JOBS_BASE_URL` and QStash credentials/signing keys. It does not require B2 or enable account jobs/backups. Account jobs also enable retention. Configure the same signed hourly maintenance schedule; AI enablement alone does not schedule cleanup. Expired AI generations are denied even before physical deletion. Cleanup rechecks each expiry transactionally so renewed quota/budget records survive.
 
@@ -66,7 +68,9 @@ Native TTL, managed Firestore backup/restore and PITR require billing and are ex
 
 AI/session lifetime is 24 hours; request receipts seven days; export processing up to seven days and ready access 24 hours; backups seven days. Learning data remains until deletion. Monitor schedule delivery, backlog, stale leases, quota waiting and repeated safe errors. See [Firestore pricing](https://firebase.google.com/docs/firestore/pricing).
 
-## Backup and isolated restore
+<a id="backup-and-isolated-restore"></a>
+
+## 💾 Backup and isolated restore
 
 The scheduler reserves four internal delivery credits per dispatch, covering the first send and up to three retries. The credit transaction and the worker both check the job's processing deadline. The sweep moves overdue backups and exports into terminal cleanup and gives due deletions first access to the five dispatch slots. Unfinished deletions remain eligible after the original deadline. Provider billing is measured separately. Deploy the account-job indexes alongside the scheduler. The expiry query combines two job kinds with three pending states, yielding six of the 30 disjunctions supported in Firestore Standard edition. [Firestore query limits](https://firebase.google.com/docs/firestore/query-data/queries#limits_on_or_queries)
 
@@ -100,6 +104,8 @@ For a failure during the initial Firestore or Auth import, keep the partial targ
 
 For a stalled deletion, inspect the private job status, last successful cursor and lease expiry. Check signed delivery history, the provider quota and the worker error code. Keep the account lock in place. For queued or quota-delayed work, restore service or capacity and let the signed worker resume the same durable job after its lease and backoff expire. For a terminal failed deletion, the owner can confirm deletion again in Account data after the cause has been addressed. Fresh Google authentication and confirmation resume the job identified by the lock. The transaction checks the job, environment, journal, restore cutover, maintenance barrier and request budget. A new browser request UUID still returns the original receipt. Inconsistent records require operator reconciliation. Verify the job, owner, matching deletion lock, journal, cursor and original error against the source inventory. Private descendants are erased in bounded name-only pages, including documents under missing parents. Earlier phase-one collection checkpoints resume against the remaining descendants. Preserve the lock and receipt. Confirm the final journal entry, private-data deletion, community anonymization and Auth removal before reporting completion. Use the receipt for user-facing status. Keep identifiers and provider diagnostics out of public incident notes.
 
-## Acceptance gates
+<a id="acceptance-gates"></a>
+
+## ✅ Acceptance gates
 
 Check authentication, queue recovery, export, deletion, expiry and isolated restore with a newer deletion. Measure quotas using synthetic data. See [validation](VALIDATION.md#live-and-operational-verification) and [audit](AUDIT_REPORT.md).
