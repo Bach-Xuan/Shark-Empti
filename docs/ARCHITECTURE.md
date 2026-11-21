@@ -83,4 +83,4 @@ The local demo uses Firebase Auth and Firestore Emulators with a deterministic A
 
 Validation covers unit and component behavior, Emulator Rules and transactions, browser flows and an Emulator export/import drill. Pull requests select additional Emulator suites by changed path, and release validation runs the full matrix. Hosted HTTP headers, real identity and AI providers, and staging recovery timing have separate verification steps.
 
-[Configuration and release procedure](CONFIGURATION.md#release-procedure) · [Validation matrix](VALIDATION.md#prerequisites-and-isolation) · [Audit register](AUDIT_REPORT.md)
+[Configuration and release procedure](CONFIGURATION.md#release-procedure) · [Validation matrix](VALIDATION.md#prerequisites-and-isolation) · [Browser compatibility evidence](VALIDATION.md#optimized-build-and-browser-matrix) · [Audit register](AUDIT_REPORT.md)

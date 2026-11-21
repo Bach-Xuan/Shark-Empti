@@ -16,7 +16,7 @@ export async function ensureLearnerProfile(db: Firestore, user: User) {
     if (!validPhoto(current?.photoURL)) patch.photoURL = validPhoto(user.photoURL) ? user.photoURL : '';
     if (!current?.createdAt) patch.createdAt = serverTimestamp();
     // Email stays in owner-only Firebase Auth, never in the shared profile.
-    if (current && Object.hasOwn(current, 'email')) patch.email = deleteField();
+    if (current && Object.prototype.hasOwnProperty.call(current, 'email')) patch.email = deleteField();
     if (Object.keys(patch).length) transaction.set(ref, { ...patch, updatedAt: serverTimestamp() }, { merge: true });
   });
 }

@@ -1,4 +1,5 @@
 'use client';
+import { browserUuid } from '@/lib/browser-uuid';
 import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useUser } from '@/firebase';
@@ -60,7 +61,7 @@ export default function ModerationPage() {
     if (!user) return;
     const input = { reportId, action, reason: reason.trim() };
     const signature = JSON.stringify(input);
-    if (pending.current?.signature !== signature) pending.current = { signature, id: crypto.randomUUID() };
+    if (pending.current?.signature !== signature) pending.current = { signature, id: browserUuid() };
     const result = await mutation.run(() => communityRequest(user, '/api/community/moderation', { ...input, requestId: pending.current!.id }), failure);
     if (result.ok) { pending.current = null; setReason(''); await load(); }
   };

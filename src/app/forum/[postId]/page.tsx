@@ -1,5 +1,6 @@
 
 "use client";
+import { browserUuid } from '@/lib/browser-uuid';
 import { useLanguageState,useThemeState } from '@/components/app-preferences';
 import { PageControls } from '@/components/page-controls';
 import { UiText } from "@/components/ui-text";
@@ -147,7 +148,7 @@ export default function PostDetailPage() {
     if (postingComment.current) return;
     postingComment.current = true;
     const content = newComment;
-    if (commentRequest.current?.content !== content) commentRequest.current = { content, id: crypto.randomUUID() };
+    if (commentRequest.current?.content !== content) commentRequest.current = { content, id: browserUuid() };
 
     try {
       const token = await user.getIdToken();

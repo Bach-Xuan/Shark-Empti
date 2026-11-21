@@ -1,5 +1,6 @@
 
 "use client";
+import { browserUuid } from '@/lib/browser-uuid';
 import { LEARNING_LIMITS } from '@/lib/data-limits';
 import { messages,uiMessage } from '@/lib/i18n';
 import type { DashboardStats } from '@/lib/stats-utils';
@@ -124,7 +125,7 @@ export default function PracticeMode({ t, lang, weakPoints, historyPending, tota
         showErrorToast(result.error, lang);
         return;
       }
-      sessionId.current = crypto.randomUUID();
+      sessionId.current = browserUuid();
       setDraftSessionId(sessionId.current);
       setQuestions(result.data.questions);
       setCurrentIndex(0);
@@ -142,7 +143,7 @@ export default function PracticeMode({ t, lang, weakPoints, historyPending, tota
 
   const handleRetry = () => {
     aiRequest.cancel(); evaluationEpoch.current++; evaluating.current = false; setIsEvaluating(false); setEvaluationError(null);
-    sessionId.current = crypto.randomUUID();
+    sessionId.current = browserUuid();
     setDraftSessionId(sessionId.current);
     setCurrentIndex(0);
     setAnswers([]);
@@ -185,7 +186,7 @@ export default function PracticeMode({ t, lang, weakPoints, historyPending, tota
     const updated = [...answers, currentFeedback];
     const last = currentIndex + 1 === questions.length;
     if (last && user) {
-      const recordId = sessionId.current ??= crypto.randomUUID();
+      const recordId = sessionId.current ??= browserUuid();
       try {
         await writeLearningRecord(user, 'practice', recordId, { concept, questions, userAnswers: updated,
           score: Math.round(updated.filter(a => a.isCorrect).length / questions.length * 100) }, archiveRequest.start());

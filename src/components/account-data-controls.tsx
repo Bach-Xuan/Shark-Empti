@@ -1,4 +1,5 @@
 'use client';
+import { browserUuid } from '@/lib/browser-uuid';
 import Link from 'next/link';
 import { RECEIPT_STORAGE_KEY, deletionReceiptSchema, type DeletionReceipt } from '@/lib/account-receipt';
 import { useEffect, useRef, useState } from 'react';
@@ -36,7 +37,7 @@ export function AccountDataControls({ lang }: { lang: Language }) {
   const create = async (kind: 'export' | 'deletion') => {
     if (!user || busy || (kind === 'deletion' && !checked)) return;
     setBusy(true); setError(false);
-    const requestId = ids.current[kind] ??= crypto.randomUUID();
+    const requestId = ids.current[kind] ??= browserUuid();
     try {
       await reauthenticateWithPopup(user, new GoogleAuthProvider());
       const result = View.extend({ kind: z.literal(kind), receipt: kind === 'deletion' ? deletionReceiptSchema.shape.receipt : deletionReceiptSchema.shape.receipt.optional() })

@@ -1,4 +1,5 @@
 'use client';
+import { browserUuid } from '@/lib/browser-uuid';
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { writeLearningRecord, saveHistoryFeedback } from '@/lib/learning-client';
@@ -66,7 +67,7 @@ export function useLearningSession(user: Pick<User, 'uid' | 'getIdToken'> | null
   const start = useCallback((config: QuizConfig, questions: QuizQuestion[] | null = null) => {
     writes.cancel();
     generation.current++;
-    saveId.current = crypto.randomUUID();
+    saveId.current = browserUuid();
     pendingPayload.current = null;
     setRestoredCompletion(null);
     setDraftId(saveId.current);
@@ -86,7 +87,7 @@ export function useLearningSession(user: Pick<User, 'uid' | 'getIdToken'> | null
       ...((analysis ?? results.analysis) ? { analysis: analysis ?? results.analysis } : {}),
       schemaVersion: 2, date: Date.now(), lang,
     }));
-    const recordId = saveId.current ??= crypto.randomUUID();
+    const recordId = saveId.current ??= browserUuid();
     setDraftAvailable(writeDraft(userId, 'quiz-session', { id: recordId, completion: combined }));
     try {
       await writeLearningRecord(user, 'history', recordId, combined, writes.start());

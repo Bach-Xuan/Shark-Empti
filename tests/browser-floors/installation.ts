@@ -6,14 +6,16 @@ import { z } from 'zod';
 
 const absolutePath = z.string().refine(isAbsolute);
 const installation = z.object({ driver: absolutePath, executable: absolutePath });
-const installations = z.object({ chromium: installation, firefox: installation, webkit: installation });
-const versions = { chromium: /^100\./, firefox: /^102\./, webkit: /^15\.4(?:\.|$)/ };
+const installations = z.object({ chromium: installation, firefox: installation, webkit: installation }).partial();
+const versions = { chromium: /^96\.0\.\d+\.\d+$/, firefox: /^96\.0(?:\.\d+)?$/, webkit: /^15\.2(?:\.\d+)?$/ };
 
 // Historical binaries use a matching driver outside the application lockfile.
 export async function launchMinimumBrowser(engine: keyof typeof versions) {
   const file = process.env.BROWSER_FLOOR_CONFIG;
   if (!file) throw new Error('BROWSER_FLOOR_CONFIG must identify the historical installations.');
-  const { driver, executable } = installations.parse(JSON.parse(readFileSync(file, 'utf8')))[engine];
+  const configured = installations.parse(JSON.parse(readFileSync(file, 'utf8')))[engine];
+  if (!configured) throw new Error(`No historical installation configured for ${engine}.`);
+  const { driver, executable } = configured;
   const requireDriver = createRequire(`${process.cwd()}/package.json`);
   const type: BrowserType = requireDriver(driver)[engine];
   const browser = await type.launch({ executablePath: executable });

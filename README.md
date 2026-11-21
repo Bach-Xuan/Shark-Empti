@@ -72,4 +72,16 @@ Authenticated account-data controls at `/account/data` remain accessible without
 
 Quiz, Flashcard and Practice saves use authenticated, schema-validated APIs with stable retry identity and count/byte admission. Profile, notes and activity SDK writes have bounded Rules; owner legacy reads and explicit record deletion remain available. Client/server/Rules changes require a coordinated rollout; see [configuration](docs/CONFIGURATION.md#learning-write-validation-rollout).
 
-The interface supports Vietnamese and English; preferences persist between pages and tabs. Camera access requires HTTPS or localhost and explicit permission. The academic report loads learning history when the learner opens its selection dialog. Lists expose 50 records per page. Client-side search and statistics reflect the exposed records. Quiz history uses one Firestore Timestamp query. Complete and verify the [timestamp migration](docs/CONFIGURATION.md#timestamp-migration) before deploying this reader. The browser targets are Safari 15.4+ on macOS and iOS, Chrome 100+ on desktop and Android, and Firefox 102+ on desktop and Android. The [validation guide](docs/VALIDATION.md#optimized-build-and-browser-matrix) explains the engine and device evidence. See the [audit](docs/AUDIT_REPORT.md) before release.
+The interface supports Vietnamese and English; preferences persist between pages and tabs. Camera access requires HTTPS or localhost and explicit permission. The academic report loads learning history when the learner opens its selection dialog. Lists expose 50 records per page. Client-side search and statistics reflect the exposed records. Quiz history uses one Firestore Timestamp query. Complete and verify the [timestamp migration](docs/CONFIGURATION.md#timestamp-migration) before deploying this reader.
+
+<a id="browser-compatibility"></a>
+
+### 🌐 Browser compatibility
+
+| Browser | Desktop target | Mobile target |
+|---|---|---|
+| Chrome / Chromium | Chrome Stable 96.0.4664.110 on Windows, macOS and Linux. Chrome Extended Stable 96.0.4664.174 on Windows and macOS. | Chrome 96.0.4664.104 for Android |
+| Safari | Safari 15.2 (build 17612.3.6 on macOS 12.1) | Safari on iOS 15.2.1 and iPadOS 15.2.1 |
+| Firefox | Firefox 96.0.3 | Firefox 96.3.1 for Android |
+
+The table lists the final releases in the minimum series for each channel and platform. Later browser series are also targets. [Browser release sources and test evidence](docs/VALIDATION.md#optimized-build-and-browser-matrix) identify the builds and environments verified for Shark Empti.

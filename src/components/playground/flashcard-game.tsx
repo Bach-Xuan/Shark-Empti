@@ -1,5 +1,6 @@
 
 "use client";
+import { browserUuid } from '@/lib/browser-uuid';
 import { uiMessage } from '@/lib/i18n';
 import type { DashboardStats } from '@/lib/stats-utils';
 
@@ -107,7 +108,7 @@ export default function FlashcardGame({ t, lang, weakPoints, historyPending, tot
       setIsFlipped(false);
 
       if (user) {
-        const recordId = crypto.randomUUID();
+        const recordId = browserUuid();
         await writeLearningRecord(user, 'flashcards', recordId, {
           sourceType: initialConcept ? 'weak_point' : 'manual',
           sourceValue: topic,

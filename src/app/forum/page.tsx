@@ -1,4 +1,5 @@
 'use client';
+import { browserUuid } from '@/lib/browser-uuid';
 import Link from 'next/link';
 import { useLanguageState,useThemeState } from '@/components/app-preferences';
 import { PageControls } from '@/components/page-controls';
@@ -182,7 +183,7 @@ export default function ForumPage() {
     setIsPublishing(true);
     try {
       const signature = JSON.stringify(postData);
-      if (creationRequest.current?.signature !== signature) creationRequest.current = { signature, id: crypto.randomUUID() };
+      if (creationRequest.current?.signature !== signature) creationRequest.current = { signature, id: browserUuid() };
       const saved = await communityRequest(user, '/api/forum', { ...postData, requestId: creationRequest.current.id });
       if (!('id' in saved) || !isDocumentId(saved.id)) throw { code: 'APP-DATA-INVALID' };
       creationRequest.current = null;

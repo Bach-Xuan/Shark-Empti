@@ -1,4 +1,5 @@
 'use client';
+import { browserUuid } from '@/lib/browser-uuid';
 import { useRef, useState } from 'react';
 import { useUser } from '@/firebase';
 import { communityRequest } from '@/lib/forum-client';
@@ -21,7 +22,7 @@ export function ReportContent({ target, lang }: { target: ReportTarget; lang: 'e
     if (!user) return;
     const input = { target, reason: reason.trim() };
     const signature = JSON.stringify(input);
-    if (pending.current?.signature !== signature) pending.current = { signature, id: crypto.randomUUID() };
+    if (pending.current?.signature !== signature) pending.current = { signature, id: browserUuid() };
     const result = await mutation.run(() => communityRequest(user, '/api/community/reports', { ...input, requestId: pending.current!.id }), error => showErrorToast(getAiError(error), lang));
     if (result.ok) { pending.current = null; setSent(true); setReason(''); }
   };

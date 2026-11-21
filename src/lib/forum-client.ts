@@ -1,3 +1,4 @@
+import { browserUuid } from '@/lib/browser-uuid';
 import type { User } from 'firebase/auth';
 
 export async function communityRequest(user: Pick<User, 'getIdToken'>, path: string, body: unknown, method = 'POST', signal?: AbortSignal) {
@@ -32,7 +33,7 @@ export async function communityRequest(user: Pick<User, 'getIdToken'>, path: str
 }
 
 export async function mutateForum(user: Pick<User, 'getIdToken'>, postId: string, mutation: unknown) {
-  return communityRequest(user, `/api/forum/${encodeURIComponent(postId)}`, { requestId: crypto.randomUUID(), mutation }, 'PATCH');
+  return communityRequest(user, `/api/forum/${encodeURIComponent(postId)}`, { requestId: browserUuid(), mutation }, 'PATCH');
 }
 
 /** Repeating DELETE resumes the same server-owned deletion, including partial cascades. */

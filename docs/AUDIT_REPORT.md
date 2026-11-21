@@ -1,6 +1,6 @@
 # 📋 Consolidated Technical Audit Report · Shark Empti **v2.2.0**
 
-This register covers **107 findings**. **106 are resolved and 1 remains open.**
+This register covers **108 findings**. **106 are resolved and 2 remain open.**
 
 See the [system architecture](ARCHITECTURE.md), the [application flow guide](FLOW.md), [technical documentation](TECHNICAL_DOCUMENTATION.md), [validation guide](VALIDATION.md), [account operations](ACCOUNT_OPERATIONS.md) and [interface design guide](DESIGN.md) for implementation and verification guidance.
 
@@ -21,6 +21,7 @@ See the [system architecture](ARCHITECTURE.md), the [application flow guide](FLO
 | ID | Finding | Status | Last Updated |
 |---|---|---|---|
 | V09 | Recovery time after an interrupted Auth import and restoration to a fresh isolated target has not been measured at staging scale against the four-hour objective | Open | 19 November 2026 |
+| V10 | Native Chrome desktop releases, Safari 15.2 on Apple platforms and the Android browser targets still need exact-version checks for sign-in, learning persistence, report printing and camera handling before acceptance of the lower browser floors | Open | 21 November 2026 |
 
 ## ✅ Resolved Findings
 

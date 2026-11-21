@@ -1,4 +1,5 @@
 "use client";
+import { browserUuid } from '@/lib/browser-uuid';
 import { useLanguageState,useThemeState } from '@/components/app-preferences';
 import { showErrorToast } from '@/lib/error-toast';
 import { createAppError,type AppError } from '@/lib/app-error';
@@ -174,7 +175,7 @@ function ArenaDetailSession({ examId }: { examId: string }) {
     }
     starting.current = true;
     setIsStarting(true);
-    pendingStart.current ??= crypto.randomUUID();
+    pendingStart.current ??= browserUuid();
     const requestId = pendingStart.current;
     const controller = new AbortController();
     requestController.current = controller;

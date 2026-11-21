@@ -42,7 +42,7 @@ export function usePagedCollection<T>(source: Query<DocumentData> | null, read: 
   const unsubscribe = onSnapshot(query(source, limit(PAGE_SIZE)), snapshot => {
    clearTimeout(timer);
    if (generation !== epoch.current) return;
-   cursor.current = snapshot.docs.at(-1) ?? null;
+   cursor.current = snapshot.docs[snapshot.docs.length - 1] ?? null;
    seenIds.current = new Set(snapshot.docs.map(doc => doc.id));
    const items = decode(snapshot.docs);
    setItems(items); setInvalidRecords(snapshot.docs.length - items.length); setError(null); setHasMore(snapshot.size === PAGE_SIZE); setLoading(false);
@@ -59,7 +59,7 @@ export function usePagedCollection<T>(source: Query<DocumentData> | null, read: 
    const snapshot = await Promise.race([getDocs(query(source, startAfter(anchor), limit(PAGE_SIZE))), new Promise<never>((_, reject) => { timer = setTimeout(() => reject({ code: 'deadline-exceeded' }), 15000); })]).finally(() => clearTimeout(timer));
    // First-page changes invalidate an in-flight continuation as well.
    if (generation !== epoch.current || cursor.current !== anchor) return;
-   cursor.current = snapshot.docs.at(-1) ?? anchor;
+   cursor.current = snapshot.docs[snapshot.docs.length - 1] ?? anchor;
    const unseen = snapshot.docs.filter(doc => !seenIds.current.has(doc.id));
    unseen.forEach(doc => seenIds.current.add(doc.id));
    const additions = decode(unseen);

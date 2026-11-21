@@ -29,6 +29,8 @@ Setup → academic validation → question generation → Quiz answers/feedback 
 
 The validated essential `shark_preferences` cookie aligns SSR/client language and theme. Legacy preferences migrate, and storage events synchronize tabs. Catalogs provide VI/EN parity; user-created content, model IDs, error codes and mathematical notation are not automatically translated. Local Inter/Space Grotesk assets include Vietnamese and OFL licenses. Loading skeletons follow route layout with bounded recovery states; reduced motion and focus behavior remain supported.
 
+Browser-generated request IDs use native `crypto.randomUUID()` where available and the same UUID v4 format from `crypto.getRandomValues()` otherwise. This preserves request identity and API validation on Safari releases that lack the native UUID method. The paginated reader and profile bootstrap use indexed access and prototype-safe own-property checks supported at the [desktop and mobile browser targets](../README.md#browser-compatibility).
+
 WebKit uses supported Firestore forced long polling with auto-detection disabled and a five-second hanging GET; other engines use SDK defaults. More frequent empty requests may affect bandwidth. Shared document/paged readers use 15-second deadlines, safe errors and retry; deployment and exact minimum browser acceptance remain separate.
 
 ## 🗄️ Data and storage

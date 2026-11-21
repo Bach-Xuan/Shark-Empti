@@ -8,7 +8,7 @@ export function quizLabel(kind: 'subject' | 'type' | 'difficulty', value: string
     type: { 'Multiple Choice': t.multipleChoice, 'True/False': t.trueFalse, 'Short Answer': t.shortAnswer, Mixed: t.mixedQuestions },
     difficulty: { Recognition: t.recognition, Comprehension: t.comprehension, Application: t.application, 'Advanced Application': t.advancedApplication, Master: t.master, Mixed: t.allLevels, Easy: t.easy, Medium: t.medium, Hard: t.hard },
   };
-  return Object.hasOwn(labels[kind], value) ? labels[kind][value] : value;
+  return Object.prototype.hasOwnProperty.call(labels[kind], value) ? labels[kind][value] : value;
 }
 
 export function errorCategoryLabel(value: string | null | undefined, t: TranslationSet, lang: string): string {

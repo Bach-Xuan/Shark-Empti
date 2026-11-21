@@ -113,11 +113,11 @@
     "node": "24.x"
   },
   "browserslist": [
-    "Chrome >= 100",
-    "Firefox >= 102",
-    "Safari >= 15.4",
-    "iOS >= 15.4",
-    "and_chr >= 100",
-    "and_ff >= 102"
+    "Chrome >= 96",
+    "Firefox >= 96",
+    "Safari >= 15.2",
+    "iOS >= 15.2",
+    "and_chr >= 96",
+    "and_ff >= 96"
   ]
 }

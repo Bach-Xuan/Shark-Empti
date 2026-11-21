@@ -6,9 +6,9 @@ import { translations } from '../../src/lib/translations';
 
 const origin = 'http://127.0.0.1:9002';
 const mobileUserAgents = {
-  chromium: 'Mozilla/5.0 (Linux; Android 12; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.0 Mobile Safari/537.36',
-  firefox: 'Mozilla/5.0 (Android 12; Mobile; rv:102.0) Gecko/102.0 Firefox/102.0',
-  webkit: 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_4 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.4 Mobile/15E148 Safari/604.1',
+  chromium: 'Mozilla/5.0 (Linux; Android 12; Pixel 5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.0.0 Mobile Safari/537.36',
+  firefox: 'Mozilla/5.0 (Android 12; Mobile; rv:96.0) Gecko/96.0 Firefox/96.0',
+  webkit: 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.2 Mobile/15E148 Safari/604.1',
 };
 
 for (const engine of ['chromium', 'firefox', 'webkit'] as const) {
@@ -59,7 +59,7 @@ for (const engine of ['chromium', 'firefox', 'webkit'] as const) {
         await popup.locator('text=Add new account').click();
         await popup.locator('text=Auto-generate user information').click();
         await popup.locator('button:has-text("Sign in with Google")').click();
-        await page.locator('text=Before you continue').waitFor();
+        await page.waitForSelector('text=Before you continue');
         await page.locator('input[type=checkbox], [role=checkbox]').first().click();
         await page.locator('button:has-text("Confirm and continue")').click();
         await page.locator('button:has-text("Got it")').first().click();
@@ -67,17 +67,18 @@ for (const engine of ['chromium', 'firefox', 'webkit'] as const) {
         await page.locator('#setup-topic').fill('Addition');
         await page.locator('input[aria-label="Number of Questions"]').fill('1');
         await page.locator('button:has-text("Start learning")').click();
-        await page.locator('text=2 + 2 = ?').first().waitFor();
+        await page.waitForSelector('text=2 + 2 = ?');
         await page.locator('button:has(:text-is("4"))').click();
         const saved = page.waitForResponse(response =>
           response.url().includes('/api/learning/history/') && response.request().method() === 'PUT');
         await page.locator('button:has-text("Finish"), button:has-text("Results")').first().click();
         expect((await saved).status()).toBe(201);
-        await page.locator('text=100%').first().waitFor();
+        await page.waitForSelector('text=100%');
         await page.locator(`button[aria-label="${translations.en.profile}"]`).click();
         await page.locator(`button:has-text("${translations.en.exportReport}")`).click();
-        const session = page.locator('[role="dialog"] input[type="checkbox"]').first();
-        await session.waitFor();
+        const reportSession = '[role="dialog"] input[type="checkbox"]';
+        await page.waitForSelector(reportSession);
+        const session = page.locator(reportSession).first();
         expect(await session.getAttribute('aria-label')).toContain('Addition');
         await session.click();
         await page.locator(`button:has-text("${translations.en.generateReport}")`).click();

@@ -1,4 +1,5 @@
 'use client';
+import { browserUuid } from '@/lib/browser-uuid';
 import { initializeFirebase } from '@/firebase';
 import { createAppError, failure, success, type AppError, type AppResult } from '@/lib/app-error';
 import type { AiClientState, AiOperation, AiProtocolResponse } from './protocol';
@@ -88,7 +89,7 @@ async function cancel(generationId: string) {
 
 /** Bounded owner-scoped recovery. Rejections are not mistaken for response loss. */
 export async function runAiOperation<T>(operation: AiOperation, input: unknown, options: RunOptions = {}): Promise<AppResult<T>> {
-  const generationId = crypto.randomUUID();
+  const generationId = browserUuid();
   const controller = new AbortController();
   const signal = controller.signal;
   const state = (value: AiClientState) => options.onState?.(value);

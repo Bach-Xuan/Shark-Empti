@@ -1,4 +1,5 @@
 'use client';
+import { browserUuid } from '@/lib/browser-uuid';
 import Link from 'next/link';
 import { useLanguageState,useThemeState } from '@/components/app-preferences';
 import { PageControls } from '@/components/page-controls';
@@ -133,7 +134,7 @@ export default function ArenaPage() {
         title: config.topic,
         config: validated,
         questions: result.data.questions,
-        requestId: crypto.randomUUID(),
+        requestId: browserUuid(),
       };
       pendingExam.current = { key, body: JSON.stringify(examData) };
       }
