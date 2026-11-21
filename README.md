@@ -65,7 +65,7 @@ Install browser engines with `npx --no-install playwright install chromium webki
 - [Validation](docs/VALIDATION.md): built-in tests, interpretation and evidence limits.
 - [Account operations](docs/ACCOUNT_OPERATIONS.md): background export/deletion, retention and encrypted backup/restore.
 
-CI action versions and runner requirements follow the [reviewed governance contract](docs/CONFIGURATION.md#ci-action-governance); local application checks and hosted workflow acceptance have separate evidence boundaries.
+The [CI validation matrix](docs/VALIDATION.md#prerequisites-and-isolation) lists the checks run on each PR and the Rules and recovery checks selected by PR changes, and the full release matrix. The configuration guide records [runner requirements](docs/CONFIGURATION.md#ci-action-governance) and the [browser security policy](docs/CONFIGURATION.md#browser-security-policy).
 
 Authenticated account-data controls at `/account/data` remain accessible without renewed learning-policy acceptance or profile provisioning. Learning and community operations require explicit current acknowledgement through the server; age eligibility remains self-declared. Export/deletion services must be configured separately.
 

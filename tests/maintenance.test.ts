@@ -5,8 +5,17 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { afterEach, expect, it } from 'vitest';
 import { cleanGenerated } from '../scripts/clean.mjs';
+import { selectPrChecks } from '../scripts/pr-validation.mjs';
 import { readPerformanceBuild, requireMatchingDependencies } from '../scripts/lib/performance-build.mjs';
 import { DEMO_ENV, verificationBuildId, requireDemoBuild, requireLocalEmulators } from '../scripts/lib/demo-build.mjs';
+
+it('selects PR checks from both removed and added paths and shared contracts', () => {
+  expect(selectPrChecks(['README.md', 'src/components/logo.tsx'])).toEqual({ integration: false, restore: false });
+  expect(selectPrChecks(['src/firebase/auth-client.ts', 'docs/FLOW.md'])).toEqual({ integration: true, restore: false });
+  for (const path of ['src/app/api/arena/route.ts', 'src/ai/generation-store.ts', 'firestore.rules', 'src/lib/jobs/backup.ts', 'scripts/restore-drill.mjs', 'package-lock.json', '.github/workflows/ci.yml']) {
+    expect(selectPrChecks([path])).toEqual({ integration: true, restore: true });
+  }
+});
 
 const roots: string[] = [];
 const tempRoot = fs.realpathSync(os.tmpdir());

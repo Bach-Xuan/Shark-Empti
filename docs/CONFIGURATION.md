@@ -136,7 +136,7 @@ Account polling recovery is defined in `src/lib/account-polling.ts`: four transi
 
 ## CI action governance
 
-Pushes and pull requests run unit tests and the optimized desktop Chromium project. Manually dispatch the full workflow on the release candidate before promotion. A `v*` tag also runs both full browser matrices, Rules/integration, the native Emulator restore drill, coverage and cross-engine print checks. Both tiers build the application and check bundle budgets, smoke tests and dependency policy.
+Pushes and pull requests run unit tests and the optimized desktop Chromium project. Pull requests also select Emulator integration and restore checks from the changed paths. See the [trigger matrix](VALIDATION.md#prerequisites-and-isolation). Manually dispatch the full workflow on the release candidate before promotion. A `v*` tag also runs both full browser matrices, Rules/integration, the native Emulator restore drill, coverage and cross-engine print checks. Both tiers build the application and check bundle budgets, smoke tests and dependency policy.
 
 [The validation workflow](../.github/workflows/ci.yml) pins every external action to a full commit SHA with its reviewed release in a comment, following [GitHub's immutable-reference guidance](https://docs.github.com/en/actions/reference/security/secure-use#using-third-party-actions). Its token has `contents: read` and checkout does not persist credentials for later build/test steps. The reviewed action manifests are:
 
@@ -160,7 +160,15 @@ For an action update, resolve the exact release tag in its official repository, 
 
 There is no `vercel.json`; dashboard settings govern hosting. Never assume Preview uses a separate Firebase database merely because the website URL differs. Local Emulator success does not verify remote Rules or IAM.
 
-The application sets a same-origin camera policy, disables microphone and geolocation access, and sets `nosniff` and a strict-origin cross-site referrer policy. CSP limits base URLs and frame ancestors to the same origin and disables object embeds. The local HTTP smoke verifies the four headers. Recheck the final hosted responses when CDN or platform headers change.
+### Browser security policy
+
+The application sets a same-origin camera policy, disables microphone and geolocation access, and sets `nosniff` and a strict-origin cross-site referrer policy.
+
+The [page proxy](../src/proxy.ts) generates a fresh 128-bit nonce for each document request and passes the same content security policy to the Next.js renderer and the browser. Pages use dynamic rendering for language and theme. Serve each HTML body with its own policy and preserve both through the hosting layer. The proxy sends `private, no-store` to browsers and `no-store` in both CDN-Cache-Control and Vercel-CDN-Cache-Control. Versioned Next.js static chunks retain immutable caching. After deployment, request the same public page twice and check nonce rotation, matching script tags and the effective cache policy. A CDN may consume its own cache-control header before forwarding the response. [Next.js nonce handling](https://nextjs.org/docs/app/guides/content-security-policy)
+
+Resources default to the application origin. Scripts can load from that origin and the Google API bootstrap paths used by Firebase popup sign-in. Inline scripts require the response nonce. Production browser connections are limited to the application, Firebase Identity Toolkit, Secure Token and Firestore. The Auth helper iframe uses the hostname in `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`. A configured demo build uses the loopback Auth and Firestore ports. Development also permits script evaluation and local hot-reload sockets. OpenRouter and account storage are accessed by the server.
+
+Inline styles support charts, math layout and UI primitives. HTTPS avatars can come from profile providers, fonts are self-hosted, and media permits local camera previews. The policy restricts base URLs, form submissions and frame ancestors to the application origin and disables object embeds. Recheck headers, sign-in, Firestore reads and the camera on the deployed origin after changing hosting or Firebase configuration. [Validation](VALIDATION.md#optimized-build-and-browser-matrix)
 
 ## 🛡️ Credential security
 

@@ -38,6 +38,7 @@ try {
   for (const url of scripts) {
     const response = await fetch(origin + url);
     if (!response.ok) throw new Error('Missing chunk');
+    if (!response.headers.get('cache-control')?.includes('immutable')) throw new Error('Versioned script lost immutable caching');
     const bytes = Buffer.from(await response.arrayBuffer());
     for (const [library, marker] of Object.entries(optionalRuntimes)) {
       if (bytes.includes(marker)) throw new Error(route + ' downloaded optional ' + library + ' in its initial HTML scripts');
@@ -49,12 +50,26 @@ try {
   }
   routes.push({route, serverResponseMs:samples, scope:'server HTML and script fetch only; no hydration or browser timing', initialScriptDecoded:chunks.reduce((n,c)=>n+c.decoded,0), initialScriptGzip:chunks.reduce((n,c)=>n+c.gzip,0),chunks});
  }
- const policy = (await fetch(origin + '/about')).headers;
- if (policy.get('x-content-type-options') !== 'nosniff' ||
-     policy.get('referrer-policy') !== 'strict-origin-when-cross-origin' ||
-     policy.get('permissions-policy') !== 'camera=(self), microphone=(), geolocation=()' ||
-     policy.get('content-security-policy') !== "base-uri 'self'; object-src 'none'; frame-ancestors 'self'") {
-   throw new Error('Missing application response policy');
+ const nonces = new Set();
+ for (const route of ['/about', '/about', '/login', '/missing-csp-page', '/fonts/missing-font']) {
+   const response = await fetch(origin + route, { headers: { Accept: 'text/html', 'x-nonce': 'caller-supplied' } });
+   const policy = response.headers.get('content-security-policy') ?? '';
+   const nonce = policy.match(/'nonce-([A-Za-z0-9+/]{22}==)'/)?.[1];
+   const html = await response.text();
+   const scripts = [...html.matchAll(/<script\b[^>]*>/g)].map(match => match[0]);
+   if (!nonce || nonces.has(nonce) || !scripts.length ||
+       !response.headers.get('cache-control')?.split(/,\s*/).includes('no-store') ||
+       response.headers.get('cdn-cache-control') !== 'no-store' ||
+       response.headers.get('vercel-cdn-cache-control') !== 'no-store' ||
+       scripts.some(tag => !tag.includes(`nonce="${nonce}"`)) ||
+       !policy.includes("default-src 'self'") || !policy.includes("connect-src 'self'") ||
+       /script-src[^;]*'unsafe-(?:inline|eval)'/.test(policy) ||
+       response.headers.get('x-content-type-options') !== 'nosniff' ||
+       response.headers.get('referrer-policy') !== 'strict-origin-when-cross-origin' ||
+       response.headers.get('permissions-policy') !== 'camera=(self), microphone=(), geolocation=()') {
+     throw new Error('Response policy or rendered script nonce mismatch on ' + route);
+   }
+   nonces.add(nonce);
  }
  const metadataEvidence = {};
  const meta = (html, name) => html.match(new RegExp('<meta[^>]*(?:name|property)="'+name+'"[^>]*content="([^"]*)"'))?.[1] ?? '';

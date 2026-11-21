@@ -50,7 +50,16 @@ When reusing the browser runtimes already installed under this checkout's `.tool
 
 Integration/browser tests use Firebase Auth and Firestore Emulators under `demo-shark-empti`, with the deterministic AI fixture. App, Firestore, Auth and AI fixture normally use ports 9002, 8080, 9099 and 9098. Avoid concurrent suites on those ports. Integration requires both Emulators; browser tests permit read-only Google popup bootstrap scripts on apis.google.com. A network interruption during bootstrap can cause the popup wait to expire before the Emulator receives a sign-in request. Application data and AI fixtures stay local.
 
-Push and pull-request validation runs `npm test` and the optimized `npm run test:e2e:chromium` project. Manually dispatch the full workflow for release candidates. Version tags beginning with `v` also run both complete browser matrices, coverage, Rules/integration, a native Emulator export/import drill and cross-engine print checks.
+| CI trigger | Checks selected by the workflow |
+|---|---|
+| Every push, pull request and manual run | Lint, typecheck, repository contracts, build, bundle budgets, optimized HTTP smoke, performance baseline and dependency audit |
+| Ordinary branch push or pull request | Unit/component tests with Chromium print and optimized desktop Chromium E2E using the demo services |
+| Pull request changing API handlers, AI, Firebase client code, Rules tests or integration tests | Add the Rules/API integration suite. Changes to shared libraries, AI, API handlers, Firestore or Firebase configuration, scripts, workflow files, shared fixtures, dependency manifests or compiler/runtime configuration select both integration and restore. The [selector](../scripts/pr-validation.mjs) compares the test merge with its base and considers both paths of a rename. |
+| Manual dispatch or push of a `v*` tag | Unit coverage, Firefox/WebKit print, Firestore Rules and API integration tests, Emulator restore drill, and the development and optimized E2E matrices |
+
+A green PR records the checks selected for that event. For a Rules or transaction change, the targeted local evidence comes from `npm run test:integration`. For recovery changes, use `npm run test:restore`. For browser-sensitive changes, exercise the affected engines on the optimized demo. Dispatch the full workflow for release candidates. Hosted configuration, live identity providers and staging recovery timing require their own evidence.
+
+Local selector checks cover documentation/UI changes, Firebase client code and shared backend inputs. Git fixtures also exercised a documentation-only merge and a Rules file renamed out of its original path. New shared inputs should be added to the selector when their consumers change.
 
 CI's SHA-pinned actions run on Node 24 independently of the application runtime. See [action governance](CONFIGURATION.md#ci-action-governance) for reviewed manifests, minimum runner, supported inputs and update review. Local YAML/manifest inspection and application tests do not prove hosted runner startup, action post steps, cache or artifact service behavior.
 
@@ -100,6 +109,12 @@ D41 checks cover public serializer whitelists, stored timestamps, ranking eligib
 The projection inventory must precede cutover. Regression fixtures include unrecognized documents, missing source records, hidden/tombstoned posts and public ranking IDs equal to owner UIDs. A blocked inventory preserves those records and stops before converting business data. Because Rules trust server-controlled version markers, the inventory and restricted privileged-writer access are operational prerequisites, not proof about a live dataset.
 
 ## Optimized build and browser matrix
+
+On the local optimized demo, Chromium, Firefox and WebKit reloaded About with a fresh nonce and a no-store response, retained the selected language and accepted another language change after hydration. For hosted verification, request the published page twice at the same URL, compare script nonces with each response policy and inspect the CDN cache result. Check versioned script URLs separately for immutable caching.
+
+For D61, the [policy tests](../tests/content-security-policy.test.ts) check the production, demo and development source lists. The [HTTP smoke](../scripts/production-smoke.mjs) requests About twice to check nonce rotation and inspects script tags on About, Login and 404 responses. Framework scripts and About structured data must carry the nonce for their own response. The local smoke also checks browser and edge no-store headers on those pages and immutable caching on versioned scripts. The sign-in, quiz, notes and sign-out flow passed on desktop Chromium in development and on desktop Chromium, Firefox and WebKit with local Emulators and an optimized demo build.
+
+Chromium also produced a Focus Shield score from a simulated camera and released the video track on close. The browser blocked two capability checks when Zod tried to construct a function and a dependency in the TensorFlow bundle tried to compile WebAssembly. Both used their fallback paths. Deployed response headers, real Google sign-in and camera hardware under this policy require separate verification.
 
 Receipt regressions cover nested key reordering, significant array order and retained legacy receipt comparison. Community integration includes more than 50 hidden and open reports, equal creation timestamps, continuation after boundary deletion, and invalid or cross-status cursors. Traffic regressions cover nine Forum/report/Arena entry points, moderator role/queue work, account job creation/list/status, malformed receipt fast rejection, final-token contention across callers, and error/replay charging without duplicate business reservations. Account read controls are tested without consent under deletion and maintenance barriers; receipt status remains available after Auth deletion and records no credential identifier. These checks do not accept deployed abuse limits, edge controls, public-identity minimization or provider capacity.
 

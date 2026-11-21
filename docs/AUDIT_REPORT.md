@@ -1,6 +1,6 @@
 # 📋 Consolidated Technical Audit Report · Shark Empti **v2.2.0**
 
-This register covers **106 findings**. **105 are resolved and 1 remains open.**
+This register covers **107 findings**. **106 are resolved and 1 remains open.**
 
 See the [application flow guide](FLOW.md), [technical documentation](TECHNICAL_DOCUMENTATION.md), [validation guide](VALIDATION.md), [account operations](ACCOUNT_OPERATIONS.md) and [interface design guide](DESIGN.md) for implementation and verification guidance.
 
@@ -101,6 +101,7 @@ See the [application flow guide](FLOW.md), [technical documentation](TECHNICAL_D
 | D58 | Shark Guru discarded successful exchanges from session history when fitting the quiz and chat byte budgets, so later explicit quotations could no longer recover an omitted exchange even when it would fit in place of a selected pair | Resolved | 20 November 2026 |
 | D59 | Recovering missing feedback replaced the personal quiz result object, clearing Shark Guru’s completed exchanges and cancelling a pending reply even though the learner was reviewing the same attempt | Resolved | 20 November 2026 |
 | D60 | Starting another personal quiz retained the previous Shark Guru transcript and unsent text after its request history was cleared, so learners saw exchanges the coach could no longer recall | Resolved | 20 November 2026 |
+| D61 | Application pages lacked CSP directives for default resources, scripts and connections, so the browser imposed no application-defined source restrictions on script execution or outbound fetches | Resolved | 21 November 2026 |
 | N01 | Inconsistent domain and file names made related modules harder to identify across features | Resolved | 18 November 2026 |
 | N02 | Shared types blurred the distinction between draft sessions, validated configurations and persisted operations | Resolved | 18 November 2026 |
 | N03 | Duplicated domain logic and insufficient unused-code checks obscured active implementation paths | Resolved | 18 November 2026 |

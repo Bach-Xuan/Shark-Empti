@@ -10,7 +10,8 @@ const nextConfig: NextConfig = {
         { key: 'X-Content-Type-Options', value: 'nosniff' },
         { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
         { key: 'Permissions-Policy', value: 'camera=(self), microphone=(), geolocation=()' },
-        { key: 'Content-Security-Policy', value: "base-uri 'self'; object-src 'none'; frame-ancestors 'self'" },
+        // Non-document responses use this fallback. The page proxy supplies the render nonce.
+        { key: 'Content-Security-Policy', value: "default-src 'none'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'" },
       ],
     }];
   },
